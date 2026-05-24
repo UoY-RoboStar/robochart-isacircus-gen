@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+    id="circus.robocalc.robochart.epsilon.isacircus.feature"
+    label="RoboChart2IsaCircus"
+    version="1.0.0.202605241350"
+    provider-name="RoboCalc Project">
+
+   <description>
+      Eclipse plugin for translating RoboChart models to Isabelle/Circus theory files.
+   </description>
+
+   <plugin
+         id="circus.robocalc.robochart.epsilon.isacircus"
+         download-size="95"
+         install-size="440"
+         version="1.0.0.202605241350"
+         unpack="false"/>
+
+</feature>

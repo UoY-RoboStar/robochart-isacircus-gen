@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?artifactRepository version='1.1.0'?>
+<artifacts size='1'>
+  <artifact classifier='org.eclipse.update.feature' id='circus.robocalc.robochart.epsilon.isacircus.feature' version='1.0.0.202605241350'>
+    <properties size='10'>
+      <property name='artifact.size' value='695'/>
+      <property name='download.size' value='695'/>
+      <property name='download.checksum.sha-512' value='e844b692f30f5ade6425fb68778e2d81731b3c787ce9b103f146f05414c4e576f24e8efa02aa11ef1018d5bf20d113e856161a8bba7fb8954aeef52093aa3553'/>
+      <property name='download.checksum.sha-1' value='297524a6e1a76ee43b9fc73cb387120b813e3603'/>
+      <property name='download.checksum.sha-256' value='94403ee535fbade2b52cba169b8a83a2d70492d7a358b3946bbe5d2a4171b0f0'/>
+      <property name='maven-groupId' value='circus.robocalc'/>
+      <property name='maven-artifactId' value='circus.robocalc.robochart.epsilon.isacircus.feature'/>
+      <property name='maven-version' value='1.0.0-SNAPSHOT'/>
+      <property name='maven-type' value='eclipse-feature'/>
+      <property name='download.contentType' value='application/zip'/>
+    </properties>
+  </artifact>
+</artifacts>

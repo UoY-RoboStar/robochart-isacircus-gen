@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+   <category-def name="isacircus" label="RoboChart to IsaCircus">
+      <description>
+         Eclipse plugin for translating RoboChart models to Isabelle/Circus theory files.
+      </description>
+   </category-def>
+   <feature url="features/circus.robocalc.robochart.epsilon.isacircus.feature_1.0.0.qualifier.jar"
+            id="circus.robocalc.robochart.epsilon.isacircus.feature"
+            version="1.0.0.qualifier">
+      <category name="isacircus"/>
+   </feature>
+</site>

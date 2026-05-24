@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension point="org.eclipse.ui.commands">
+      <category
+            id="circus.robocalc.robochart.epsilon.isacircus.ui.commands.category"
+            name="IsaCircus"/>
+      <command
+            categoryId="circus.robocalc.robochart.epsilon.isacircus.ui.commands.category"
+            id="circus.robocalc.robochart.epsilon.isacircus.ui.commands.compile"
+            name="Compile to IsaCircus"/>
+      <command
+            categoryId="circus.robocalc.robochart.epsilon.isacircus.ui.commands.category"
+            id="circus.robocalc.robochart.epsilon.isacircus.ui.commands.runIsabelle"
+            name="Verify in Isabelle"/>
+   </extension>
+   <extension point="org.eclipse.ui.handlers">
+      <handler
+            class="circus.robocalc.robochart.epsilon.isacircus.ui.handlers.CompileToIsaCircusHandler"
+            commandId="circus.robocalc.robochart.epsilon.isacircus.ui.commands.compile"/>
+      <handler
+            class="circus.robocalc.robochart.epsilon.isacircus.ui.handlers.RunIsabelleHandler"
+            commandId="circus.robocalc.robochart.epsilon.isacircus.ui.commands.runIsabelle"/>
+   </extension>
+   <extension point="org.eclipse.ui.menus">
+      <menuContribution locationURI="popup:robotool.contextMenu">
+         <menu
+               id="circus.robocalc.robochart.epsilon.isacircus.ui.menus.isacircus"
+               label="IsaCircus"
+               mnemonic="I">
+            <command
+                  commandId="circus.robocalc.robochart.epsilon.isacircus.ui.commands.compile"
+                  id="circus.robocalc.robochart.epsilon.isacircus.ui.menus.compile"
+                  label="Compile"
+                  mnemonic="C"/>
+            <visibleWhen>
+               <iterate>
+                  <adapt type="org.eclipse.core.resources.IFile">
+                     <test property="org.eclipse.core.resources.name"
+                           value="*.rct"/>
+                  </adapt>
+               </iterate>
+            </visibleWhen>
+         </menu>
+      </menuContribution>
+      <menuContribution locationURI="popup:org.eclipse.ui.popup.any">
+         <menu
+               id="circus.robocalc.robochart.epsilon.isacircus.ui.menus.isabelle"
+               label="Isabelle"
+               mnemonic="I">
+            <command
+                  commandId="circus.robocalc.robochart.epsilon.isacircus.ui.commands.runIsabelle"
+                  id="circus.robocalc.robochart.epsilon.isacircus.ui.menus.runIsabelle"
+                  label="Verify (console)"
+                  mnemonic="V"/>
+            <visibleWhen>
+               <iterate>
+                  <adapt type="org.eclipse.core.resources.IFile">
+                     <test property="org.eclipse.core.resources.name"
+                           value="*.thy"/>
+                  </adapt>
+               </iterate>
+            </visibleWhen>
+         </menu>
+      </menuContribution>
+ 	  <menuContribution locationURI="toolbar:org.eclipse.ui.main.toolbar?after=additions">
+   <toolbar
+         id="circus.robocalc.robochart.epsilon.isacircus.ui.toolbar"
+         label="IsaCircus">
+      <control
+            class="circus.robocalc.robochart.epsilon.isacircus.ui.handlers.IsaCircusToolbarLabel">
+      </control>
+      <command
+            commandId="circus.robocalc.robochart.epsilon.isacircus.ui.commands.compile"
+            icon="icons/compile.png"
+            label="Compile to IsaCircus"
+            style="push"
+            tooltip="Compile selected .rct file to IsaCircus"/>
+      <command
+            commandId="circus.robocalc.robochart.epsilon.isacircus.ui.commands.runIsabelle"
+            icon="icons/run.png"
+            label="Verify in Isabelle"
+            style="push"
+            tooltip="Verify selected .thy file in Isabelle"/>
+   </toolbar>
+</menuContribution>
+   </extension>
+</plugin>

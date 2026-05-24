@@ -1,0 +1,43 @@
+//pre{
+// var javaDate = new Native("java.text.SimpleDateFormat")("ddMMyyyy_HHmmss").
+//  format(new Native("java.util.Date"));
+// var javaDateString = new String;
+// javaDateString= javaDate.toString();
+// 
+//var stm_name: String;
+//for (stm in RC!StateMachineDef.allInstances){ 
+//	stm_name=stm.name;
+//	}
+//}
+
+pre{
+
+ var javaDate = new Native("java.text.SimpleDateFormat")("ddMMyyyy_HHmmss").format(new Native("java.util.Date"));
+ var javaDateString = new String;
+ javaDateString= javaDate.toString();
+var name =Z!ZSect.allInstances.select(s|s.instanceOf(Z!ZSect)).at(0).name;
+}
+
+
+
+rule circusM2T_IsaCircus_enriched
+transform z: Z!Spec {
+//transform z: Z!CApplExprList{
+template : "circusM2T.egl"
+target : "circus_gen/IsaCircus_enriched_" + baseName + "_"+javaDateString+".thy" 
+//target : "circus_gen/" +"expr"+".thy" 
+//target : "circus_gen/" +"expr_"+javaDateString +".thy" 
+}
+
+rule circusM2T_HOLCSP
+transform z: Z!Spec {
+template : "circusM2T_HOLCSP.egl"
+target : "hol-csp_gen/HOLCSP"+ "_" + baseName + "_" +javaDateString +".thy" 
+}
+
+
+rule circusM2T_HOLCSP_AbstractInst
+transform z: Z!Spec {
+template : "circusM2T_HOLCSP_AbstractInst.egl"
+target : "hol-csp-abstact_gen/HOLCSP_AbstractInst"+ "_"+ baseName + "_" +javaDateString+".thy" 
+}

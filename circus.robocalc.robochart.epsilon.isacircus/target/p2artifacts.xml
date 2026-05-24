@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?artifactRepository version='1.1.0'?>
+<artifacts size='1'>
+  <artifact classifier='osgi.bundle' id='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350'>
+    <properties size='9'>
+      <property name='artifact.size' value='97957'/>
+      <property name='download.size' value='97957'/>
+      <property name='download.checksum.sha-512' value='ee80d766b22097bec4ce0dcd1f35a0b6f8fd68074e297a5a5ebc56dc16feeb86022d3e548684ae4c7d52c1c558f335b87367ef804cd48d845d6f159b3799f84d'/>
+      <property name='download.checksum.sha-1' value='3f2b06fa0eca794277c79207c11ee0c075e41893'/>
+      <property name='download.checksum.sha-256' value='220912831ed39bd29bca50e97c85c5a032b4f83b0239591527669f60bc5b9780'/>
+      <property name='maven-groupId' value='circus.robocalc'/>
+      <property name='maven-artifactId' value='circus.robocalc.robochart.epsilon.isacircus'/>
+      <property name='maven-version' value='1.0.0-SNAPSHOT'/>
+      <property name='maven-type' value='eclipse-plugin'/>
+    </properties>
+  </artifact>
+</artifacts>

@@ -1,0 +1,1066 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ecore:EPackage xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore" name="circus" nsURI="http://www.robocalc.circus/Circus" nsPrefix="circus">
+  <eClassifiers xsi:type="ecore:EClass" name="Term" abstract="true">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="net.sourceforge.czt.z.ast"/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Ann" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="SectTypeEnvAnn" eSuperTypes="#//Ann">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameSectTypeTriples" upperBound="-1"
+        eType="#//NameSectTypeTriple" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="LocAnn" eSuperTypes="#//Ann">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="col" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="end" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="length" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="line" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="loc" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="start" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SignatureAnn" eSuperTypes="#//Ann">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="signature" eType="#//Signature"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="TypeAnn" eSuperTypes="#//Ann">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="type" eType="#//Type" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="applexprList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CApplExprList" eSuperTypes="#//applexprList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="applExprs" upperBound="-1"
+        eType="#//ApplExpr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="predList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CPredList" eSuperTypes="#//predList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="preds" upperBound="-1"
+        eType="#//Pred" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusActionList" eSuperTypes="#//ActionList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="circusActions" upperBound="-1"
+        eType="#//CircusAction" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusAnn" abstract="true" eSuperTypes="#//ActionList"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionSignatureAnn" eSuperTypes="#//CircusAnn">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="actionSignature" eType="#//ActionSignature"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusStateAnn" eSuperTypes="#//CircusAnn"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ImplicitChannelAnn" eSuperTypes="#//CircusAnn"/>
+  <eClassifiers xsi:type="ecore:EClass" name="OnTheFlyDefAnn" eSuperTypes="#//CircusAnn"/>
+  <eClassifiers xsi:type="ecore:EClass" name="OutputFieldAnn" eSuperTypes="#//CircusAnn"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ProcessSignatureAnn" eSuperTypes="#//CircusAnn">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="processSignature" eType="#//ProcessSignature"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ProofObligationAnn" eSuperTypes="#//CircusAnn">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="pred" eType="#//Pred" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="StateUpdateAnn" eSuperTypes="#//CircusAnn">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="stateUpdate" eType="#//StateUpdate"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="AssignmentPairs" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="lhsElement" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rhsElement" eType="#//ZExprList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ChannelSet" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusChannelSet" eSuperTypes="#//ChannelSet">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ChannelSetList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusChannelSetList" eSuperTypes="#//ChannelSetList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSets" upperBound="-1"
+        eType="#//ChannelSet" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusSignature" abstract="true" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionSignature" eSuperTypes="#//CircusSignature">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="actionName" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSetList" eType="#//CircusChannelSetList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="communicationList" eType="#//CircusCommunicationList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="formalParams" eType="#//Signature"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="localVarsl" eType="#//Signature"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameSetList" eType="#//CircusNameSetList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="signatureList" eType="#//SignatureList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="usedChannels" eType="#//Signature"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isParamAction" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ZNameToActionSignatureList" instanceClassName="java.util.Map$Entry">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="key" eType="#//ZName"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//ActionSignatureList"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ZNameToZSignatureList" instanceClassName="java.util.Map$Entry">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="key" eType="#//ZName"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//ZSignatureList"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ZNameToSignature" instanceClassName="java.util.Map$Entry">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="key" eType="#//ZName"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//Signature"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ZNameToCircusChannelSetList" instanceClassName="java.util.Map$Entry">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="key" eType="#//ZName"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//CircusChannelSetList"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ZNameToCircusCommunicationList" instanceClassName="java.util.Map$Entry">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="key" eType="#//ZName"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//CircusCommunicationList"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ZNameToCircusNameSetList" instanceClassName="java.util.Map$Entry">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="key" eType="#//ZName"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//CircusNameSetList"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ProcessSignature" eSuperTypes="#//CircusSignature">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="actions" eType="#//ZNameToActionSignatureList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="actionSignatureList" eType="#//ActionSignatureList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="basicProcessLocalZSignatureList"
+        eType="#//ZSignatureList" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="callUsage" eType="#//CallUsage"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="circusProcessChannelSetList"
+        eType="#//CircusChannelSetList" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="formalParamsOrIndexes"
+        eType="#//Signature" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="genFormals" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="localZSignatures" eType="#//ZNameToZSignatureList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="mainSignatureList" eType="#//ZSignatureList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="processSignatureList" eType="#//ProcessSignatureList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="processName" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="signatureLists" upperBound="-1"
+        eType="#//SignatureList" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="stateSignature" eType="#//Signature"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="stateUpdate" eType="#//StateUpdate"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="usedChannels" eType="#//ZNameToSignature"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="usedChannelsAsList" upperBound="-1"
+        eType="#//NameTypePair" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="usedChannelSets" eType="#//ZNameToCircusChannelSetList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="usedChannelSetsList" upperBound="-1"
+        eType="#//ChannelSet" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="usedCommunications" eType="#//ZNameToCircusCommunicationList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="usedCommunicationsAsList"
+        upperBound="-1" eType="#//Communication" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="usedNameSets" eType="#//ZNameToCircusNameSetList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="usedNameSetsAsList" upperBound="-1"
+        eType="#//NameSet" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isBasicProcessSignature"
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isEmptyProcessSignature"
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="CommPattern">
+    <eLiterals name="ChannelSet"/>
+    <eLiterals name="Input" value="1"/>
+    <eLiterals name="Mixed" value="2"/>
+    <eLiterals name="Output" value="3"/>
+    <eLiterals name="Synch" value="4"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="CommUsage">
+    <eLiterals name="Generic"/>
+    <eLiterals name="Normal" value="1"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Communication" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelExpr" eType="#//RefExpr"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="fieldList" eType="#//CircusFieldList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="commPattern" eType="#//CommPattern"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="commUsage" eType="#//CommUsage"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="indexed" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="multiSych" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CommunicationList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusCommunicationList" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="communications" upperBound="-1"
+        eType="#//Communication" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Field" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="DotField" eSuperTypes="#//Field">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="outputField" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBooleanObject"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="InputField" eSuperTypes="#//Field">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="?N: Pred"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="varialbeName" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="restriction" eType="#//Pred"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="FieldList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusFieldList" eSuperTypes="#//FieldList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="fields" upperBound="-1"
+        eType="#//Field" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NameSet" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusNameSet" eSuperTypes="#//NameSet">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NameSetList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusNameSetList" eSuperTypes="#//NameSetList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="circusNameSets" upperBound="-1"
+        eType="#//CircusNameSet" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="DeclList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZDeclList" eSuperTypes="#//DeclList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="decls" upperBound="-1"
+        eType="#//Decl" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Freetype" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="branchList" eType="#//ZBranchList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="FreetypeList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZFreetypeList" eSuperTypes="#//FreetypeList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="freeTypes" upperBound="-1"
+        eType="#//Freetype" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Para" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EEnum" name="Box">
+    <eLiterals name="AxBox"/>
+    <eLiterals name="OmitBox" value="1"/>
+    <eLiterals name="SchBox" value="2"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="AxPara" eSuperTypes="#//Para">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="box" eType="#//Box"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="namelist" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="zSchText" eType="#//ZSchText"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionPara" eSuperTypes="#//Para">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A action paragraph that declares a name for an action definition. Strokes are not allowed in channel set names, and this is ensured by the parser. This element represents the N == ParAction grammar rule, where, where N is a Name."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="circusAction" eType="#//CircusAction"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ChannelPara" eSuperTypes="#//Para">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The property of name is not in CZT AST, as Circus does not need a name for channel paragraph, but it is convenient for M2T of Isabelle axiomatic Circus"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="declList" eType="#//ZDeclList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ChannelSetPara" eSuperTypes="#//Para">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="GenFormals" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ConjPara" eSuperTypes="#//Para">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="name" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="namelist" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="pred" eType="#//Pred" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="FreePara" eSuperTypes="#//Para">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="freetypeList" eType="#//FreetypeList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="GivenPara" eSuperTypes="#//Para">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameList" eType="#//ZNameList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NameSetPara" eSuperTypes="#//Para">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameSet" eType="#//NameSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="Assoc">
+    <eLiterals name="Left"/>
+    <eLiterals name="Right" value="1"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="Cat">
+    <eLiterals name="Function"/>
+    <eLiterals name="Generic" value="1"/>
+    <eLiterals name="Relation" value="2"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="OptempPara" eSuperTypes="#//Para">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="assoc" eType="#//Assoc"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="cat" eType="#//Cat"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="opers" upperBound="-1"
+        eType="#//Oper" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="prec" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ProcessPara" eSuperTypes="#//Para">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="circusProcess" eType="#//CircusProcess"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="zGenFormals" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isBasicProcess" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusConjPara" eSuperTypes="#//Para"/>
+  <eClassifiers xsi:type="ecore:EClass" name="TransformerPara" eSuperTypes="#//CircusConjPara">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//Name" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="transformerPred" eType="#//TransformerPred"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Sect" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZSect" eSuperTypes="#//Sect">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="name" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="parents" upperBound="-1"
+        eType="#//Parent" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="paraList" eType="#//ZParaList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NarrSect" eSuperTypes="#//Sect"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParaList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZParaList" eSuperTypes="#//ParaList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="paras" upperBound="-1"
+        eType="#//Para" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ParenAnn" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="Parent" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="word" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SchText" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZSchText" eSuperTypes="#//SchText">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="declList" eType="#//ZDeclList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="pred" eType="#//Pred" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Pred" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ExprPred" eSuperTypes="#//Pred">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A schema predicate."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Fact" abstract="true" eSuperTypes="#//Pred">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="An abstract superclass for constant true/false facts."/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NegPred" eSuperTypes="#//Pred">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="pred" eType="#//Pred" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="FalsePred" eSuperTypes="#//Fact">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="Falsity."/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="TruePred" eSuperTypes="#//Fact">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="Truth."/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Pred2" abstract="true" eSuperTypes="#//Pred">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="leftPred" eType="#//Pred"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rightPred" eType="#//Pred"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="MemPred" eSuperTypes="#//Pred">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="Membership predicate: Mixfix=false, Equality: Mixfix=true, Other operator application: Mixfix=true"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="leftExpr" eType="#//Expr"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rightExpr" eType="#//Expr"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="mixFix" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="And">
+    <eLiterals name="Chain"/>
+    <eLiterals name="NL" value="1"/>
+    <eLiterals name="Semi" value="2"/>
+    <eLiterals name="Wedge" value="3"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="AndPred" eSuperTypes="#//Pred2">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="and" eType="#//And"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="IffPred" eSuperTypes="#//Pred2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ImpliesPred" eSuperTypes="#//Pred2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="OrPred" eSuperTypes="#//Pred2"/>
+  <eClassifiers xsi:type="ecore:EEnum" name="Model">
+    <eLiterals name="FlDv"/>
+    <eLiterals name="SFl" value="1"/>
+    <eLiterals name="Tr" value="2"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="Transformation">
+    <eLiterals name="Equivalence"/>
+    <eLiterals name="Refinement" value="1"/>
+    <eLiterals name="Simulation" value="2"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="TransformerPred" eSuperTypes="#//Pred">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="model" eType="#//Model"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="schText" eType="#//SchText"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="transformation" eType="#//Transformation"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionTransformerPred" eSuperTypes="#//TransformerPred">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="impl" eType="#//CircusAction"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="spec" eType="#//CircusAction"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ProcessTransformerPred" eSuperTypes="#//TransformerPred">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="impl" eType="#//CircusProcess"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="spec" eType="#//CircusProcess"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="QntPred" abstract="true" eSuperTypes="#//Pred">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="pred" eType="#//Pred" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="schText" eType="#//SchText"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Exists1Pred" eSuperTypes="#//QntPred"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ExistsPred" eSuperTypes="#//QntPred"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ForallPred" eSuperTypes="#//QntPred"/>
+  <eClassifiers xsi:type="ecore:EClass" name="StateUpdate" eSuperTypes="#//QntPred">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="assignmentPairs" upperBound="-1"
+        eType="#//AssignmentPairs" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SignatureList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionSignatureList" eSuperTypes="#//SignatureList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="actionSignatureList" upperBound="-1"
+        eType="#//ActionSignature" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ProcessSignatureList" eSuperTypes="#//SignatureList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="processSignatures" upperBound="-1"
+        eType="#//ProcessSignature" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ZSignatureList" eSuperTypes="#//SignatureList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="signatures" upperBound="-1"
+        eType="#//Signature" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NewOldPair" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="newName" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="oldName" eType="#//ZName"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Signature" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameTypePairs" upperBound="-1"
+        eType="#//NameTypePair" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Spec" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="sects" upperBound="-1"
+        eType="#//Sect" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="version" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="StrokeList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZStrokeList" eSuperTypes="#//StrokeList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="strokes" upperBound="-1"
+        eType="#//Stroke" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Type" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="GenericType" eSuperTypes="#//Type">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameList" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="types" upperBound="-1"
+        eType="#//Type2" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Type2" abstract="true" eSuperTypes="#//Type"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusType" abstract="true" eSuperTypes="#//Type2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="GenParamType" eSuperTypes="#//Type2">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A generic parameter type"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="GivenType" eSuperTypes="#//Type2">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="PowerType" eSuperTypes="#//Type2">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="type" eType="#//Type2"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ProdType" eSuperTypes="#//Type2">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="types" upperBound="-1"
+        eType="#//Type2" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SchemaType" eSuperTypes="#//Type2">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="signature" eType="#//Signature"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionType" eSuperTypes="#//CircusType">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="actionSignature" eType="#//ActionSignature"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ChannelType" eSuperTypes="#//CircusType">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="type" eType="#//Type2"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusSigType" eSuperTypes="#//CircusType">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="signature" eType="#//Signature"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ProcessType" eSuperTypes="#//CircusType">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="processSignature" eType="#//ProcessSignature"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ChannelSetType" eSuperTypes="#//CircusSigType"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CommunicationType" eSuperTypes="#//CircusSigType">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelName" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelType" eType="#//Type"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="communicationPattern" upperBound="-1"
+        eType="#//NameTypePair" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isSynchronisation" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NameSetType" eSuperTypes="#//CircusSigType"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusProcess" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="BasicProcess" eSuperTypes="#//CircusProcess">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="localParas" upperBound="-1"
+        eType="#//Para" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="mainAction" eType="#//CircusAction"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="onTheFlyParas" upperBound="-1"
+        eType="#//Para" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="paraList" eType="#//ZParaList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="statePara" eType="#//AxPara"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="stateParaName" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isMainActionValid" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isStateValid" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="CallUsage">
+    <eLiterals name="Indexed"/>
+    <eLiterals name="Parameterised" value="1"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CallProcess" eSuperTypes="#//CircusProcess">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The default value of CallUsage is Param."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="actuals" eType="#//ZExprList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="callExpr" eType="#//RefExpr"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="callUsage" eType="#//CallUsage"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Process1" abstract="true" eSuperTypes="#//CircusProcess">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="circusProcess" eType="#//CircusProcess"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="HideProcess" eSuperTypes="#//Process1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="RenameProcess" eSuperTypes="#//Process1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="assignmentPairs" eType="#//AssignmentPairs"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ProcessD" abstract="true" eSuperTypes="#//Process1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="basicProcess" eType="#//BasicProcess"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="declList" eType="#//ZDeclList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isBasicProcess" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="IndexedProcess" eSuperTypes="#//ProcessD"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParamProcess" eSuperTypes="#//ProcessD"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ProcessIte" abstract="true" eSuperTypes="#//ProcessD"/>
+  <eClassifiers xsi:type="ecore:EClass" name="SeqProcessIte" eSuperTypes="#//ProcessIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ExtChoiceProcessIte" eSuperTypes="#//ProcessIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="IntChoiceProcessIte" eSuperTypes="#//ProcessIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ProcessIdx" abstract="true" eSuperTypes="#//ProcessIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="IntChoiceProcessIdx" eSuperTypes="#//ProcessIdx"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ExtChoiceProcessIdx" eSuperTypes="#//ProcessIdx"/>
+  <eClassifiers xsi:type="ecore:EClass" name="SeqProcessIdx" eSuperTypes="#//ProcessIdx"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParProcessIdx" abstract="true" eSuperTypes="#//ProcessIdx"/>
+  <eClassifiers xsi:type="ecore:EClass" name="AlphabetisedParallelProcessIdx" eSuperTypes="#//ParProcessIdx">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="InterleaveProcessIdx" eSuperTypes="#//ParProcessIdx"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParallelProcessIdx" eSuperTypes="#//ParProcessIdx">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ParProcessIte" abstract="true" eSuperTypes="#//ProcessIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="AlphabetisedParallelProcessIte" eSuperTypes="#//ParProcessIte">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="InterleaveProcessIte" eSuperTypes="#//ParProcessIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParallelProcessIte" eSuperTypes="#//ParProcessIte">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Process2" abstract="true" eSuperTypes="#//CircusProcess">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="leftProcess" eType="#//CircusProcess"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rightProcess" eType="#//CircusProcess"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ExtChoiceProcessImpl" eSuperTypes="#//Process2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="IntChoiceProcess" eSuperTypes="#//Process2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="SeqProcess" eSuperTypes="#//Process2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ExtChoiceProcess" eSuperTypes="#//Process2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParProcess" abstract="true" eSuperTypes="#//Process2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="AlphabetisedParallelProcess" eSuperTypes="#//ParProcess">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="leftAlpha" eType="#//ChannelSet"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rightAlpha" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="InterleaveProcess" eSuperTypes="#//ParProcess"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParallelProcess" eSuperTypes="#//ParProcess">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusAction" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="Action1" abstract="true" eSuperTypes="#//CircusAction">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="circusAction" eType="#//CircusAction"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="GuardedAction" eSuperTypes="#//Action1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="pred" eType="#//Pred" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="HideAction" eSuperTypes="#//Action1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="MuAction" eSuperTypes="#//Action1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isParameterised" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="RenameAction" eSuperTypes="#//Action1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="assignmentPairs" eType="#//AssignmentPairs"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="PrefixingAction" eSuperTypes="#//Action1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="communication" eType="#//Communication"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SubstitutionAction" eSuperTypes="#//Action1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="zRenameList" eType="#//ZRenameList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="LetAction" abstract="true" eSuperTypes="#//Action1"/>
+  <eClassifiers xsi:type="ecore:EClass" name="LetMuAction" eSuperTypes="#//LetAction">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="paraList" eType="#//ZParaList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="LetVarAction" eSuperTypes="#//LetAction">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="declList" eType="#//ZDeclList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="exprList" eType="#//ZExprList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionD" abstract="true" eSuperTypes="#//Action1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="declList" eType="#//ZDeclList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionIte" abstract="true" eSuperTypes="#//ActionD"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParamAction" eSuperTypes="#//ActionD">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isParamCommand" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ExtChoiceActionIte" eSuperTypes="#//ActionIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="IntChoiceActionIte" eSuperTypes="#//ActionIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="SeqActionIte" eSuperTypes="#//ActionIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParActionIte" abstract="true" eSuperTypes="#//ActionIte">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameSet" eType="#//NameSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="AlphabetisedParallelActionIte" eSuperTypes="#//ParActionIte">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="InterleaveActionIte" eSuperTypes="#//ParActionIte"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParallelActionIte" eSuperTypes="#//ParActionIte">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Action2" abstract="true" eSuperTypes="#//CircusAction">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="leftAction" eType="#//CircusAction"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rightAction" eType="#//CircusAction"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ExtChoiceAction" eSuperTypes="#//Action2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="IntChoiceAction" eSuperTypes="#//Action2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="InterruptAction" eSuperTypes="#//Action2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="SeqAction" eSuperTypes="#//Action2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParAction" abstract="true" eSuperTypes="#//Action2">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="leftNameSet" eType="#//NameSet"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rightNameSet" eType="#//NameSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="AlphabetisedParallelAction" eSuperTypes="#//ParAction">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="leftAlpha" eType="#//ChannelSet"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rightAlpha" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="InterleaveAction" eSuperTypes="#//ParAction"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ParallelAction" eSuperTypes="#//ParAction">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelSet" eType="#//ChannelSet"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="BasicAction" abstract="true" eSuperTypes="#//CircusAction"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ChaosAction" eSuperTypes="#//BasicAction"/>
+  <eClassifiers xsi:type="ecore:EClass" name="SkipAction" eSuperTypes="#//BasicAction"/>
+  <eClassifiers xsi:type="ecore:EClass" name="StopAction" eSuperTypes="#//BasicAction"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusCommand" abstract="true" eSuperTypes="#//CircusAction"/>
+  <eClassifiers xsi:type="ecore:EClass" name="AssignmentCommand" eSuperTypes="#//CircusCommand">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="assignmentPairs" eType="#//AssignmentPairs"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SpecStmtCommand" eSuperTypes="#//CircusCommand">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="frame" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="post" eType="#//Pred" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="pre" eType="#//Pred" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="VarDeclCommand" eSuperTypes="#//CircusCommand">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="circusAction" eType="#//CircusAction"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="declList" eType="#//ZDeclList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CircusGuardedCommand" abstract="true"
+      eSuperTypes="#//CircusCommand">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="circusActions" upperBound="-1"
+        eType="#//GuardedAction" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="IfGuardedCommand" eSuperTypes="#//CircusGuardedCommand"/>
+  <eClassifiers xsi:type="ecore:EClass" name="DoGuardedCommand" eSuperTypes="#//CircusGuardedCommand"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CallAction" eSuperTypes="#//CircusAction">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="exprList" eType="#//ZExprList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SchExprAction" eSuperTypes="#//CircusAction">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Name" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EEnum" name="Fixity">
+    <eLiterals name="INFIX"/>
+    <eLiterals name="NOFIX" value="1"/>
+    <eLiterals name="POSTFIX" value="2"/>
+    <eLiterals name="PREFIX" value="3"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ZName" eSuperTypes="#//Name">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="word" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="id" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="operatorName" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="strokeLsit" eType="#//ZStrokeList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NameList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZNameList" eSuperTypes="#//NameList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="names" upperBound="-1"
+        eType="#//ZName" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NameSectTypeTriple" eSuperTypes="#//Term">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A tuple consisting of a name, a section, and a type."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="section" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="type" eType="#//Type" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NameTypePair" eSuperTypes="#//Term">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A tuple consisting of a name, a section, and a type."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="type" eType="#//Type" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Numeral" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZNumeral" eSuperTypes="#//Numeral">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Oper" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="Operand" eSuperTypes="#//Oper">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value=" If the List attribute is false, then this operand represents a single expression. If true, this operand represents a comma-separated list of expressions."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="isList" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Operator" eSuperTypes="#//Oper">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="word" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Decl" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ChannelDecl" eSuperTypes="#//Decl">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The getNameList method contains a list of non-null NameList objects with size two. Therefore, we specify the size of the NameList as 2, so that no need for the wellformed-ness on this"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="genFormals" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channelNameList" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ConstDecl" eSuperTypes="#//Decl">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="net.sourceforge.czt.z.ast, A constant declaration. Example: x==3"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="InclDecl" eSuperTypes="#//Decl">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="ParamQualifier">
+    <eLiterals name="Result"/>
+    <eLiterals name="Value" value="1"/>
+    <eLiterals name="ValueResult" value="2"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="QualifiedDecl" eSuperTypes="#//Decl">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameList" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="paramQualifier" eType="#//ParamQualifier"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="VarDecl" eSuperTypes="#//Decl">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameList" eType="#//ZNameList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Branch" eSuperTypes="#//Term">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="BranchList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZBranchList" eSuperTypes="#//BranchList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="branches" upperBound="-1"
+        eType="#//Branch" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Stroke" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="InStroke" eSuperTypes="#//Stroke">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The stroke '?' "/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NextStroke" eSuperTypes="#//Stroke">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The stroke ' ' ' "/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="Digit">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="net.sourceforge.czt.base.ast, An enumeration of the digits zero to nine. This is not used."/>
+    </eAnnotations>
+    <eLiterals name="EIGHT"/>
+    <eLiterals name="FIVE" value="1"/>
+    <eLiterals name="FOUR" value="2"/>
+    <eLiterals name="NINE" value="3"/>
+    <eLiterals name="ONE" value="4"/>
+    <eLiterals name="SEVEN" value="5"/>
+    <eLiterals name="SIX" value="6"/>
+    <eLiterals name="THREE" value="7"/>
+    <eLiterals name="TWO" value="8"/>
+    <eLiterals name="ZERO" value="9"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NumStroke" eSuperTypes="#//Stroke">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A digit stroke"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="digit" eType="#//Digit"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="OutStroke" eSuperTypes="#//Stroke">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The stroke '!' "/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="RenameList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZRenameList" eSuperTypes="#//RenameList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="newOldPair" upperBound="-1"
+        eType="#//NewOldPair" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ExprList" abstract="true" eSuperTypes="#//Term"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ZExprList" eSuperTypes="#//ExprList">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="exprs" upperBound="-1"
+        eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Expr" abstract="true" eSuperTypes="#//Term">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="RoboChart Expression"/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="BasicChannelSetExpr" eSuperTypes="#//Expr">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="communicationList" eType="#//CircusCommunicationList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="BindExpr" eSuperTypes="#//Expr">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="declList" eType="#//ZDeclList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="CondExpr" eSuperTypes="#//Expr">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="leftExpr" eType="#//Expr"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rightExpr" eType="#//Expr"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="pred" eType="#//Pred" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NumExpr" eSuperTypes="#//Expr">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="numeral" eType="#//ZNumeral"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="RefExpr" eSuperTypes="#//Expr">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="C.6.21 - Generic Operator Application. For example: S \rel T.  mixfix and explicit are  true; C.6.28 - Reference. For example: \arithmos, mixfix and explicit are false; C.6.29 - Generic Instantiation. For example: \emptyset[T], mixfix is always false"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="exprList" eType="#//ZExprList"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="explicit" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="mixFix" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SigmaExpr" eSuperTypes="#//Expr">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="channel" eType="#//RefExpr"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//Expr"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SchExpr" eSuperTypes="#//Expr">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A schema construction expression C.6.34"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="schText" eType="#//ZSchText"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Expr1" abstract="true" eSuperTypes="#//Expr">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="An abstract unary expression"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="DecorExpr" eSuperTypes="#//Expr1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="stroke" eType="#//Stroke"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="BindSelExpr" eSuperTypes="#//Expr1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="HideExpr" eSuperTypes="#//Expr1">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A schema hiding expression"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="nameList" eType="#//ZNameList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NegExpr" eSuperTypes="#//Expr1"/>
+  <eClassifiers xsi:type="ecore:EClass" name="PowerExpr" eSuperTypes="#//Expr1"/>
+  <eClassifiers xsi:type="ecore:EClass" name="PreExpr" eSuperTypes="#//Expr1"/>
+  <eClassifiers xsi:type="ecore:EClass" name="RenameExpr" eSuperTypes="#//Expr1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="renameList" eType="#//ZRenameList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ThetaExpr" eSuperTypes="#//Expr1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="strokeList" eType="#//ZStrokeList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="TupleSelExpr" eSuperTypes="#//Expr1">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="numeral" eType="#//ZNumeral"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Expr2" abstract="true" eSuperTypes="#//Expr">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="leftExpr" eType="#//Expr"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="rightExpr" eType="#//Expr"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="QntExpr" abstract="true" eSuperTypes="#//Expr">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="schText" eType="#//SchText"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="MuExpr" eSuperTypes="#//QntExpr"/>
+  <eClassifiers xsi:type="ecore:EClass" name="SetCompExpr" eSuperTypes="#//QntExpr"/>
+  <eClassifiers xsi:type="ecore:EClass" name="Qnt1Expr" abstract="true" eSuperTypes="#//QntExpr">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="variables" ordered="false"
+        lowerBound="1" upperBound="-1" eType="#//VarDecl" containment="true">
+      <eAnnotations source="http://www.eclipse.org/OCL/Collection">
+        <details key="nullFree" value="false"/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="suchthat" eType="#//Expr"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="predicate" lowerBound="1"
+        eType="#//Expr" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ForallExpr" eSuperTypes="#//Qnt1Expr"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ExistsExpr" eSuperTypes="#//Qnt1Expr"/>
+  <eClassifiers xsi:type="ecore:EClass" name="LambdaExpr" eSuperTypes="#//Qnt1Expr"/>
+  <eClassifiers xsi:type="ecore:EClass" name="LetExpr" eSuperTypes="#//Qnt1Expr"/>
+  <eClassifiers xsi:type="ecore:EClass" name="Exists1Expr" eSuperTypes="#//Qnt1Expr"/>
+  <eClassifiers xsi:type="ecore:EClass" name="Expr0N" abstract="true" eSuperTypes="#//Expr">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="An abstract expression containing 0..N expression"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="exprList" eType="#//ZExprList"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Expr2N" abstract="true" eSuperTypes="#//Expr0N">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="An abstract expression containing 2..N expression"/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SetExpr" eSuperTypes="#//Expr0N"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ProdExpr" eSuperTypes="#//Expr2N"/>
+  <eClassifiers xsi:type="ecore:EClass" name="TupleExpr" eSuperTypes="#//Expr2N"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ApplExpr" eSuperTypes="#//Expr2">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="Function Operator Application: mixFix = true, Application: mixFix = false"/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="mixFix" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="SchExpr2" abstract="true" eSuperTypes="#//Expr2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="AndExpr" eSuperTypes="#//SchExpr2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="CompExpr" eSuperTypes="#//SchExpr2">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A schema composition expression"/>
+    </eAnnotations>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="IffExpr" eSuperTypes="#//SchExpr2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ImpliesExpr" eSuperTypes="#//SchExpr2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="OrExpr" eSuperTypes="#//SchExpr2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="PipeExpr" eSuperTypes="#//SchExpr2"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ProjExpr" eSuperTypes="#//SchExpr2"/>
+</ecore:EPackage>
