@@ -140,7 +140,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         // ── Step 1: EOL transformation (RC2Z.eol) ────────────────────────────
         // Input model:  RC  — the RoboChart .rct file, read-only
         // Output model: Z   — the intermediate Circus .model file, written to temp dir
-        monitor.subTask("Step 1/2: RoboChart model to Circus model (EOL)");
+        monitor.subTask("Step 1/2: RoboChart model to Circus model");
 
         // Load input RoboChart model
         EmfModel rcModel = new EmfModel();
@@ -187,15 +187,30 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             new org.eclipse.epsilon.eol.dt.ExtensionPointToolNativeTypeDelegate()
         );
         try {
-        	/*to hide the console output from eol code:*/
-//        	eolModule.getContext().setOutputStream(nullStream);
-            /**/
-        	
-        	eolModule.execute();
-        } catch (EolRuntimeException e) {
-        	throw new InvocationTargetException(e, "EOL execution failed: " + e.getMessage());
-        	
-        }
+    /*to hide the console output from eol code:*/
+  eolModule.getContext().setOutputStream(nullStream);
+    /**/
+    
+    eolModule.execute();
+} catch (EolRuntimeException e) {
+    // Step 1 (M2M) failed — most likely the RoboChart model uses a feature
+    // that is not currently supported by the translation. Show a friendly
+    // dialog instead of a technical stack trace, and stop the compilation.
+    circusModel.dispose();
+    rcModel.dispose();
+    monitor.done();
+    org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+        org.eclipse.jface.dialogs.MessageDialog.openWarning(
+            org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+            "Unsupported RoboChart Feature",
+            "The compilation could not be completed.\n\n"
+            + "The RoboChart model appears to contain one or more features "
+            + "that are not currently supported by the RoboChart-to-IsaCircus translation.\n\n"
+            + "Please modify the model and try again."
+        );
+    });
+    return; // stop here, do not proceed to Step 2
+}
 
         // Disposing circusModel triggers storeOnDisposal, writing _circus.model to temp dir
         circusModel.dispose();
@@ -206,7 +221,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         // Input model: Z  — the intermediate Circus model written in Step 1
         // Output:          .thy text files written to subdirectories under rctDirAbsPath:
         //                  circus_gen/, hol-csp_gen/, hol-csp-abstact_gen/
-        monitor.subTask("Step 2/2: Circus model to text (EGX)");
+        monitor.subTask("Step 2/2: Circus model to IsaCyPhyCirus/HOL-CSP");
 
         // Reload the Circus model from temp dir as read-only input for M2T
         EmfModel circusModelForM2T = new EmfModel();
@@ -230,10 +245,11 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         //   "hol-csp_gen/HOLCSP_*.thy"
         //   "hol-csp-abstact_gen/HOLCSP_AbstractInst_*.thy"
         try {
-        	EgxModule egxModule = new EgxModule(rctDirAbsPath);
+            EgxModule egxModule = new EgxModule(rctDirAbsPath);
+            System.out.println("[DEBUG] EGX base dir: " + rctDirAbsPath);
             egxModule.parse(new java.net.URI(
                 "platform:/plugin/circus.robocalc.robochart.epsilon.isacircus/erules/CircusM2T.egx"));
-
+            System.out.println("[DEBUG] EGX parsed OK");
             EmfModel rcModelForM2T = new EmfModel();
             rcModelForM2T.setName("RC");
             rcModelForM2T.setMetamodelUri("http://www.robocalc.circus/RoboChart");
@@ -241,20 +257,19 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             rcModelForM2T.setReadOnLoad(true);
             rcModelForM2T.setStoredOnDisposal(false);
             try { rcModelForM2T.load(); } catch (EolModelLoadingException e) { e.printStackTrace(); }
-
             egxModule.getContext().getModelRepository().addModel(circusModelForM2T);
             egxModule.getContext().getModelRepository().addModel(rcModelForM2T);
             egxModule.getContext().getFrameStack().put(
                 org.eclipse.epsilon.eol.execute.context.Variable.createReadOnlyVariable("baseName", baseName)
             );
             /*to hide console output from egl code*/
-//            egxModule.getContext().setOutputStream(nullStream);
+          egxModule.getContext().setOutputStream(nullStream);
             /**/
-            
             egxModule.execute();
+            System.out.println("[DEBUG] EGX executed OK");
         } catch (Exception e) {
-        	throw new InvocationTargetException(e, "EGX execution failed: " + e.getMessage());
-        	
+            System.out.println("[DEBUG] EGX exception: " + e.getMessage());
+            throw new InvocationTargetException(e, "EGX execution failed: " + e.getMessage());
         }
         circusModelForM2T.dispose();
         monitor.worked(3);

@@ -25,19 +25,28 @@ transform z: Z!Spec {
 //transform z: Z!CApplExprList{
 template : "circusM2T.egl"
 target : "circus_gen/IsaCircus_enriched_" + baseName + "_"+javaDateString+".thy" 
+parameters : Map { "ts" = javaDateString, "baseName" = baseName }
 //target : "circus_gen/" +"expr"+".thy" 
 //target : "circus_gen/" +"expr_"+javaDateString +".thy" 
 }
 
-rule circusM2T_HOLCSP
+//to create a complete HOL-CSP without lemma to be proved
+rule circusM2T_HOLCSP_complete
 transform z: Z!Spec {
 template : "circusM2T_HOLCSP.egl"
-target : "hol-csp_gen/HOLCSP"+ "_" + baseName + "_" +javaDateString +".thy" 
+target : "hol-csp_gen/HOLCSP"+ "_" + baseName  + "_" +javaDateString +".thy" 
+parameters : Map { "ts" = javaDateString, "baseName" = baseName }
 }
 
-
-rule circusM2T_HOLCSP_AbstractInst
+//to create a HOL-CSP for Trans_core and the ddlf lemma
+rule circusM2T_HOLCSP_trans_core
 transform z: Z!Spec {
-template : "circusM2T_HOLCSP_AbstractInst.egl"
-target : "hol-csp-abstact_gen/HOLCSP_AbstractInst"+ "_"+ baseName + "_" +javaDateString+".thy" 
+template : "circusM2T_HOLCSP_trans_core.egl"
+target : "hol-csp_gen/HOLCSP_trans_core"+ "_" + baseName + "_" +javaDateString +".thy" 
+parameters : Map { "ts" = javaDateString, "baseName" = baseName }
 }
+//rule circusM2T_HOLCSP_AbstractInst
+//transform z: Z!Spec {
+//template : "circusM2T_HOLCSP_AbstractInst.egl"
+//target : "hol-csp-abstact_gen/HOLCSP_AbstractInst"+ "_"+ z.version + "_" +javaDateString+".thy" 
+//}

@@ -1,8 +1,7 @@
 [*14052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
-
-theory [%=z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).name%]_HOLCSP 
+theory HOLCSP_[%=baseName%]_[%=ts%]
 	imports "RC_HOL-CSP.RoboChart_Library"
 begin
 
@@ -160,7 +159,6 @@ where
 	[%=actpara.circusAction.parseAction()%] \<close>
 [%}%]
 
-
 [%//to collect the nodes into nodeSet
 var nodeSet = new Set<String>;
 for(actpara in actparas.select(ap|ap.name.word.startsWith("Inactive_") 
@@ -200,6 +198,7 @@ or ap.name.word.startsWith("Exiting_")
 or ap.name.word.startsWith("Entering_")
 or ap.name.word.startsWith("Interrupted_")
 or ap.name.word.startsWith("Trans_") 
+or ap.name.word.startsWith("Transc_") 
 ))){%]
 
 fixrec [%= actpara.name.word%] :: "[%= actpara.actionWithSig()%]chan_event process"
@@ -957,6 +956,7 @@ end
 			cs_str = cs_str + ",";
 		}
 	}
+//	return  "\\<lbrace> " + cs_str +" \\<rbrace>";
 	return  "{ " + cs_str +" }";
 }%]
 

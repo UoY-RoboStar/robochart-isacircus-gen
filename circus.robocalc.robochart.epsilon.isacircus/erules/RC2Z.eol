@@ -139,10 +139,10 @@ TBD: Rule 55 and Rule 68
 RC!RCPackage.all().println();
 var pkgs =  RC!RCPackage.all().select(p|p.name != "relation_toolkit" and p.name != "function_toolkit" and p.name != "sequence_toolkit" and p.name != "set_toolkit" and p.name != "core");
 pkgs.println();
-var pkg =  RC!RCPackage.all().selectOne(p|p.name != "relation_toolkit" and p.name != "function_toolkit" and p.name != "sequence_toolkit" and p.name != "set_toolkit" and p.name != "core");pkg.println();
+var pkg =  RC!RCPackage.all().selectOne(p|p.name != "relation_toolkit" and p.name != "function_toolkit" and p.name != "sequence_toolkit" and p.name != "set_toolkit" and p.name != "core");
+pkg.println();
 pkg.name.isDefined().println();
 pkg.isDefined().println();
-
 //for(stm in RC!StateMachineDef.all().selectOne(s|s.name = "stm0" or s.name = "GasAnalysis_stm")){
 //	stm.nodes.println();
 ////	for(nd in stm.nodes){
@@ -196,6 +196,7 @@ pkg.isDefined().println();
 replaceRef();
 
 //To transform RoboChart user defined types
+
 createTypeDeclPara(pkg);
 
 //to transform functions
@@ -344,6 +345,7 @@ datatype GasSensor {
 enumeration Angle { Left Right Back Front }
 */
 operation createTypeDeclPara(pkg:RC!RCPackage){
+
 	for(tp in pkg.types){
 	
 		if(tp.instanceOf(RC!PrimitiveType)){
@@ -517,10 +519,10 @@ operation Shared2FQLocalVariablesAndConst(nc: RC!NodeContainer){
 	
 	
 	//here to convert all the names to FQN
-	FQAllLocalVariables(nc);
+	FQNllLocalVariables(nc);
 }
 
-operation FQAllLocalVariables(nc: RC!NodeContainer){
+operation FQNllLocalVariables(nc: RC!NodeContainer){
 
 	for(v in allLocalVariablesandConst(nc)){
 		v.name = v.name + "_" + nc.FQN();
@@ -2524,9 +2526,15 @@ operation stateful(stm: RC!StateMachineBody): Z!ActionPara{
 	var parallelL = machineBody(stm).name.word.createCallAction();
 	var parallelR = varMemory(stm).name.word.createCallAction();
 	var channelSet = getsetLocalChannels(stm);
-	channelSet.add("terminate");
+	var channelSetAndTerm = getsetLocalChannels(stm);
+	channelSetAndTerm.add("terminate");
+	//TO DO: terminate is not a channel set, so .add not work here
+	//{|set_v, get_v|} unioin {terminate}
+	//THIS NEEDS TO BE FIXED
+	//15 March 2026
 	
-	var stateful = createParallelAction(channelSet, parallelL, parallelR).createHideAction(channelSet.asSequence());
+	
+	var stateful = createParallelAction(channelSetAndTerm, parallelL, parallelR).createHideAction(channelSet.asSequence());
 	
 	return stateful.createActionPara("stateful_"+ stm.FQN());
 }
@@ -4198,6 +4206,9 @@ operation ncCoreBehaviour(nc: RC!NodeContainer): Z!ActionPara{
 	//create transition action: Q
 	var transActionPara = nc.createTransitionsAsActionPara();
 	
+	//to create the transition_core for the ddlf check in Isabelle
+	var transCoreActionPara = nc.createTransitionsCoreAsActionPara();
+	
 	var initial_name = nc.nodes.selectOne(n|n.instanceOf(RC!Initial)).FQN();
 
 	var commu = createSynchCommunication("enter_" + initial_name);
@@ -5224,8 +5235,7 @@ operation Z!CircusChannelSet createChanSetPara(name: String): Z!ChannelSetPara{
 }
 
 
-//CSP Rule 53, modified: 1. update action Trans into a prefixingaction, 2. updated as a process: (enter.initial(nc.nodes) -> Trans)
-//enter.initial is moved from Rule 41 to here
+//CSP Rule 53, modified: Trans is an action because it will be prefixed in rule 41
 operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 	
 	var trans;
@@ -5320,19 +5330,7 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 	//Trans is an actioin and can not be a process, because it will be prefixed.
 	//end of CSP Rule53
 	
-	/***********************************
-	To be moved to Rule 41
-	//to integrate the prefix "enter.initial"
-	//and to convert the action into a Process
-	var initial_name = self.nodes.selectOne(n|n.instanceOf(Initial)).FQN();
-
-	var commu = createSynchCommunication("enter_" + initial_name);
 	
-	var prefixAction = createPrefixingAction(commu, Trans);
-	prefixAction.createActionPara("prefixedTransAction_"+self.FQN());
-	//?? THIS ACTIONPARA SHOULD BE USED IN RULE 41 THROUGH A CALLACTION, THUS THE STRUCTURE IS MORE READABLE
-	//TO DO, REMOVE PREFIX IN THIS OPERATION TO RULE 41 SO THAT CONSISTENT WITH MANUAL.
-	**********************************/
 	
 //	var actionParaSeq = new Sequence<Z!ActionPara>;
 //	actionParaSeq = Sequence{prefixAction.createActionPara("prefixedTransAction_"+self.FQN())};
@@ -5340,6 +5338,121 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 		
 //	return proc;
 
+}
+
+
+/* Rule 53-1, this is a variant of rule 53, to create the Trans_core for the purpose of ddlf check
+ * difference from rule 53:
+ * 1. to remove 3 branches which will be always enabled in the context of Transitions
+ * 	1) interrupt.id(nc) branch
+ *  2) share -> Skip branch
+ * 	3) terminate -> Skip branc
+ * 2. ENRICHMENT for final: add a branch for final: (n= final) & (terminate -> Skip)
+ */
+operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
+	
+	var trans;
+	
+	var tran_seq = new Sequence<Z!CircusAction>;
+	tran_seq = Sequence{};
+	for(t in self.transitions){
+		tran_seq.add(t.createTransitionAsCircusAction4TransCore());
+	}
+	
+	var choice1_action1_left;
+	if(tran_seq.size() = 1){
+		choice1_action1_left = tran_seq.at(0);
+	} else if(tran_seq.size() > 1) {
+		choice1_action1_left = tran_seq.createSequenceAsExtchoiceAction();
+	}
+
+	var choice1_action1;
+	
+	//to define choice1_action1_left if final state exist: 
+	// (n = final) & (terminate -> Skip)
+	if(self.nodes.exists(t|t.isTypeOf(RC!Final))){
+	
+	//Step 1: to identify final node existance
+	var final_name = self.nodes.selectOne(t|t.isTypeOf(RC!Final)).FQN();
+	("Line 5374: final_name" + final_name).println();
+	
+	//Step 2: to create the guard: n = final
+	var src_grd_pred = createMemPredEquality("n", "NID_" + final_name);
+	
+	//Step 3: (n = final) & (terminate -> Skip)
+	var final_terminiate = createPrefixingAction(createSynchCommunication("terminate"), createSkipAction());
+	var choice1_action1_right = createGuardedAction(src_grd_pred, final_terminiate); 
+	
+	choice1_action1 = createAction2("ExtChoiceAction", choice1_action1_left, choice1_action1_right);
+ } else choice1_action1 = choice1_action1_left;
+	//share -> Trans(n)
+//	var choice1_action1_right = createPrefixingAction(createSynchCommunication("share"), ("Trans_"+self.FQN()).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+//	
+// 	var choice1_action1 = createAction2("ExtChoiceAction", choice1_action1_left, choice1_action1_right);
+
+//  Because the Trans recursion is pushed into each choice, this seqAction below is no longer needed.
+//	var choice1 = createAction2("SeqAction", choice1_action1, ("Trans_"+self.FQN()).createCallAction());
+	
+	/* Start of Choice 2 creation*/
+	//Stop /\ (exit -> Skip)
+//	var choice2_action1_action2 = createAction2("InterruptAction", "SSTOP".createCallAction(), createPrefixingAction(createSynchCommunication("exit_"+self.FQN()), createSkipAction()));
+//	var choice2_action1 = createPrefixingAction(createSynchCommunication("interrupt_" + self.FQN()), choice2_action1_action2);
+//	
+//	//exited -> end -> Skip
+//	var choice2_action2_action2 = createPrefixingAction(createSynchCommunication("exited_"+self.FQN()), createPrefixingAction(createSynchCommunication("terminate"), createSkipAction()));
+//	
+//	//SStop /\ (exited -> end -> Skip)
+//	var choice2_action2 = createAction2("InterruptAction", "SSTOP".createCallAction(), choice2_action2_action2);
+//	var choice2 = createAction2("SeqAction", choice2_action1, choice2_action2);
+	/* End of Choice 2 creation*/
+	
+	
+	//terminate -> Skip
+//	var choice3 = createPrefixingAction(createSynchCommunication("terminate"), createSkipAction());
+	var trans = choice1_action1;
+//	var trans = createAction2("ExtChoiceAction", choice1_action1, createAction2("ExtChoiceAction", choice2, choice3));
+	("transc: "+trans).println();
+	
+	//to introduce assumption condition, i.e. to change trans(n) into if inv then trans(n) else aviol -> trans(n)
+	//by creating an IfGuardedCommand 
+	
+	//true means inv=true, this true shall be MANUALLY REPLACED by invariant on the variables in HOL-CSP models
+	var if_pred = createTruePred();
+	
+	//if true then continue to behave as trans
+	var ifAction = createGuardedAction(if_pred, trans) ;
+	
+	var else_pred = createFalsePred();
+	
+	//elseif false then aviol -> Trans(n)
+	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Transc_" + self.name).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+	elseAction = createGuardedAction(else_pred, elseAction);
+	
+	var actions = Sequence{ifAction, elseAction};
+	
+	/*
+	1. we first create the main body of trans (without the readStateA part) as trans
+	2. then add assumption as an outer layer
+	so, here trans is the behaviour after gets
+	*/
+	var trans_action = createIFGuardedCommand(actions);
+	
+
+	/*
+	3. to add another outer layer of readStateA
+	*/
+
+	var vguards = self.vguards(); 
+	"line309".println();
+	vguards.println();
+	
+	var Trans = new Z!ParamAction;
+	Trans.isParamCommand = true;
+	Trans.circusAction = readStateA(vguards, trans_action);
+	Trans.declList = new Z!ZDeclList;
+	Trans.declList.decls.add(createVarDeclfromString("n", "NIDS_"+self.FQN()));
+
+	return Trans.createActionPara("Transc_" + self.name);	
 }
 
 operation createTruePred(): Z!TruePred{
@@ -5425,6 +5538,84 @@ operation RC!Transition createTransitionAsCircusAction(): Z!CircusAction{
 	return circusAction;
 }
 
+/* CSP Rule 54-1
+ * to create circus action for each transition
+ * to be used in rule 53-1 Transition Core
+ * difference from 54: 
+ *  transc instead of trans
+ *  remove FQN() for simplicification for trans and nc, but not the node NID
+ */
+operation RC!Transition createTransitionAsCircusAction4TransCore(): Z!CircusAction{
+	var circusAction;
+	
+	//"n = src"
+	var src_grd_pred = createMemPredEquality("n", "NID_" + self.source.FQN());
+	
+	if(self.source.type().name = "State"){
+					
+		//action1: trigger; action2: interruptAction1 ; action3: interruptAction(SStop, SeqAction )
+		
+		var action1 = trigger(self);
+		
+		//to create action2: exit
+		var rightAction1 = createPrefixingAction(createSynchCommunication("exit_"+nc(self).name), createSkipAction());
+		var action2 = createAction2("InterruptAction", "SSTOP".createCallAction(), rightAction1);
+		
+		//to create action3_inner_1: exited
+		var prefixedAction = self.createTrActionAsCircusAction();
+		
+		
+		var action3_inner_1 = createPrefixingAction(createSynchCommunication("exited_"+nc(self).name), prefixedAction);
+		
+		
+		//to create action3_inner_2: enter
+		var action3_inner_2 = createPrefixingAction(createSynchCommunication("enter_" + self.target.FQN()), ("Transc_" + nc(self).name).createCallAction(Sequence{"NID_" + self.target.FQN()}.createRefExprSeq(false,false))  );
+		
+		var action3_right = createAction2("SeqAction", action3_inner_1, action3_inner_2);
+		
+		//SStop /\ ( (exited-> [[t.action]]) ; (enter_t.target -> Skip))
+		var action3 = createAction2("InterruptAction", "SSTOP".createCallAction(), action3_right);
+		
+		
+		circusAction = createAction2("SeqAction", action1, createAction2("SeqAction", action2, action3));
+		
+		
+		if(self.condition != null){
+			
+			("line 2419,  self.condition.eContainer() = " + self.condition.eContainer()).println(); 
+			("line 2419,  self.condition = " + self.condition).println();
+			("line 2419,  self.condition.type() = " + self.condition.type()).println();
+			var pred = self.condition.createExpr().createMemPredEquality();
+			circusAction = createGuardedAction(pred, circusAction);
+		}
+		
+	} else 
+	
+	if(self.source.type().name != "State"){
+		//action1: prefixingAction
+		
+		("line 2225, self.source.type().name = " + self.source.type().name).println();
+		var prefixedAction = self.createTrActionAsCircusAction();
+		
+		/*A transition containing a trigger must start on a state, so tevent below can only return internal__.id(t.source)*/
+		var action1 = createPrefixingAction(tevent(self), prefixedAction);
+		
+		
+		var action2 = createPrefixingAction(createSynchCommunication("enter_" + self.target.FQN()), ("Transc_" + nc(self).name).createCallAction(Sequence{"NID_" + self.target.FQN()}.createRefExprSeq(false,false)));
+		
+		circusAction = createAction2("SeqAction", action1, action2);
+		
+		if(self.condition != null){
+			var pred = self.condition.createExpr().createMemPredEquality();
+			
+			circusAction = createGuardedAction(pred, circusAction);
+		} 
+	} 
+	
+	//the line below is to introduce an extra guard "n = source node"
+	circusAction = createGuardedAction(src_grd_pred, circusAction); 
+	return circusAction;
+}
 //to turn the expr of a boolean type into a predicate by "expr = True"
 //"True is a boolean type too"
 //equality is s relation operator application (C.5.12): MemPred
@@ -5733,7 +5924,7 @@ operation RC!State createCompositeStateAsActionParas(){
 	*******************************/
 	var cs = enteredSS(self).asSet().includingAll(Set{"terminate", "interrupt_" + nc(self).FQN()});//TBC
 	var ns1 = vars(self.nodes);
-	var ns2 = vars(s.actions.selectOne(a|a.instanceOf(RC!DuringAction)).action); //Manual: vars(s.during) TBC: s.during.type = statement? 
+	var ns2 = vars(self.actions.selectOne(a|a.instanceOf(RC!DuringAction)).action); //Manual: vars(s.during) TBC: s.during.type = statement? 
 	var Beh_act1 = ncbehaviour(self);
 	var Behaviour = createParallelAction(cs,ns1,ns2,Beh_act1.name.word.createCallAction(),"During_"+self.FQN().createCallAction());
 	Behaviour.createActionPara("Behaviour_" + self.FQN());
