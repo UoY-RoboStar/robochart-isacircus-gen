@@ -62,13 +62,24 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
             return null;
         }
 
-        try {
-            new ProgressMonitorDialog(HandlerUtil.getActiveShell(event)).run(true, true, this);
-        } catch (InvocationTargetException e) {
-            throw new ExecutionException("Isabelle verification failed", e.getCause());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        org.eclipse.core.runtime.jobs.Job job = new org.eclipse.core.runtime.jobs.Job("Isabelle Verification") {
+            @Override
+            protected org.eclipse.core.runtime.IStatus run(org.eclipse.core.runtime.IProgressMonitor monitor) {
+                try {
+                    RunIsabelleHandler.this.run(monitor);
+                } catch (InvocationTargetException e) {
+                    return new org.eclipse.core.runtime.Status(
+                        org.eclipse.core.runtime.IStatus.ERROR,
+                        "circus.robocalc.robochart.epsilon.isacircus",
+                        "Isabelle verification failed", e.getCause());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return org.eclipse.core.runtime.Status.OK_STATUS;
+            }
+        };
+        job.setUser(false);
+        job.schedule();
 
         return null;
     }
