@@ -741,6 +741,36 @@
         </instructions>
       </touchpointData>
     </unit>
+    <unit id='circus.robocalc.robochart.epsilon.isacircus.feature.feature.jar' version='1.0.0.202606181304'>
+      <properties size='7'>
+        <property name='org.eclipse.equinox.p2.name' value='RoboChart2IsaCircus'/>
+        <property name='org.eclipse.equinox.p2.description' value='Eclipse plugin for translating RoboChart models to Isabelle/Circus theory files.'/>
+        <property name='org.eclipse.equinox.p2.provider' value='RoboCalc Project'/>
+        <property name='maven-groupId' value='circus.robocalc'/>
+        <property name='maven-artifactId' value='circus.robocalc.robochart.epsilon.isacircus.feature'/>
+        <property name='maven-version' value='1.0.0-SNAPSHOT'/>
+        <property name='maven-type' value='eclipse-feature'/>
+      </properties>
+      <provides size='3'>
+        <provided namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.feature.feature.jar' version='1.0.0.202606181304'/>
+        <provided namespace='org.eclipse.equinox.p2.eclipse.type' name='feature' version='1.0.0'/>
+        <provided namespace='org.eclipse.update.feature' name='circus.robocalc.robochart.epsilon.isacircus.feature' version='1.0.0.202606181304'/>
+      </provides>
+      <filter>
+        (org.eclipse.update.install.features=true)
+      </filter>
+      <artifacts size='1'>
+        <artifact classifier='org.eclipse.update.feature' id='circus.robocalc.robochart.epsilon.isacircus.feature' version='1.0.0.202606181304'/>
+      </artifacts>
+      <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
+      <touchpointData size='1'>
+        <instructions size='1'>
+          <instruction key='zipped'>
+            true
+          </instruction>
+        </instructions>
+      </touchpointData>
+    </unit>
     <unit id='org.eclipse.core.commands' version='3.10.300.v20221024-2137' singleton='false' generation='2'>
       <update id='org.eclipse.core.commands' range='[0.0.0,3.10.300.v20221024-2137)' severity='0'/>
       <properties size='9'>
@@ -951,31 +981,6 @@
           </instruction>
         </instructions>
       </touchpointData>
-    </unit>
-    <unit id='circus.robocalc.robochart.epsilon.isacircus.feature.feature.group' version='1.0.0.202605241350' singleton='false'>
-      <update id='circus.robocalc.robochart.epsilon.isacircus.feature.feature.group' range='[0.0.0,1.0.0.202605241350)' severity='0'/>
-      <properties size='8'>
-        <property name='org.eclipse.equinox.p2.name' value='RoboChart2IsaCircus'/>
-        <property name='org.eclipse.equinox.p2.description' value='Eclipse plugin for translating RoboChart models to Isabelle/Circus theory files.'/>
-        <property name='org.eclipse.equinox.p2.provider' value='RoboCalc Project'/>
-        <property name='org.eclipse.equinox.p2.type.group' value='true'/>
-        <property name='maven-groupId' value='circus.robocalc'/>
-        <property name='maven-artifactId' value='circus.robocalc.robochart.epsilon.isacircus.feature'/>
-        <property name='maven-version' value='1.0.0-SNAPSHOT'/>
-        <property name='maven-type' value='eclipse-feature'/>
-      </properties>
-      <provides size='1'>
-        <provided namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.feature.feature.group' version='1.0.0.202605241350'/>
-      </provides>
-      <requires size='2'>
-        <required namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus' range='[1.0.0.202605241350,1.0.0.202605241350]'/>
-        <required namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.feature.feature.jar' range='[1.0.0.202605241350,1.0.0.202605241350]'>
-          <filter>
-            (org.eclipse.update.install.features=true)
-          </filter>
-        </required>
-      </requires>
-      <touchpoint id='null' version='0.0.0'/>
     </unit>
     <unit id='org.eclipse.e4.core.services' version='2.3.400.v20220915-1347' generation='2'>
       <update id='org.eclipse.e4.core.services' range='[0.0.0,2.3.400.v20220915-1347)' severity='0'/>
@@ -2750,36 +2755,6 @@
         </instructions>
       </touchpointData>
     </unit>
-    <unit id='circus.robocalc.robochart.epsilon.isacircus.feature.feature.jar' version='1.0.0.202605241350'>
-      <properties size='7'>
-        <property name='org.eclipse.equinox.p2.name' value='RoboChart2IsaCircus'/>
-        <property name='org.eclipse.equinox.p2.description' value='Eclipse plugin for translating RoboChart models to Isabelle/Circus theory files.'/>
-        <property name='org.eclipse.equinox.p2.provider' value='RoboCalc Project'/>
-        <property name='maven-groupId' value='circus.robocalc'/>
-        <property name='maven-artifactId' value='circus.robocalc.robochart.epsilon.isacircus.feature'/>
-        <property name='maven-version' value='1.0.0-SNAPSHOT'/>
-        <property name='maven-type' value='eclipse-feature'/>
-      </properties>
-      <provides size='3'>
-        <provided namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.feature.feature.jar' version='1.0.0.202605241350'/>
-        <provided namespace='org.eclipse.equinox.p2.eclipse.type' name='feature' version='1.0.0'/>
-        <provided namespace='org.eclipse.update.feature' name='circus.robocalc.robochart.epsilon.isacircus.feature' version='1.0.0.202605241350'/>
-      </provides>
-      <filter>
-        (org.eclipse.update.install.features=true)
-      </filter>
-      <artifacts size='1'>
-        <artifact classifier='org.eclipse.update.feature' id='circus.robocalc.robochart.epsilon.isacircus.feature' version='1.0.0.202605241350'/>
-      </artifacts>
-      <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
-      <touchpointData size='1'>
-        <instructions size='1'>
-          <instruction key='zipped'>
-            true
-          </instruction>
-        </instructions>
-      </touchpointData>
-    </unit>
     <unit id='javax.annotation' version='1.3.5.v20221112-0806' singleton='false' generation='2'>
       <update id='javax.annotation' range='[0.0.0,1.3.5.v20221112-0806)' severity='0'/>
       <properties size='9'>
@@ -3628,59 +3603,6 @@
         </instructions>
       </touchpointData>
     </unit>
-    <unit id='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350' generation='2'>
-      <update id='circus.robocalc.robochart.epsilon.isacircus' range='[0.0.0,1.0.0.202605241350)' severity='0'/>
-      <properties size='5'>
-        <property name='org.eclipse.equinox.p2.name' value='RoboChart2IsaCircus'/>
-        <property name='maven-groupId' value='circus.robocalc'/>
-        <property name='maven-artifactId' value='circus.robocalc.robochart.epsilon.isacircus'/>
-        <property name='maven-version' value='1.0.0-SNAPSHOT'/>
-        <property name='maven-type' value='eclipse-plugin'/>
-      </properties>
-      <provides size='5'>
-        <provided namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350'/>
-        <provided namespace='osgi.bundle' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350'/>
-        <provided namespace='java.package' name='circus.robocalc.robochart.epsilon.isacircus.ui.handlers' version='0.0.0'/>
-        <provided namespace='osgi.identity' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350'>
-          <properties size='1'>
-            <property name='type' value='osgi.bundle'/>
-          </properties>
-        </provided>
-        <provided namespace='org.eclipse.equinox.p2.eclipse.type' name='bundle' version='1.0.0'/>
-      </provides>
-      <requires size='11'>
-        <required namespace='osgi.bundle' name='org.eclipse.ui' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.core.resources' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.core.runtime' range='3.24.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.epsilon.eol.engine' range='2.4.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.epsilon.eol.dt' range='2.4.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.epsilon.egl.engine' range='2.4.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.epsilon.emc.emf' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='circus.robocalc.robochart' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.ui.console' range='0.0.0'/>
-        <requiredProperties namespace='osgi.ee' match='(&amp;(osgi.ee=JavaSE)(version=21))'>
-          <description>
-            circus.robocalc.robochart.epsilon.isacircus
-          </description>
-        </requiredProperties>
-        <required namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.source' range='[1.0.0.202605241350,1.0.0.202605241350]' optional='true'>
-          <filter>
-            (org.eclipse.update.install.sources=true)
-          </filter>
-        </required>
-      </requires>
-      <artifacts size='1'>
-        <artifact classifier='osgi.bundle' id='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350'/>
-      </artifacts>
-      <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
-      <touchpointData size='1'>
-        <instructions size='1'>
-          <instruction key='manifest'>
-            Bundle-SymbolicName: circus.robocalc.robochart.epsilon.isacircus;singleton:=true&#xA;Bundle-Version: 1.0.0.202605241350
-          </instruction>
-        </instructions>
-      </touchpointData>
-    </unit>
     <unit id='org.eclipse.epsilon.eol.engine' version='2.4.0.202203041826' generation='2'>
       <update id='org.eclipse.epsilon.eol.engine' range='[0.0.0,2.4.0.202203041826)' severity='0'/>
       <properties size='6'>
@@ -4378,16 +4300,16 @@
         <provided namespace='org.eclipse.equinox.p2.iu' name='a.jre.javase' version='21.0.0'/>
         <provided namespace='java.package' name='java.applet' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.image' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.xml.crypto.dsig.dom' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.scene.layout' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.xml.crypto.dsig.dom' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.stream' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.table' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.desktop' version='0.0.0'/>
         <provided namespace='java.package' name='javax.imageio.plugins.jpeg' version='0.0.0'/>
         <provided namespace='java.package' name='javax.lang.model.type' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.xml.transform.dom' version='0.0.0'/>
-        <provided namespace='java.package' name='java.util.zip' version='0.0.0'/>
         <provided namespace='java.package' name='java.security.cert' version='0.0.0'/>
+        <provided namespace='java.package' name='java.util.zip' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.xml.transform.dom' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio.file' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.util.converter' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom.views' version='0.0.0'/>
@@ -4408,18 +4330,18 @@
         <provided namespace='java.package' name='org.w3c.dom.events' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.print' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.datatransfer' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.swing.plaf' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.swing.text.html' version='0.0.0'/>
         <provided namespace='java.package' name='java.lang.foreign' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.swing.text.html' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.swing.plaf' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.jdi.event' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.scene' version='0.0.0'/>
-        <provided namespace='java.package' name='javafx.scene.chart' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.dynalink' version='0.0.0'/>
+        <provided namespace='java.package' name='javafx.scene.chart' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.plaf.metal' version='0.0.0'/>
         <provided namespace='java.package' name='java.net.spi' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.swing.colorchooser' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.logging' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.swing.colorchooser' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.dynalink.support' version='0.0.0'/>
         <provided namespace='java.package' name='javax.security.auth.x500' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.stream' version='0.0.0'/>
@@ -4434,16 +4356,16 @@
         <provided namespace='java.package' name='javax.security.auth' version='0.0.0'/>
         <provided namespace='java.package' name='java.math' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom' version='0.0.0'/>
-        <provided namespace='java.package' name='java.awt.geom' version='0.0.0'/>
         <provided namespace='java.package' name='javax.transaction.xa' version='0.0.0'/>
+        <provided namespace='java.package' name='java.awt.geom' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.scene.paint' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.transform.stax' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom.traversal' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.swing.interop' version='0.0.0'/>
         <provided namespace='java.package' name='java.text' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.swing.undo' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.management' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.swing.undo' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.transform.stream' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.datatype' version='0.0.0'/>
         <provided namespace='java.package' name='javax.print' version='0.0.0'/>
@@ -4467,19 +4389,19 @@
         <provided namespace='java.package' name='java.time.format' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.concurrent' version='0.0.0'/>
         <provided namespace='java.package' name='javax.security.auth.spi' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.sound.sampled' version='0.0.0'/>
-        <provided namespace='java.package' name='javafx.application' version='0.0.0'/>
         <provided namespace='java.package' name='java.rmi.server' version='0.0.0'/>
+        <provided namespace='java.package' name='javafx.application' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.sound.sampled' version='0.0.0'/>
         <provided namespace='java.package' name='javax.sql.rowset.serial' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.parsers' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.plaf.synth' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.swing.plaf.basic' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.fxml' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.swing.plaf.basic' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.tree' version='0.0.0'/>
-        <provided namespace='java.package' name='java.util.function' version='0.0.0'/>
         <provided namespace='java.package' name='javax.net' version='0.0.0'/>
-        <provided namespace='java.package' name='java.awt.image.renderable' version='0.0.0'/>
+        <provided namespace='java.package' name='java.util.function' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.dynalink.linker' version='0.0.0'/>
+        <provided namespace='java.package' name='java.awt.image.renderable' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.nio.file' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom.ls' version='0.0.0'/>
         <provided namespace='java.package' name='javax.smartcardio' version='0.0.0'/>
@@ -4499,34 +4421,34 @@
         <provided namespace='java.package' name='jdk.nio' version='0.0.0'/>
         <provided namespace='java.package' name='java.lang.management' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.concurrent.atomic' version='0.0.0'/>
-        <provided namespace='java.package' name='javafx.scene.transform' version='0.0.0'/>
         <provided namespace='java.package' name='javax.rmi.ssl' version='0.0.0'/>
+        <provided namespace='java.package' name='javafx.scene.transform' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.event' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.color' version='0.0.0'/>
         <provided namespace='java.package' name='javax.management.openmbean' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.text.rtf' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.javadoc.doclet' version='0.0.0'/>
+        <provided namespace='java.package' name='javafx.scene.image' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.print' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.crypto' version='0.0.0'/>
-        <provided namespace='java.package' name='javafx.scene.image' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.css.converter' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.plaf.multi' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.imageio.event' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio.channels.spi' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.imageio.event' version='0.0.0'/>
         <provided namespace='java.package' name='javax.net.ssl' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.xml.stream.events' version='0.0.0'/>
         <provided namespace='java.package' name='java.rmi.registry' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.print.attribute' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.xml.stream.events' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.java.accessibility.util' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.swing' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.print.attribute' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio.file.attribute' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.swing' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.management.jfr' version='0.0.0'/>
-        <provided namespace='java.package' name='javafx.scene.control.cell' version='0.0.0'/>
         <provided namespace='java.package' name='java.lang.constant' version='0.0.0'/>
+        <provided namespace='java.package' name='javafx.scene.control.cell' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.jdi.request' version='0.0.0'/>
-        <provided namespace='java.package' name='java.lang.instrument' version='0.0.0'/>
         <provided namespace='java.package' name='java.lang.ref' version='0.0.0'/>
+        <provided namespace='java.package' name='java.lang.instrument' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.regex' version='0.0.0'/>
         <provided namespace='java.package' name='org.ietf.jgss' version='0.0.0'/>
         <provided namespace='java.package' name='javax.sound.midi.spi' version='0.0.0'/>
@@ -4535,9 +4457,9 @@
         <provided namespace='java.package' name='java.lang.reflect' version='0.0.0'/>
         <provided namespace='java.package' name='java.security' version='0.0.0'/>
         <provided namespace='java.package' name='org.xml.sax.helpers' version='0.0.0'/>
-        <provided namespace='java.package' name='jdk.jshell' version='0.0.0'/>
-        <provided namespace='java.package' name='com.sun.tools.attach' version='0.0.0'/>
         <provided namespace='java.package' name='javax.naming.ldap.spi' version='0.0.0'/>
+        <provided namespace='java.package' name='com.sun.tools.attach' version='0.0.0'/>
+        <provided namespace='java.package' name='jdk.jshell' version='0.0.0'/>
         <provided namespace='java.package' name='javax.print.attribute.standard' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.jshell.tool' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.tools.jconsole' version='0.0.0'/>
@@ -4546,13 +4468,13 @@
         <provided namespace='java.package' name='com.sun.security.auth' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.collections.transformation' version='0.0.0'/>
         <provided namespace='java.package' name='javax.security.auth.kerberos' version='0.0.0'/>
-        <provided namespace='java.package' name='java.sql' version='0.0.0'/>
         <provided namespace='java.package' name='javax.crypto' version='0.0.0'/>
-        <provided namespace='java.package' name='javafx.collections' version='0.0.0'/>
+        <provided namespace='java.package' name='java.sql' version='0.0.0'/>
         <provided namespace='java.package' name='java.util' version='0.0.0'/>
+        <provided namespace='java.package' name='javafx.collections' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.event' version='0.0.0'/>
-        <provided namespace='java.package' name='java.time.temporal' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio.channels' version='0.0.0'/>
+        <provided namespace='java.package' name='java.time.temporal' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom.stylesheets' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio.charset' version='0.0.0'/>
         <provided namespace='java.package' name='javax.sound.midi' version='0.0.0'/>
@@ -4576,12 +4498,12 @@
         <provided namespace='java.package' name='javax.xml.crypto.dsig' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.tools.javac' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.jdi' version='0.0.0'/>
+        <provided namespace='java.package' name='java.nio.charset.spi' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.security.jgss' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.beans' version='0.0.0'/>
-        <provided namespace='java.package' name='java.nio.charset.spi' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.scene.control.skin' version='0.0.0'/>
-        <provided namespace='java.package' name='java.text.spi' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.spi' version='0.0.0'/>
+        <provided namespace='java.package' name='java.text.spi' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.scene.control' version='0.0.0'/>
         <provided namespace='java.package' name='javax.management.timer' version='0.0.0'/>
         <provided namespace='java.package' name='java.security.spec' version='0.0.0'/>
@@ -4589,26 +4511,26 @@
         <provided namespace='java.package' name='javax.xml.crypto.dsig.keyinfo' version='0.0.0'/>
         <provided namespace='java.package' name='javax.accessibility' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.css' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.xml.namespace' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.source.tree' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.xml.namespace' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.font' version='0.0.0'/>
         <provided namespace='java.package' name='java.security.interfaces' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.tools.attach.spi' version='0.0.0'/>
         <provided namespace='java.package' name='javax.management.relation' version='0.0.0'/>
         <provided namespace='java.package' name='javax.management.modelmbean' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.sound.sampled.spi' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.scene.text' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.sound.sampled.spi' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.transform.sax' version='0.0.0'/>
         <provided namespace='java.package' name='javax.management.remote.rmi' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.beans.value' version='0.0.0'/>
         <provided namespace='java.package' name='javax.naming.event' version='0.0.0'/>
-        <provided namespace='java.package' name='javafx.stage' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.concurrent.locks' version='0.0.0'/>
+        <provided namespace='java.package' name='javafx.stage' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.nio.mapmode' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.plaf.nimbus' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.event' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.swing.border' version='0.0.0'/>
         <provided namespace='java.package' name='javax.sql.rowset.spi' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.swing.border' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.jfr.consumer' version='0.0.0'/>
         <provided namespace='java.package' name='javax.imageio.plugins.tiff' version='0.0.0'/>
         <provided namespace='java.package' name='javax.management.remote' version='0.0.0'/>
@@ -4622,8 +4544,8 @@
         <provided namespace='java.package' name='javax.security.sasl' version='0.0.0'/>
         <provided namespace='java.package' name='javafx.scene.shape' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.security.auth.module' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.xml.crypto.dom' version='0.0.0'/>
         <provided namespace='java.package' name='javax.naming.ldap' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.xml.crypto.dom' version='0.0.0'/>
         <provided namespace='java.package' name='java.time.zone' version='0.0.0'/>
         <provided namespace='java.package' name='netscape.javascript' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.im.spi' version='0.0.0'/>
@@ -4634,8 +4556,8 @@
         <provided namespace='java.package' name='javax.script' version='0.0.0'/>
         <provided namespace='java.package' name='java.lang.module' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.source.util' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.sql.rowset' version='0.0.0'/>
         <provided namespace='java.package' name='java.io' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.sql.rowset' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.jar' version='0.0.0'/>
         <provided namespace='java.package' name='javax.crypto.interfaces' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom.ranges' version='0.0.0'/>
@@ -5948,6 +5870,31 @@
           </instruction>
         </instructions>
       </touchpointData>
+    </unit>
+    <unit id='circus.robocalc.robochart.epsilon.isacircus.feature.feature.group' version='1.0.0.202606181304' singleton='false'>
+      <update id='circus.robocalc.robochart.epsilon.isacircus.feature.feature.group' range='[0.0.0,1.0.0.202606181304)' severity='0'/>
+      <properties size='8'>
+        <property name='org.eclipse.equinox.p2.name' value='RoboChart2IsaCircus'/>
+        <property name='org.eclipse.equinox.p2.description' value='Eclipse plugin for translating RoboChart models to Isabelle/Circus theory files.'/>
+        <property name='org.eclipse.equinox.p2.provider' value='RoboCalc Project'/>
+        <property name='org.eclipse.equinox.p2.type.group' value='true'/>
+        <property name='maven-groupId' value='circus.robocalc'/>
+        <property name='maven-artifactId' value='circus.robocalc.robochart.epsilon.isacircus.feature'/>
+        <property name='maven-version' value='1.0.0-SNAPSHOT'/>
+        <property name='maven-type' value='eclipse-feature'/>
+      </properties>
+      <provides size='1'>
+        <provided namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.feature.feature.group' version='1.0.0.202606181304'/>
+      </provides>
+      <requires size='2'>
+        <required namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus' range='[1.0.0.202606181304,1.0.0.202606181304]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.feature.feature.jar' range='[1.0.0.202606181304,1.0.0.202606181304]'>
+          <filter>
+            (org.eclipse.update.install.features=true)
+          </filter>
+        </required>
+      </requires>
+      <touchpoint id='null' version='0.0.0'/>
     </unit>
     <unit id='org.eclipse.equinox.p2.engine' version='2.7.500.v20220817-1208' generation='2'>
       <update id='org.eclipse.equinox.p2.engine' range='[0.0.0,2.7.500.v20220817-1208)' severity='0'/>
@@ -7397,6 +7344,59 @@
         <instructions size='1'>
           <instruction key='manifest'>
             Bundle-SymbolicName: org.eclipse.e4.ui.services;singleton:=true&#xA;Bundle-Version: 1.5.100.v20221024-2137
+          </instruction>
+        </instructions>
+      </touchpointData>
+    </unit>
+    <unit id='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304' generation='2'>
+      <update id='circus.robocalc.robochart.epsilon.isacircus' range='[0.0.0,1.0.0.202606181304)' severity='0'/>
+      <properties size='5'>
+        <property name='org.eclipse.equinox.p2.name' value='RoboChart2IsaCircus'/>
+        <property name='maven-groupId' value='circus.robocalc'/>
+        <property name='maven-artifactId' value='circus.robocalc.robochart.epsilon.isacircus'/>
+        <property name='maven-version' value='1.0.0-SNAPSHOT'/>
+        <property name='maven-type' value='eclipse-plugin'/>
+      </properties>
+      <provides size='5'>
+        <provided namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304'/>
+        <provided namespace='osgi.bundle' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304'/>
+        <provided namespace='java.package' name='circus.robocalc.robochart.epsilon.isacircus.ui.handlers' version='0.0.0'/>
+        <provided namespace='osgi.identity' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304'>
+          <properties size='1'>
+            <property name='type' value='osgi.bundle'/>
+          </properties>
+        </provided>
+        <provided namespace='org.eclipse.equinox.p2.eclipse.type' name='bundle' version='1.0.0'/>
+      </provides>
+      <requires size='11'>
+        <required namespace='osgi.bundle' name='org.eclipse.ui' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.core.resources' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.core.runtime' range='3.24.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.epsilon.eol.engine' range='2.4.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.epsilon.eol.dt' range='2.4.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.epsilon.egl.engine' range='2.4.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.epsilon.emc.emf' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='circus.robocalc.robochart' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.ui.console' range='0.0.0'/>
+        <requiredProperties namespace='osgi.ee' match='(&amp;(osgi.ee=JavaSE)(version=21))'>
+          <description>
+            circus.robocalc.robochart.epsilon.isacircus
+          </description>
+        </requiredProperties>
+        <required namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.source' range='[1.0.0.202606181304,1.0.0.202606181304]' optional='true'>
+          <filter>
+            (org.eclipse.update.install.sources=true)
+          </filter>
+        </required>
+      </requires>
+      <artifacts size='1'>
+        <artifact classifier='osgi.bundle' id='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304'/>
+      </artifacts>
+      <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
+      <touchpointData size='1'>
+        <instructions size='1'>
+          <instruction key='manifest'>
+            Bundle-SymbolicName: circus.robocalc.robochart.epsilon.isacircus;singleton:=true&#xA;Bundle-Version: 1.0.0.202606181304
           </instruction>
         </instructions>
       </touchpointData>

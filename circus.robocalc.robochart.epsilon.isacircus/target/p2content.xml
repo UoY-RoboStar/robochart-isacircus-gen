@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <units size='1'>
-  <unit id='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350' generation='2'>
-    <update id='circus.robocalc.robochart.epsilon.isacircus' range='[0.0.0,1.0.0.202605241350)' severity='0'/>
+  <unit id='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304' generation='2'>
+    <update id='circus.robocalc.robochart.epsilon.isacircus' range='[0.0.0,1.0.0.202606181304)' severity='0'/>
     <properties size='5'>
       <property name='org.eclipse.equinox.p2.name' value='RoboChart2IsaCircus'/>
       <property name='maven-groupId' value='circus.robocalc'/>
@@ -10,10 +10,10 @@
       <property name='maven-type' value='eclipse-plugin'/>
     </properties>
     <provides size='5'>
-      <provided namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350'/>
-      <provided namespace='osgi.bundle' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350'/>
+      <provided namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304'/>
+      <provided namespace='osgi.bundle' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304'/>
       <provided namespace='java.package' name='circus.robocalc.robochart.epsilon.isacircus.ui.handlers' version='0.0.0'/>
-      <provided namespace='osgi.identity' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350'>
+      <provided namespace='osgi.identity' name='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304'>
         <properties size='1'>
           <property name='type' value='osgi.bundle'/>
         </properties>
@@ -35,20 +35,20 @@
           circus.robocalc.robochart.epsilon.isacircus
         </description>
       </requiredProperties>
-      <required namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.source' range='[1.0.0.202605241350,1.0.0.202605241350]' optional='true'>
+      <required namespace='org.eclipse.equinox.p2.iu' name='circus.robocalc.robochart.epsilon.isacircus.source' range='[1.0.0.202606181304,1.0.0.202606181304]' optional='true'>
         <filter>
           (org.eclipse.update.install.sources=true)
         </filter>
       </required>
     </requires>
     <artifacts size='1'>
-      <artifact classifier='osgi.bundle' id='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202605241350'/>
+      <artifact classifier='osgi.bundle' id='circus.robocalc.robochart.epsilon.isacircus' version='1.0.0.202606181304'/>
     </artifacts>
     <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
     <touchpointData size='1'>
       <instructions size='1'>
         <instruction key='manifest'>
-          Bundle-SymbolicName: circus.robocalc.robochart.epsilon.isacircus;singleton:=true&#xA;Bundle-Version: 1.0.0.202605241350&#xA;
+          Bundle-SymbolicName: circus.robocalc.robochart.epsilon.isacircus;singleton:=true&#xA;Bundle-Version: 1.0.0.202606181304&#xA;
         </instruction>
       </instructions>
     </touchpointData>

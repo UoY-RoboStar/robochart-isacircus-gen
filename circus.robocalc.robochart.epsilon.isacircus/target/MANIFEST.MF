@@ -3,7 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: RoboChart2IsaCircus
 Bundle-SymbolicName: circus.robocalc.robochart.epsilon.isacircus;singlet
  on:=true
-Bundle-Version: 1.0.0.202605241350
+Bundle-Version: 1.0.0.202606181304
 Bundle-Activator: circus.robocalc.robochart.epsilon.isacircus.Activator
 Bundle-ActivationPolicy: lazy
 Require-Bundle: org.eclipse.ui,org.eclipse.core.resources,org.eclipse.co

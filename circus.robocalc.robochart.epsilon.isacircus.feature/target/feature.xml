@@ -2,7 +2,7 @@
 <feature
     id="circus.robocalc.robochart.epsilon.isacircus.feature"
     label="RoboChart2IsaCircus"
-    version="1.0.0.202605241350"
+    version="1.0.0.202606181304"
     provider-name="RoboCalc Project">
 
    <description>
@@ -11,9 +11,9 @@
 
    <plugin
          id="circus.robocalc.robochart.epsilon.isacircus"
-         download-size="95"
-         install-size="440"
-         version="1.0.0.202605241350"
+         download-size="104"
+         install-size="484"
+         version="1.0.0.202606181304"
          unpack="false"/>
 
 </feature>
