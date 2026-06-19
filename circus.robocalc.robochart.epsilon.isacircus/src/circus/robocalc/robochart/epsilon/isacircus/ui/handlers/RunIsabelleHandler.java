@@ -8,7 +8,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -25,8 +26,6 @@ import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.jface.dialogs.ProgressMonitorDialog;
-import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ui.console.ConsolePlugin;
 import org.eclipse.ui.console.IConsole;
@@ -35,60 +34,61 @@ import org.eclipse.ui.console.MessageConsole;
 import org.eclipse.ui.console.MessageConsoleStream;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-public class RunIsabelleHandler extends AbstractHandler implements IRunnableWithProgress {
+public class RunIsabelleHandler extends AbstractHandler {
 
     private static final String ISABELLE_NAME = "isabelle";
     private static final int SERVER_PORT = 4711;
     private static final String SESSION_NAME = "HOL-CSP_RS";
-    private static final long TIMEOUT = 120000; // 2 minutes
 
-    // Static state for session reuse
+    // Timeouts
+    private static final long TIMEOUT = 60000;                   // 1 min: deadlock_free' apply
+    private static final long SLEDGEHAMMER_TIMEOUT = 180000;     // 3 min: sledgehammer
+    private static final long COUNTEREXAMPLE_TIMEOUT = 480000;   // 8 min: quickcheck/nitpick
+
+    // Max sledgehammer iterations to avoid infinite loop
+    private static final int MAX_SLEDGEHAMMER_ITERATIONS = 5;
+
+    // Static state for session reuse across invocations
     private static String isabellePath = null;
     private static String sessionId = null;
     private static boolean serverRunning = false;
 
     IFile inputFile;
 
+    // ── Entry point ──────────────────────────────────────────────────────────
     @Override
     public Object execute(ExecutionEvent event) throws ExecutionException {
         IStructuredSelection selection = HandlerUtil.getCurrentStructuredSelection(event);
+        if (!(selection.getFirstElement() instanceof IFile)) return null;
 
-        if (!(selection.getFirstElement() instanceof IFile)) {
-            return null;
-        }
         inputFile = (IFile) selection.getFirstElement();
+        if (!inputFile.getFileExtension().equals("thy")) return null;
 
-        if (!inputFile.getFileExtension().equals("thy")) {
-            return null;
-        }
-
-        org.eclipse.core.runtime.jobs.Job job = new org.eclipse.core.runtime.jobs.Job("Isabelle Verification") {
-            @Override
-            protected org.eclipse.core.runtime.IStatus run(org.eclipse.core.runtime.IProgressMonitor monitor) {
-                try {
-                    RunIsabelleHandler.this.run(monitor);
-                } catch (InvocationTargetException e) {
-                    return new org.eclipse.core.runtime.Status(
-                        org.eclipse.core.runtime.IStatus.ERROR,
-                        "circus.robocalc.robochart.epsilon.isacircus",
-                        "Isabelle verification failed", e.getCause());
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+        org.eclipse.core.runtime.jobs.Job job =
+            new org.eclipse.core.runtime.jobs.Job("Isabelle Verification") {
+                @Override
+                protected org.eclipse.core.runtime.IStatus run(
+                        org.eclipse.core.runtime.IProgressMonitor monitor) {
+                    try {
+                        runVerification(monitor);
+                    } catch (Exception e) {
+                        return new org.eclipse.core.runtime.Status(
+                            org.eclipse.core.runtime.IStatus.ERROR,
+                            "circus.robocalc.robochart.epsilon.isacircus",
+                            "Isabelle verification failed: " + e.getMessage(), e);
+                    }
+                    return org.eclipse.core.runtime.Status.OK_STATUS;
                 }
-                return org.eclipse.core.runtime.Status.OK_STATUS;
-            }
-        };
-        job.setUser(false);
+            };
+        job.setUser(true);
         job.schedule();
-
         return null;
     }
 
-    @Override
-    public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
-        monitor.beginTask("Running Isabelle verification...", 10);
+    // ── Main verification logic ───────────────────────────────────────────────
+    private void runVerification(org.eclipse.core.runtime.IProgressMonitor monitor)
+            throws IOException, InterruptedException {
 
-        // Get Eclipse Console for output
         MessageConsole console = getOrCreateConsole("Isabelle Verification");
         MessageConsoleStream out = console.newMessageStream();
         showConsole(console);
@@ -99,20 +99,18 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
             ? thyAbsPath.substring(0, thyAbsPath.length() - 4) : thyAbsPath;
         String thyFileName = theoryPath.substring(theoryPath.lastIndexOf("/") + 1);
 
-        // Prepare log file
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String projectDir = new File(inputFile.getProject().getLocationURI()).getAbsolutePath();
         String logDir = projectDir + "/isabelle_log";
         new File(logDir).mkdirs();
         String logPath = logDir + "/" + thyFileName + "_" + timestamp + ".log";
-        
-        PrintWriter logWriter = null;
 
+        PrintWriter logWriter = null;
         try {
             logWriter = new PrintWriter(new FileWriter(logPath));
             DualOutput dual = new DualOutput(out, logWriter);
 
-            // Step 1: Find Isabelle (reuse if already found)
+            if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
             if (isabellePath == null) {
                 dual.println("TASK 1: Detecting Isabelle path...");
                 isabellePath = findIsabelleExecutable();
@@ -120,66 +118,656 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
             } else {
                 dual.println("TASK 1: Isabelle path already known: " + isabellePath);
             }
-            monitor.worked(1);
 
-            // Step 2 & 3: Start and check server (reuse if already running)
+            if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
             if (!serverRunning) {
                 dual.println("\nTASK 2: Starting Isabelle server...");
                 startIsabelleServer(isabellePath, dual);
-                monitor.worked(1);
-
                 dual.println("\nTASK 3: Checking if Isabelle server is running...");
                 boolean running = checkIsabelleServer(isabellePath, dual);
-                if (!running) {
-                    throw new InvocationTargetException(new IOException("Isabelle server is not running."));
-                }
+                if (!running) throw new IOException("Isabelle server is not running.");
                 dual.println("✅ Isabelle server is running.");
                 serverRunning = true;
             } else {
                 dual.println("\nTASK 2 & 3: Isabelle server already running.");
             }
-            monitor.worked(1);
 
-            // Step 4: Connect client (reuse if session exists)
+            if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
             if (sessionId == null) {
                 dual.println("\nTASK 4: Connecting to Isabelle client...");
                 startIsabelleClient(isabellePath, dual);
-                monitor.worked(1);
-
-                // Step 5: Start session
                 dual.println("\nTASK 5: Starting " + SESSION_NAME + " session...");
                 sessionId = sendCommandAndGetSessionId(
                     "{\"session\": \"" + SESSION_NAME + "\"}", "session_start", dual);
-                dual.println("✅ Session started successfully. Session ID: " + sessionId);
+                dual.println("✅ Session started. Session ID: " + sessionId);
             } else {
                 dual.println("\nTASK 4 & 5: Reusing existing session: " + sessionId);
             }
-            monitor.worked(2);
 
-            // Step 6: Run theory file
+            if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
             dual.println("\nTASK 6: Running Theory File...");
-            runTheoryFile(sessionId, theoryPath, dual);
-            monitor.worked(3);
+            runTheoryFile(theoryPath, thyAbsPath, dual, monitor);
 
-            dual.println("Log saved to: " + logPath);
-
-            // Refresh workspace to show log file
+            dual.println("\nLog saved to: " + logPath);
             try {
                 inputFile.getProject().refreshLocal(IResource.DEPTH_INFINITE, null);
-            } catch (Exception e) {
-                // ignore
-            }
+            } catch (Exception e) { /* ignore */ }
 
         } catch (IOException e) {
-            throw new InvocationTargetException(e, e.getMessage());
+            if (logWriter != null) logWriter.println("ERROR: " + e.getMessage());
+            sessionId = null;
+            serverRunning = false;
+            throw e;
         } finally {
-            monitor.done();
             if (logWriter != null) logWriter.close();
             try { out.close(); } catch (IOException e) { /* ignore */ }
         }
     }
 
-    // ── Shutdown: called by Activator on Eclipse close ───────────────────────
+    // ── Run theory file with full decision logic ──────────────────────────────
+    private void runTheoryFile(String theoryPath, String thyAbsPath,
+            DualOutput dual, org.eclipse.core.runtime.IProgressMonitor monitor)
+            throws IOException, InterruptedException {
+
+        dual.println("➡ Loading: " + theoryPath + ".thy");
+        dual.println("⬅ [Theory Execution] Loading dependencies, this may take a while...");
+
+        // Run first pass with TIMEOUT
+        TheoryResult result = executeTheory(theoryPath, TIMEOUT, dual, monitor);
+
+        if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
+
+        // ── Case A: Timeout → apply (deadlock_free' ...) got stuck ───────────
+        if (result.timedOut) {
+            dual.println("\n⏱️ TIMEOUT: apply (deadlock_free' ...) did not complete in "
+                + (TIMEOUT / 1000) + "s — tactic got stuck.");
+            dual.println("   Removing apply and done, inserting oops...");
+
+            int applyLine = findApplyDeadlockFreeLine(thyAbsPath);
+            int doneLine  = findDoneLine(thyAbsPath);
+            if (applyLine > 0 && doneLine > 0) {
+                removeLines(thyAbsPath, applyLine, doneLine);
+                insertLine(thyAbsPath, applyLine, "  oops");
+                dual.println("   ✏️ Lines " + applyLine + "-" + doneLine
+                    + " replaced with 'oops'.");
+            }
+            runCounterexample(theoryPath, thyAbsPath, dual, monitor);
+            return;
+        }
+
+        // ── Case B: ok:false + "Failed to finish proof" on done line ─────────
+        if (!result.ok && result.failedFinishLine > 0) {
+            dual.println("\n⚠️  'done' failed at line " + result.failedFinishLine
+                + ": apply completed but proof not closed.");
+            dual.println("   Running sledgehammer...");
+
+            boolean resolved = runSledgehammerLoop(
+                theoryPath, thyAbsPath, result.failedFinishLine, dual, monitor);
+
+            if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
+
+            if (resolved) {
+                // Sledgehammer closed the proof — re-run to verify
+                dual.println("\n   Re-running verification on updated file...");
+                TheoryResult rerun = executeTheory(theoryPath, TIMEOUT, dual, monitor);
+                if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
+                dual.println("\n========== VERIFICATION RESULT ==========");
+                printLemmaResults(rerun, dual);
+                dual.println("==========================================\n");
+            } else {
+                // Sledgehammer exhausted — replace remaining proof with oops
+                dual.println("\n❌ Sledgehammer could not close the proof.");
+                dual.println("   Replacing proof with oops and running counterexample...");
+                int applyLine = findApplyDeadlockFreeLine(thyAbsPath);
+                int doneLine  = findDoneLine(thyAbsPath);
+                if (applyLine > 0 && doneLine > 0) {
+                    removeLines(thyAbsPath, applyLine, doneLine);
+                    insertLine(thyAbsPath, applyLine, "  oops");
+                    dual.println("   ✏️ Proof replaced with 'oops'.");
+                }
+                runCounterexample(theoryPath, thyAbsPath, dual, monitor);
+            }
+            return;
+        }
+
+        // ── Case C: ok:true or other errors ──────────────────────────────────
+        dual.println("\n========== VERIFICATION RESULT ==========");
+        printLemmaResults(result, dual);
+        dual.println("==========================================\n");
+    }
+
+    // ── Sledgehammer loop: iterates until proof closed or exhausted ───────────
+    // Returns true if proof was closed with by(...), false if gave up.
+    private boolean runSledgehammerLoop(String theoryPath, String thyAbsPath,
+            int doneLineNumber, DualOutput dual,
+            org.eclipse.core.runtime.IProgressMonitor monitor)
+            throws IOException, InterruptedException {
+
+        int currentDoneLine = doneLineNumber;
+
+        for (int iter = 1; iter <= MAX_SLEDGEHAMMER_ITERATIONS; iter++) {
+            if (monitor.isCanceled()) return false;
+
+            dual.println("\n   [Sledgehammer iteration " + iter + "/"
+                + MAX_SLEDGEHAMMER_ITERATIONS + "]");
+
+            // Replace done/previous-apply line with sledgehammer in temp file
+            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS").format(new Date());
+            String tempPath = "/tmp/sledgehammer_temp_" + timestamp;
+            String tempThyPath = tempPath + ".thy";
+
+            List<String> lines = Files.readAllLines(Paths.get(thyAbsPath));
+            lines.set(currentDoneLine - 1, "  sledgehammer");
+            Files.write(Paths.get(tempThyPath), lines);
+            dual.println("   Temp file written: " + tempThyPath);
+
+            TheoryResult sledgeResult = executeTheory(tempPath, SLEDGEHAMMER_TIMEOUT, dual, monitor);
+            new File(tempThyPath).delete();
+
+            if (monitor.isCanceled()) return false;
+
+            if (sledgeResult.timedOut) {
+                dual.println("   ⏱️ Sledgehammer timed out after "
+                    + (SLEDGEHAMMER_TIMEOUT / 1000) + "s.");
+                return false;
+            }
+
+            String proof = sledgeResult.sledgehammerProof;
+            if (proof == null) {
+                dual.println("   ❌ Sledgehammer returned no proof suggestion.");
+                return false;
+            }
+
+            dual.println("   💡 Sledgehammer suggests: " + proof);
+
+            if (proof.startsWith("by (") || proof.startsWith("by(")) {
+                // Proof closed! Replace done line with by(...)
+                replaceLine(thyAbsPath, currentDoneLine, "  " + proof);
+                dual.println("   ✅ Proof closed with: " + proof);
+                dual.println("   ✏️ File updated at line " + currentDoneLine + ".");
+                return true;
+
+            } else if (proof.startsWith("apply (") || proof.startsWith("apply(")) {
+                // Sub-goal not closed — insert apply(...) and add new sledgehammer below
+                replaceLine(thyAbsPath, currentDoneLine, "  " + proof);
+                // Insert a new done line after the apply so we can replace it next iteration
+                insertLineAfter(thyAbsPath, currentDoneLine, "  done");
+                currentDoneLine = currentDoneLine + 1;
+                dual.println("   ↩ Sub-goal not closed. Inserted: " + proof);
+                dual.println("   ↩ Continuing sledgehammer on next sub-goal (line "
+                    + currentDoneLine + ")...");
+            } else {
+                dual.println("   ❓ Unexpected proof format: " + proof);
+                return false;
+            }
+        }
+
+        dual.println("   ❌ Reached max iterations (" + MAX_SLEDGEHAMMER_ITERATIONS
+            + ") without closing proof.");
+        return false;
+    }
+
+    // ── Run counterexample search ─────────────────────────────────────────────
+    private void runCounterexample(String theoryPath, String thyAbsPath,
+            DualOutput dual, org.eclipse.core.runtime.IProgressMonitor monitor)
+            throws IOException, InterruptedException {
+
+        if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
+        dual.println("\n🔍 Running counterexample search (quickcheck + nitpick)...");
+        dual.println("   Timeout: " + (COUNTEREXAMPLE_TIMEOUT / 1000) + "s");
+
+        TheoryResult result = executeTheory(theoryPath, COUNTEREXAMPLE_TIMEOUT, dual, monitor);
+
+        if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
+
+        dual.println("\n========== COUNTEREXAMPLE RESULT ==========");
+        if (result.timedOut) {
+            dual.println("⏱️ TIMEOUT: No counterexample found within "
+                + (COUNTEREXAMPLE_TIMEOUT / 1000) + "s.");
+            dual.println("   Result inconclusive.");
+        } else {
+            printLemmaResults(result, dual);
+        }
+        dual.println("==========================================\n");
+    }
+
+    // ── Execute a theory file and collect results ─────────────────────────────
+    private TheoryResult executeTheory(String theoryPath, long timeoutMs,
+            DualOutput dual, org.eclipse.core.runtime.IProgressMonitor monitor)
+            throws IOException, InterruptedException {
+
+        TheoryResult result = new TheoryResult();
+        String targetFileName = theoryPath.substring(theoryPath.lastIndexOf("/") + 1) + ".thy";
+
+        // Parse lemma structure from file
+        LinkedHashMap<String, String> lemmaStatus = new LinkedHashMap<>();
+        LinkedHashMap<String, Integer> lemmaLineNumbers = new LinkedHashMap<>();
+        File thyFile = new File(theoryPath + ".thy");
+        if (thyFile.exists()) {
+            List<String> fileLines = Files.readAllLines(Paths.get(theoryPath + ".thy"));
+            String lastLemma = null;
+            boolean hasCounterexampleTool = false;
+            for (int i = 0; i < fileLines.size(); i++) {
+                String line = fileLines.get(i).trim();
+                int lineNum = i + 1;
+                if (line.startsWith("lemma ")) {
+                    lastLemma = line.substring(6).split(":")[0].trim();
+                    lemmaStatus.put(lastLemma, "unknown");
+                    lemmaLineNumbers.put(lastLemma, lineNum);
+                    hasCounterexampleTool = false;
+                } else if (line.equals("nitpick") || line.startsWith("nitpick ")
+                        || line.equals("quickcheck") || line.startsWith("quickcheck ")) {
+                    hasCounterexampleTool = true;
+                } else if (line.equals("oops") && lastLemma != null) {
+                    lemmaStatus.put(lastLemma,
+                        hasCounterexampleTool ? "counterexample_search" : "oops");
+                    lastLemma = null;
+                    hasCounterexampleTool = false;
+                } else if (line.equals("done") || line.equals("sorry") || line.equals("qed")) {
+                    lastLemma = null;
+                    hasCounterexampleTool = false;
+                }
+            }
+        }
+
+        Process process = new ProcessBuilder("isabelle", "client", "-n", ISABELLE_NAME).start();
+        try (BufferedWriter writer = new BufferedWriter(
+                    new OutputStreamWriter(process.getOutputStream()));
+             BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()))) {
+
+            String command = String.format(
+                "use_theories {\"session_id\": \"%s\", \"theories\": [\"%s\"]}\n",
+                sessionId, theoryPath);
+            writer.write(command);
+            writer.flush();
+            dual.logOnly("➡ Sent: " + command.trim());
+
+            long startTime = System.currentTimeMillis();
+            String response = null;
+            // Track current lemma context for real-time NOTE parsing
+            String currentNoteLemma = null;
+
+            while (true) {
+                if (monitor.isCanceled()) {
+                    process.destroy();
+                    dual.println("⛔ Cancelled.");
+                    result.timedOut = true;
+                    return result;
+                }
+                if (System.currentTimeMillis() - startTime > timeoutMs) {
+                    process.destroy();
+                    result.timedOut = true;
+                    return result;
+                }
+                if (reader.ready()) {
+                    response = reader.readLine();
+                    if (response == null) break;
+                    dual.logOnly("⬅ [Raw] " + response);
+
+                    // ── Real-time parsing of NOTE messages ────────────────
+                    if (response.startsWith("NOTE")) {
+                        // Sledgehammer: "Try this: by (...)" or "Try this: apply (...)"
+                        if (response.contains("Try this:")) {
+                            String suggestion = extractTryThis(response);
+                            if (suggestion != null && result.sledgehammerProof == null) {
+                                result.sledgehammerProof = suggestion;
+                                dual.println("   💡 Sledgehammer: " + suggestion);
+                            }
+                        }
+
+                        // Track which lemma we are currently in via theorem messages
+                        if (response.contains("\"theorem\\\\n")) {
+                            try {
+                                String msg = extractMessageField(response);
+                                String[] parts = msg.split("\\\\n");
+                                if (parts.length >= 2) {
+                                    currentNoteLemma = parts[1].trim().replace(":", "");
+                                }
+                            } catch (Exception e) { /* ignore */ }
+                        }
+
+                        // Nitpick confirmed counterexample
+                        // NOTE: "Nitpick found a potentially spurious counterexample" is
+                        // intentionally NOT handled here — spurious counterexamples are
+                        // unreliable and may be false positives. Only confirmed counterexamples
+                        // (without "potentially spurious") are reported.
+                        if (response.contains("Nitpick found a counterexample")
+                                && !response.contains("potentially spurious")) {
+                            String msg = extractMessageField(response);
+                            String lemmaName = currentNoteLemma != null
+                                ? currentNoteLemma
+                                : findLemmaForLine(
+                                    extractLineFromNote(response), lemmaLineNumbers, null);
+                            if (lemmaName != null && !result.reportedLemmas.contains(lemmaName)) {
+                                List<String> lines = new ArrayList<>();
+                                lines.add("🔍 Nitpick counterexample for " + lemmaName + ":");
+                                lines.add("   " + msg.replace("\\n", "\n   "));
+                                result.lemmaResults.put(lemmaName, lines);
+                                result.reportedLemmas.add(lemmaName);
+                                dual.println("🔍 Nitpick counterexample for " + lemmaName + ":");
+                                dual.println("   " + msg.replace("\\n", "\n   "));
+                            }
+                        }
+
+                        // Quickcheck counterexample
+                        if (response.contains("Quickcheck found a counterexample")) {
+                            String msg = extractMessageField(response);
+                            String lemmaName = currentNoteLemma != null
+                                ? currentNoteLemma
+                                : findLemmaForLine(
+                                    extractLineFromNote(response), lemmaLineNumbers, null);
+                            if (lemmaName != null && !result.reportedLemmas.contains(lemmaName)) {
+                                List<String> lines = new ArrayList<>();
+                                lines.add("🔍 Quickcheck counterexample for " + lemmaName + ":");
+                                lines.add("   " + msg.replace("\\n", "\n   "));
+                                result.lemmaResults.put(lemmaName, lines);
+                                result.reportedLemmas.add(lemmaName);
+                                dual.println("🔍 Quickcheck counterexample for " + lemmaName + ":");
+                                dual.println("   " + msg.replace("\\n", "\n   "));
+                            }
+                        }
+
+                        // Nitpick/Quickcheck no counterexample found
+                        if (response.contains("No counterexample") 
+                                || response.contains("no counterexample")) {
+                            String lemmaName = currentNoteLemma;
+                            if (lemmaName != null && !result.reportedLemmas.contains(lemmaName)) {
+                                dual.println("   ❓ No counterexample found for: " + lemmaName);
+                            }
+                        }
+
+                        // Quickcheck failed (e.g. no code equations)
+                        if (response.contains("Quickcheck") && response.contains("failed")) {
+                            String msg = extractMessageField(response);
+                            dual.println("   ⚠️ Quickcheck failed: " + msg.replace("\\n", " "));
+                        }
+                    }
+
+                    if (response.contains("FINISHED")) break;
+                } else {
+                    Thread.sleep(300);
+                }
+            }
+
+            if (response == null || !response.contains("FINISHED")) return result;
+
+            result.ok = response.contains("\"ok\":true");
+
+            // Parse "Failed to finish proof" + line number from done
+            if (!result.ok && response.contains("Failed to finish proof")) {
+                result.failedFinishLine = extractLineNumber(response, "Failed to finish proof");
+            }
+
+            // Parse any remaining lemma results from FINISHED node blocks
+            // (for passed lemmas not caught in real-time)
+            String[] nodeBlocks = response.split("\"node_name\"");
+            for (String block : nodeBlocks) {
+                if (!block.contains(targetFileName)) continue;
+                parseLemmaResults(block, lemmaStatus, lemmaLineNumbers,
+                    result.lemmaResults, result.reportedLemmas);
+                break;
+            }
+            result.lemmaStatus = lemmaStatus;
+        }
+        return result;
+    }
+
+    // ── Find line number of apply (deadlock_free' ...) ────────────────────────
+    private int findApplyDeadlockFreeLine(String thyAbsPath) throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get(thyAbsPath));
+        for (int i = 0; i < lines.size(); i++) {
+            String trimmed = lines.get(i).trim();
+            if (trimmed.startsWith("apply (deadlock_free") || 
+                trimmed.startsWith("apply(deadlock_free")) {
+                return i + 1;
+            }
+        }
+        return -1;
+    }
+
+    // ── Find line number of first 'done' ─────────────────────────────────────
+    private int findDoneLine(String thyAbsPath) throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get(thyAbsPath));
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).trim().equals("done")) return i + 1;
+        }
+        return -1;
+    }
+
+    // ── Remove lines from startLine to endLine (inclusive, 1-based) ──────────
+    private void removeLines(String filePath, int startLine, int endLine) throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        // Remove from end to start to preserve line numbers
+        for (int i = endLine - 1; i >= startLine - 1; i--) {
+            if (i >= 0 && i < lines.size()) lines.remove(i);
+        }
+        Files.write(Paths.get(filePath), lines);
+    }
+
+    // ── Insert a line at position lineNumber (1-based), shifting rest down ────
+    private void insertLine(String filePath, int lineNumber, String content) throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        lines.add(lineNumber - 1, content);
+        Files.write(Paths.get(filePath), lines);
+    }
+
+    // ── Insert a line after lineNumber (1-based) ──────────────────────────────
+    private void insertLineAfter(String filePath, int lineNumber, String content)
+            throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        lines.add(lineNumber, content); // lineNumber is 1-based, add() is 0-based = insert after
+        Files.write(Paths.get(filePath), lines);
+    }
+
+    // ── Replace a specific line (1-based) ────────────────────────────────────
+    private void replaceLine(String filePath, int lineNumber, String newContent)
+            throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        if (lineNumber > 0 && lineNumber <= lines.size()) {
+            lines.set(lineNumber - 1, newContent);
+            Files.write(Paths.get(filePath), lines);
+        }
+    }
+
+    // ── Extract "message" field from a NOTE line ──────────────────────────────
+    private String extractMessageField(String response) {
+        try {
+            int idx = response.indexOf("\"message\":\"");
+            if (idx < 0) return "";
+            int start = idx + 11;
+            // Find end — escaped string, walk char by char
+            StringBuilder sb = new StringBuilder();
+            boolean escaped = false;
+            for (int i = start; i < response.length(); i++) {
+                char c = response.charAt(i);
+                if (escaped) {
+                    sb.append(c);
+                    escaped = false;
+                } else if (c == '\\') {
+                    sb.append(c);
+                    escaped = true;
+                } else if (c == '"') {
+                    break;
+                } else {
+                    sb.append(c);
+                }
+            }
+            return sb.toString();
+        } catch (Exception e) { return ""; }
+    }
+
+    // ── Extract line number from a NOTE message ───────────────────────────────
+    private int extractLineFromNote(String response) {
+        try {
+            int idx = response.indexOf("\"line\":");
+            if (idx < 0) return -1;
+            int end = response.indexOf(",", idx + 7);
+            if (end < 0) end = response.indexOf("}", idx + 7);
+            if (end < 0) return -1;
+            return Integer.parseInt(response.substring(idx + 7, end).trim());
+        } catch (Exception e) { return -1; }
+    }
+
+    // ── Extract line number near a keyword in FINISHED JSON ───────────────────
+    private int extractLineNumber(String response, String keyword) {
+        try {
+            int idx = response.indexOf(keyword);
+            if (idx < 0) return -1;
+            int lineIdx = response.indexOf("\"line\":", idx);
+            if (lineIdx < 0) return -1;
+            int lineEnd = response.indexOf(",", lineIdx + 7);
+            if (lineEnd < 0) lineEnd = response.indexOf("}", lineIdx + 7);
+            if (lineEnd < 0) return -1;
+            return Integer.parseInt(response.substring(lineIdx + 7, lineEnd).trim());
+        } catch (Exception e) { return -1; }
+    }
+
+    // ── Extract "Try this: by (...)" or "Try this: apply (...)" ──────────────
+    private String extractTryThis(String response) {
+        try {
+            int idx = response.indexOf("Try this:");
+            if (idx < 0) return null;
+
+            // Find by( or apply(
+            int byIdx = response.indexOf("by (", idx);
+            int applyIdx = response.indexOf("apply (", idx);
+
+            int start;
+            if (byIdx >= 0 && (applyIdx < 0 || byIdx < applyIdx)) {
+                start = byIdx;
+            } else if (applyIdx >= 0) {
+                start = applyIdx;
+            } else {
+                return null;
+            }
+
+            // Find matching closing paren
+            int depth = 0;
+            for (int i = start; i < response.length(); i++) {
+                char c = response.charAt(i);
+                if (c == '(') depth++;
+                else if (c == ')') {
+                    depth--;
+                    if (depth == 0) {
+                        return response.substring(start, i + 1)
+                            .replace("\\n", " ")
+                            .replace("\\\\", "\\")
+                            .trim();
+                    }
+                }
+            }
+        } catch (Exception e) { /* ignore */ }
+        return null;
+    }
+
+    // ── Parse lemma results from a node block ────────────────────────────────
+    private void parseLemmaResults(String block,
+            LinkedHashMap<String, String> lemmaStatus,
+            LinkedHashMap<String, Integer> lemmaLineNumbers,
+            LinkedHashMap<String, List<String>> lemmaResults,
+            Set<String> reportedLemmas) {
+
+        String[] messages = block.split("\\{\"kind\":");
+        String currentLemma = null;
+
+        for (String msg : messages) {
+            if (!msg.contains("\"writeln\"")) continue;
+
+            int msgStart = msg.indexOf("\"message\":\"") + 11;
+            if (msgStart < 11) continue;
+            int msgEnd = msg.indexOf("\",\"pos\"", msgStart);
+            if (msgEnd < 0) continue;
+            String message = msg.substring(msgStart, msgEnd);
+
+            int lineStart = msg.indexOf("\"line\":", msgEnd);
+            int lineNumber = -1;
+            if (lineStart != -1) {
+                int lineEnd = msg.indexOf(",", lineStart + 7);
+                if (lineEnd > lineStart) {
+                    try {
+                        lineNumber = Integer.parseInt(
+                            msg.substring(lineStart + 7, lineEnd).trim());
+                    } catch (NumberFormatException e) { /* ignore */ }
+                }
+            }
+
+            if (message.startsWith("theorem\\n")) {
+                if (currentLemma != null && !reportedLemmas.contains(currentLemma)) {
+                    List<String> result = new ArrayList<>();
+                    result.add("✅ PASSED: " + currentLemma);
+                    lemmaResults.put(currentLemma, result);
+                    reportedLemmas.add(currentLemma);
+                }
+                String[] msgLines = message.split("\\\\n");
+                currentLemma = msgLines.length >= 2
+                    ? msgLines[1].trim().replace(":", "") : "unknown";
+
+            } else if (message.contains("found a counterexample")
+                    || message.contains("Nitpick found")
+                    || message.contains("Quickcheck found")) {
+                String ce = message.replace("\\n", "\n   ").replace("\\\\", "");
+                String targetLemma = findLemmaForLine(lineNumber, lemmaLineNumbers, currentLemma);
+                if (targetLemma != null && !reportedLemmas.contains(targetLemma)) {
+                    List<String> result = new ArrayList<>();
+                    result.add("🔍 Counterexample for " + targetLemma + ":");
+                    result.add("   " + ce);
+                    lemmaResults.put(targetLemma, result);
+                    reportedLemmas.add(targetLemma);
+                }
+            } else if (message.contains("No counterexample found")
+                    || message.contains("no counterexample")) {
+                if (currentLemma != null && !reportedLemmas.contains(currentLemma)) {
+                    List<String> result = new ArrayList<>();
+                    result.add("❓ No counterexample found: " + currentLemma);
+                    lemmaResults.put(currentLemma, result);
+                    reportedLemmas.add(currentLemma);
+                }
+            }
+        }
+
+        if (currentLemma != null && !reportedLemmas.contains(currentLemma)) {
+            List<String> result = new ArrayList<>();
+            result.add("✅ PASSED: " + currentLemma);
+            lemmaResults.put(currentLemma, result);
+            reportedLemmas.add(currentLemma);
+        }
+    }
+
+    private String findLemmaForLine(int lineNumber,
+            LinkedHashMap<String, Integer> lemmaLineNumbers, String fallback) {
+        if (lineNumber < 0) return fallback;
+        String closest = fallback;
+        int closestLine = -1;
+        for (Map.Entry<String, Integer> entry : lemmaLineNumbers.entrySet()) {
+            if (entry.getValue() <= lineNumber && entry.getValue() > closestLine) {
+                closestLine = entry.getValue();
+                closest = entry.getKey();
+            }
+        }
+        return closest;
+    }
+
+    // ── Print lemma results ───────────────────────────────────────────────────
+    private void printLemmaResults(TheoryResult result, DualOutput dual) {
+        if (result.lemmaStatus == null) return;
+        for (String lemmaName : result.lemmaStatus.keySet()) {
+            if (result.lemmaResults.containsKey(lemmaName)) {
+                for (String line : result.lemmaResults.get(lemmaName)) {
+                    dual.println(line);
+                }
+            } else {
+                String status = result.lemmaStatus.get(lemmaName);
+                if ("oops".equals(status)) {
+                    dual.println("⚠️  UNPROVED (oops): " + lemmaName);
+                } else if ("counterexample_search".equals(status)) {
+                    dual.println("🔍 COUNTEREXAMPLE SEARCH (no result): " + lemmaName);
+                }
+            }
+        }
+    }
+
+    // ── Shutdown ──────────────────────────────────────────────────────────────
     public static void shutdown() {
         try {
             if (sessionId != null && isabellePath != null) {
@@ -190,17 +778,16 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
                 stopIsabelleServerStatic();
                 serverRunning = false;
             }
-        } catch (IOException e) {
-            // ignore errors during shutdown
-        }
+        } catch (IOException e) { /* ignore */ }
     }
 
     private static void stopSessionStatic() throws IOException {
         Process process = new ProcessBuilder("isabelle", "client", "-n", ISABELLE_NAME).start();
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
-             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String stopCommand = "session_stop {\"session_id\": \"" + sessionId + "\"}\n";
-            writer.write(stopCommand);
+        try (BufferedWriter writer = new BufferedWriter(
+                    new OutputStreamWriter(process.getOutputStream()));
+             BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()))) {
+            writer.write("session_stop {\"session_id\": \"" + sessionId + "\"}\n");
             writer.flush();
             String response;
             while ((response = reader.readLine()) != null) {
@@ -210,15 +797,17 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
     }
 
     private static void stopIsabelleServerStatic() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder(isabellePath, "server", "-n", ISABELLE_NAME, "-x");
+        ProcessBuilder pb = new ProcessBuilder(isabellePath, "server",
+            "-n", ISABELLE_NAME, "-x");
         pb.redirectErrorStream(true);
         Process process = pb.start();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            while (reader.readLine() != null) { /* consume output */ }
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream()))) {
+            while (reader.readLine() != null) { /* consume */ }
         }
     }
 
-    // ── Find Isabelle executable ─────────────────────────────────────────────
+    // ── Find Isabelle executable ──────────────────────────────────────────────
     private String findIsabelleExecutable() throws IOException {
         try {
             String os = System.getProperty("os.name").toLowerCase();
@@ -227,23 +816,20 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream()))) {
                 String path = reader.readLine();
-                if (path != null && !path.isEmpty()) {
-                    return path.trim();
-                }
+                if (path != null && !path.isEmpty()) return path.trim();
             }
-        } catch (Exception e) {
-            // auto detection failed
-        }
+        } catch (Exception e) { /* fall through */ }
         throw new IOException("Isabelle not found in PATH.");
     }
 
-    // ── Start Isabelle server ────────────────────────────────────────────────
+    // ── Start Isabelle server ─────────────────────────────────────────────────
     private void startIsabelleServer(String isabellePath, DualOutput out) throws IOException {
-        ProcessBuilder pb = new ProcessBuilder(isabellePath, "server", "-n", ISABELLE_NAME,
-            "-p", String.valueOf(SERVER_PORT));
+        ProcessBuilder pb = new ProcessBuilder(isabellePath, "server",
+            "-n", ISABELLE_NAME, "-p", String.valueOf(SERVER_PORT));
         pb.redirectErrorStream(true);
         Process process = pb.start();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 out.println("⬅ [Isabelle Server] " + line);
@@ -255,10 +841,11 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
         }
     }
 
-    // ── Check Isabelle server ────────────────────────────────────────────────
+    // ── Check Isabelle server ─────────────────────────────────────────────────
     private boolean checkIsabelleServer(String isabellePath, DualOutput out) throws IOException {
         Process process = new ProcessBuilder(isabellePath, "server", "-l").start();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream()))) {
             String line = reader.readLine();
             if (line == null) return false;
             out.println("⬅ [Isabelle Server Check] " + line);
@@ -266,12 +853,13 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
         }
     }
 
-    // ── Start Isabelle client ────────────────────────────────────────────────
+    // ── Start Isabelle client ─────────────────────────────────────────────────
     private void startIsabelleClient(String isabellePath, DualOutput out) throws IOException {
         ProcessBuilder pb = new ProcessBuilder(isabellePath, "client", "-n", ISABELLE_NAME);
         pb.redirectErrorStream(true);
         Process process = pb.start();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.startsWith("OK")) {
@@ -282,226 +870,51 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
         }
     }
 
-    // ── Send command and get session ID ──────────────────────────────────────
+    // ── Send session_start and get session ID ─────────────────────────────────
     private String sendCommandAndGetSessionId(String jsonPayload, String command,
             DualOutput out) throws IOException {
         Process process = new ProcessBuilder("isabelle", "client", "-n", ISABELLE_NAME).start();
-
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
-             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+        try (BufferedWriter writer = new BufferedWriter(
+                    new OutputStreamWriter(process.getOutputStream()));
+             BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()))) {
 
             String fullCommand = command + " " + jsonPayload + "\n";
             writer.write(fullCommand);
             writer.flush();
             out.println("➡ Sent: " + fullCommand.trim());
 
-            String sessionName = jsonPayload.split("\"session\": \"")[1].split("\"")[0];
             String response;
             String sid = null;
-
             while ((response = reader.readLine()) != null) {
-                if (response.contains("\"verbose\":\"true\"")) continue;
-                if (response.trim().matches("\\d+")) continue;
-                if (response.startsWith("OK") && response.contains("\"isabelle_id\"")) continue;
-                if (response.startsWith("server")) continue;
-                if (response.startsWith("OK") && response.contains("\"task\"")) {
-                    out.println("⬅ [Session Start] Command received. Loading session " + sessionName + "...");
-                    continue;
-                }
-                if (response.contains("\"verbose\":\"false\"") && response.contains("\"message\"")) {
-                    String message = response.split("\"message\":\"")[1].split("\"")[0];
-                    out.println("⬅ [Session Start] " + message);
-                    continue;
-                }
-                if (response.contains("FINISHED")) {
+                if (response.contains("FINISHED") && response.contains("\"session_id\"")) {
                     out.println("⬅ [Session Start] FINISHED");
-                } else {
-                    out.println("⬅ [Session Start] " + response);
-                }
-                if (response.contains("\"session_id\"")) {
                     sid = response.split("\"session_id\":\"")[1].split("\"")[0];
                     break;
+                } else if (response.contains("\"message\"")) {
+                    try {
+                        String message = response.split("\"message\":\"")[1].split("\"")[0];
+                        out.println("⬅ [Session Start] " + message);
+                    } catch (Exception e) { /* ignore */ }
                 }
             }
-
             if (sid == null) throw new IOException("Failed to retrieve session_id.");
             return sid;
         }
     }
 
-    // ── Run theory file ──────────────────────────────────────────────────────
-    private void runTheoryFile(String sessionId, String theoryPath, DualOutput out)
-            throws IOException, InterruptedException {
-        Process process = new ProcessBuilder("isabelle", "client", "-n", ISABELLE_NAME).start();
-
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
-             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-
-            String command = String.format(
-                "use_theories {\"session_id\": \"%s\", \"theories\": [\"%s\"]}\n",
-                sessionId, theoryPath);
-            writer.write(command);
-            writer.flush();
-            out.println("➡ Sent: " + command.trim());
-            out.println("⬅ [Theory Execution] Loading dependencies and running proof, this may take a while...");
-
-            String targetFileName = theoryPath.substring(theoryPath.lastIndexOf("/") + 1) + ".thy";
-
-            // Read thy file to extract lemma names and their status
-            LinkedHashMap<String, String> lemmaStatus = new LinkedHashMap<>();
-            LinkedHashMap<String, Integer> lemmaLineNumbers = new LinkedHashMap<>();
-            File thyFile = new File(theoryPath + ".thy");
-            if (thyFile.exists()) {
-                Scanner scanner = new Scanner(thyFile);
-                String lastLemma = null;
-                boolean hasNitpickOrQuickcheck = false;
-                int lineNum = 0;
-                while (scanner.hasNextLine()) {
-                    String line = scanner.nextLine().trim();
-                    lineNum++;
-                    if (line.startsWith("lemma ")) {
-                        lastLemma = line.substring(6).split(":")[0].trim();
-                        lemmaStatus.put(lastLemma, "unknown");
-                        lemmaLineNumbers.put(lastLemma, lineNum);
-                        hasNitpickOrQuickcheck = false;
-                    } else if (line.equals("nitpick") || line.startsWith("nitpick ")
-                            || line.equals("quickcheck") || line.startsWith("quickcheck ")) {
-                        hasNitpickOrQuickcheck = true;
-                    } else if (line.equals("oops") && lastLemma != null) {
-                        lemmaStatus.put(lastLemma, hasNitpickOrQuickcheck ? "nitpick_oops" : "oops");
-                        lastLemma = null;
-                        hasNitpickOrQuickcheck = false;
-                    } else if (line.equals("done") || line.equals("sorry") || line.equals("qed")) {
-                        lastLemma = null;
-                        hasNitpickOrQuickcheck = false;
-                    }
-                }
-                scanner.close();
-            }
-
-            // Set timeout
-            long startTime = System.currentTimeMillis();
-            String response = null;
-            while (true) {
-                if (System.currentTimeMillis() - startTime > TIMEOUT) {
-                    out.println("\n========== VERIFICATION RESULT ==========");
-                    out.println("⏱️ TIMEOUT: Proof did not complete within " + (TIMEOUT / 1000) + " seconds.");
-                    out.println("   Some lemmas may be stuck.");
-                    out.println("   Consider adding 'sorry' or 'oops' to unfinished lemmas.");
-                    out.println("==========================================\n");
-                    process.destroy();
-                    return;
-                }
-                if (reader.ready()) {
-                    response = reader.readLine();
-                    if (response == null) break;
-                    out.logOnly("⬅ [Raw] " + response);
-                    if (response.contains("FINISHED")) break;
-                } else {
-                    Thread.sleep(500);
-                }
-            }
-
-            if (response == null || !response.contains("FINISHED")) return;
-
-            String[] nodeBlocks = response.split("\"node_name\"");
-
-            for (String block : nodeBlocks) {
-                if (!block.contains(targetFileName)) continue;
-
-                out.println("\n========== VERIFICATION RESULT ==========");
-
-                String[] messages = block.split("\\{\"kind\":");
-                String currentLemma = null;
-                LinkedHashMap<String, List<String>> lemmaResults = new LinkedHashMap<>();
-                Set<String> reportedLemmas = new HashSet<>();
-
-                for (String msg : messages) {
-                    if (!msg.contains("\"writeln\"")) continue;
-
-                    int msgStart = msg.indexOf("\"message\":\"") + 11;
-                    if (msgStart < 11) continue;
-                    int msgEnd = msg.indexOf("\",\"pos\"", msgStart);
-                    if (msgEnd < 0) continue;
-                    String message = msg.substring(msgStart, msgEnd);
-
-                    int lineStart = msg.indexOf("\"line\":", msgEnd);
-                    int lineNumber = -1;
-                    if (lineStart != -1) {
-                        int lineEnd = msg.indexOf(",", lineStart + 7);
-                        if (lineEnd > lineStart) {
-                            try {
-                                lineNumber = Integer.parseInt(msg.substring(lineStart + 7, lineEnd).trim());
-                            } catch (NumberFormatException e) { /* ignore */ }
-                        }
-                    }
-
-                    if (message.startsWith("theorem\\n")) {
-                        if (currentLemma != null && !reportedLemmas.contains(currentLemma)) {
-                            List<String> lines = new ArrayList<>();
-                            lines.add("✅ PASSED: " + currentLemma);
-                            lemmaResults.put(currentLemma, lines);
-                            reportedLemmas.add(currentLemma);
-                        }
-                        String[] msgLines = message.split("\\\\n");
-                        currentLemma = msgLines.length >= 2 ? msgLines[1].trim().replace(":", "") : "unknown";
-
-                    } else if (message.contains("found a counterexample")) {
-                        String ce = message.replace("\\n", "\n   ").replace("\\\\", "");
-
-                        String counterexampleLemma = null;
-                        if (lineNumber != -1) {
-                            int closestLine = -1;
-                            for (Map.Entry<String, Integer> entry : lemmaLineNumbers.entrySet()) {
-                                if (entry.getValue() <= lineNumber && entry.getValue() > closestLine) {
-                                    closestLine = entry.getValue();
-                                    counterexampleLemma = entry.getKey();
-                                }
-                            }
-                        }
-
-                        String targetLemma = counterexampleLemma != null ? counterexampleLemma : currentLemma;
-
-                        if (targetLemma != null && !reportedLemmas.contains(targetLemma)) {
-                            List<String> lines = new ArrayList<>();
-                            lines.add("🔍 Lemma " + targetLemma + " found a counterexample:");
-                            lines.add("   " + ce);
-                            lemmaResults.put(targetLemma, lines);
-                            reportedLemmas.add(targetLemma);
-                            if (targetLemma.equals(currentLemma)) currentLemma = null;
-                        }
-                    }
-                }
-
-                if (currentLemma != null && !reportedLemmas.contains(currentLemma)) {
-                    List<String> lines = new ArrayList<>();
-                    lines.add("✅ PASSED: " + currentLemma);
-                    lemmaResults.put(currentLemma, lines);
-                    reportedLemmas.add(currentLemma);
-                }
-
-                for (String lemmaName : lemmaStatus.keySet()) {
-                    if (lemmaResults.containsKey(lemmaName)) {
-                        for (String line : lemmaResults.get(lemmaName)) {
-                            out.println(line);
-                        }
-                    } else {
-                        String status = lemmaStatus.get(lemmaName);
-                        if (status.equals("oops")) {
-                            out.println("⚠️  UNPROVED (oops): " + lemmaName);
-                        } else if (status.equals("nitpick_oops")) {
-                            out.println("🔍 COUNTEREXAMPLE SEARCH (no result returned): " + lemmaName);
-                        }
-                    }
-                }
-
-                out.println("==========================================\n");
-                break;
-            }
-        }
+    // ── Result container ──────────────────────────────────────────────────────
+    private static class TheoryResult {
+        boolean ok = false;
+        boolean timedOut = false;
+        int failedFinishLine = -1;           // line number of failed 'done'
+        String sledgehammerProof = null;     // "by (...)" or "apply (...)"
+        LinkedHashMap<String, String> lemmaStatus = new LinkedHashMap<>();
+        LinkedHashMap<String, List<String>> lemmaResults = new LinkedHashMap<>();
+        Set<String> reportedLemmas = new HashSet<>();
     }
 
-    // ── Dual output helper: writes to both Console and log file ──────────────
+    // ── DualOutput: Console + log file ───────────────────────────────────────
     private static class DualOutput {
         private final MessageConsoleStream console;
         private final PrintWriter log;
@@ -510,25 +923,22 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
             this.log = log;
         }
         void println(String msg) {
-            try {
-                console.println(msg);
-            } catch (Exception e) { /* ignore */ }
+            try { console.println(msg); } catch (Exception e) { /* ignore */ }
             log.println(msg);
             log.flush();
         }
-        // Write to log file only, not to Console
         void logOnly(String msg) {
             log.println(msg);
             log.flush();
         }
     }
-    // ── Eclipse Console helpers ──────────────────────────────────────────────
+
+    // ── Eclipse Console helpers ───────────────────────────────────────────────
     private MessageConsole getOrCreateConsole(String name) {
         IConsoleManager manager = ConsolePlugin.getDefault().getConsoleManager();
         for (IConsole c : manager.getConsoles()) {
-            if (name.equals(c.getName()) && c instanceof MessageConsole) {
+            if (name.equals(c.getName()) && c instanceof MessageConsole)
                 return (MessageConsole) c;
-            }
         }
         MessageConsole c = new MessageConsole(name, null);
         manager.addConsoles(new IConsole[]{c});
@@ -536,7 +946,6 @@ public class RunIsabelleHandler extends AbstractHandler implements IRunnableWith
     }
 
     private void showConsole(MessageConsole console) {
-        IConsoleManager manager = ConsolePlugin.getDefault().getConsoleManager();
-        manager.showConsoleView(console);
+        ConsolePlugin.getDefault().getConsoleManager().showConsoleView(console);
     }
 }

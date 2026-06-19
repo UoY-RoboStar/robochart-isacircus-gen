@@ -120,36 +120,38 @@ abbreviation "assume b Q P \<equiv> (if b then P else aviol \<rightarrow> Q)"
 abbreviation "guar b P \<equiv> (if b then P else gviol \<rightarrow> STOP)"
 abbreviation "SSTOP \<equiv> SSTOP_aux share"  
 
-          
 
 [%var procparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ProcessPara));%]
 [%for(procpara in procparas){%]
-locale [%=procpara.name.word%] 
+
+[*Trans_core*]
+[%for(actpara in procpara.circusProcess.paraList.paras.select(ap|ap.name.word.startsWith("Transc_"))){%]
+locale trans_core_action 
 begin
+fixrec [%= actpara.name.word%] :: "[%=NID_name%] \<rightarrow> chan_event process"
+where
+[simp del] :\<open>[%= actpara.name.word%]\<cdot>n = 
+	[%=actpara.circusAction.parseAction()%] \<close>
+	
+lemma [%=z.version%]_trans_core_ddlf:
+  "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%=actpara.name.word%]\<cdot>n)  "
+  apply (deadlock_free P_def: [%=actpara.name.word%].simps)
+  done
+  
+lemma [%=z.version%]_trans_core_findcounterexample:
+  "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%= actpara.name.word%]\<cdot>n)"
+  apply (find_counterexample P_def: [%= actpara.name.word%].simps)
+  nitpick
+  quickcheck
+  oops
 
-actions  is "(mychan, unit) action" where 
-[%if(procpara.circusProcess.instanceOf(Z!BasicProcess)){%]
-[%=procpara.circusProcess.parseProc()%]
-[%} else {%]
-" [%= procpara.name.word%] = 
-	[%=procpara.circusProcess.parseProc()%] "
+[%}%]
 [%}%]
 
-\<comment> \<open>Main action of the process\<close>
-[%if(procpara.circusProcess.instanceOf(Z!BasicProcess)){%]
-definition "ProcDef = cProcess [%= procpara.circusProcess.mainAction.parseAction()%]"
-	[%} else {%]
-definition "ProcDef = cProcess [%= procpara.name.word%].ProcDef"
-	[%}%]
-
-end
-[%}%]
-
- 
 [%var actparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ActionPara));
 if(procparas.size()=0 and actparas.size()>0){%]
 
-locale actions 
+locale trans_core_action 
 begin
 [*Trans_core*]
 [%for(actpara in actparas.select(ap|ap.name.word.startsWith("Transc_"))){%]
@@ -167,6 +169,7 @@ lemma [%=z.version%]_trans_core_findcounterexample:
   "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%= actpara.name.word%]\<cdot>n)"
   apply (find_counterexample P_def: [%= actpara.name.word%].simps)
   nitpick
+  quickcheck
   oops
 
 [%}%]

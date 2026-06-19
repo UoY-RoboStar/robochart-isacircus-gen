@@ -21,7 +21,7 @@ public class Activator extends AbstractUIPlugin {
     public void stop(BundleContext context) throws Exception {
         // Cleanup Isabelle session and server on Eclipse shutdown
         try {
-            circus.robocalc.robochart.epsilon.isacircus.ui.handlers.RunIsabelleHandler.shutdown();
+            circus.robocalc.robochart.epsilon.isacircus.ui.handlers.RunIsabelleHandlerR0.shutdown();
         } catch (Exception e) {
             // ignore errors during shutdown
         }
