@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -38,15 +39,21 @@ public class RunIsabelleHandler extends AbstractHandler {
 
     private static final String ISABELLE_NAME = "isabelle";
     private static final int SERVER_PORT = 4711;
-    private static final String SESSION_NAME = "HOL-CSP_RS";
+    private static final String SESSION_NAME = "RC_HOL-CSP";
 
     // Timeouts
-    private static final long TIMEOUT = 60000;                   // 1 min: deadlock_free' apply
-    private static final long SLEDGEHAMMER_TIMEOUT = 180000;     // 3 min: sledgehammer
+    private static final long TIMEOUT = 120000;                  // 2 min: deadlock_free' apply
+    // Note: no timeout for sledgehammer — it always returns either a proof or "No proof found"
+    // Using a very large value (24 hours) effectively means no timeout
+    private static final long SLEDGEHAMMER_TIMEOUT = 86400000;   // 24 hours = no effective timeout
     private static final long COUNTEREXAMPLE_TIMEOUT = 480000;   // 8 min: quickcheck/nitpick
 
     // Max sledgehammer iterations to avoid infinite loop
     private static final int MAX_SLEDGEHAMMER_ITERATIONS = 5;
+
+    // Sledgehammer command with extended provers for better coverage
+    private static final String SLEDGEHAMMER_CMD =
+        "sledgehammer [provers = \"cvc5 verit z3 e spass vampire zipperposition\"]";
 
     // Static state for session reuse across invocations
     private static String isabellePath = null;
@@ -107,7 +114,7 @@ public class RunIsabelleHandler extends AbstractHandler {
 
         PrintWriter logWriter = null;
         try {
-            logWriter = new PrintWriter(new FileWriter(logPath));
+            logWriter = new PrintWriter(new FileWriter(logPath, StandardCharsets.UTF_8));
             DualOutput dual = new DualOutput(out, logWriter);
 
             if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
@@ -245,28 +252,48 @@ public class RunIsabelleHandler extends AbstractHandler {
 
         int currentDoneLine = doneLineNumber;
 
+        // Save the very original file content for restoration on failure
+        List<String> veryOriginalLines = Files.readAllLines(
+            Paths.get(thyAbsPath), StandardCharsets.UTF_8);
+
+        // Working copy that accumulates apply(...) steps across iterations
+        List<String> workingLines = new ArrayList<>(veryOriginalLines);
+
         for (int iter = 1; iter <= MAX_SLEDGEHAMMER_ITERATIONS; iter++) {
-            if (monitor.isCanceled()) return false;
+            if (monitor.isCanceled()) {
+                // Restore on cancel
+                Files.write(Paths.get(thyAbsPath), veryOriginalLines, StandardCharsets.UTF_8);
+                return false;
+            }
 
             dual.println("\n   [Sledgehammer iteration " + iter + "/"
                 + MAX_SLEDGEHAMMER_ITERATIONS + "]");
 
-            // Replace done/previous-apply line with sledgehammer in temp file
-            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS").format(new Date());
-            String tempPath = "/tmp/sledgehammer_temp_" + timestamp;
-            String tempThyPath = tempPath + ".thy";
+            // Replace current target line with sledgehammer in working copy
+            List<String> sledgeLines = new ArrayList<>(workingLines);
+            sledgeLines.set(currentDoneLine - 1, "  " + SLEDGEHAMMER_CMD);
 
-            List<String> lines = Files.readAllLines(Paths.get(thyAbsPath));
-            lines.set(currentDoneLine - 1, "  sledgehammer");
-            Files.write(Paths.get(tempThyPath), lines);
-            dual.println("   Temp file written: " + tempThyPath);
+            // Write to original file (theory name must match filename)
+            Files.write(Paths.get(thyAbsPath), sledgeLines, StandardCharsets.UTF_8);
+            dual.println("   Modified file: line " + currentDoneLine + " → sledgehammer");
 
-            TheoryResult sledgeResult = executeTheory(tempPath, SLEDGEHAMMER_TIMEOUT, dual, monitor);
-            new File(tempThyPath).delete();
+            TheoryResult sledgeResult;
+            try {
+                sledgeResult = executeTheory(theoryPath, SLEDGEHAMMER_TIMEOUT, dual, monitor);
+            } finally {
+                // Restore working lines after each sledgehammer run
+                // (working lines reflect accumulated apply steps so far)
+                Files.write(Paths.get(thyAbsPath), workingLines, StandardCharsets.UTF_8);
+                dual.println("   File restored to working state.");
+            }
 
-            if (monitor.isCanceled()) return false;
+            if (monitor.isCanceled()) {
+                Files.write(Paths.get(thyAbsPath), veryOriginalLines, StandardCharsets.UTF_8);
+                return false;
+            }
 
             if (sledgeResult.timedOut) {
+                Files.write(Paths.get(thyAbsPath), veryOriginalLines, StandardCharsets.UTF_8);
                 dual.println("   ⏱️ Sledgehammer timed out after "
                     + (SLEDGEHAMMER_TIMEOUT / 1000) + "s.");
                 return false;
@@ -274,34 +301,39 @@ public class RunIsabelleHandler extends AbstractHandler {
 
             String proof = sledgeResult.sledgehammerProof;
             if (proof == null) {
+                Files.write(Paths.get(thyAbsPath), veryOriginalLines, StandardCharsets.UTF_8);
                 dual.println("   ❌ Sledgehammer returned no proof suggestion.");
                 return false;
             }
 
             dual.println("   💡 Sledgehammer suggests: " + proof);
 
-            if (proof.startsWith("by (") || proof.startsWith("by(")) {
-                // Proof closed! Replace done line with by(...)
-                replaceLine(thyAbsPath, currentDoneLine, "  " + proof);
+            if (proof.startsWith("by ") || proof.startsWith("by(")) {
+                // Proof closed! Update working lines and write final result
+                workingLines.set(currentDoneLine - 1, "  " + proof);
+                Files.write(Paths.get(thyAbsPath), workingLines, StandardCharsets.UTF_8);
                 dual.println("   ✅ Proof closed with: " + proof);
-                dual.println("   ✏️ File updated at line " + currentDoneLine + ".");
+                dual.println("   ✏️ File updated permanently.");
                 return true;
 
-            } else if (proof.startsWith("apply (") || proof.startsWith("apply(")) {
-                // Sub-goal not closed — insert apply(...) and add new sledgehammer below
-                replaceLine(thyAbsPath, currentDoneLine, "  " + proof);
-                // Insert a new done line after the apply so we can replace it next iteration
-                insertLineAfter(thyAbsPath, currentDoneLine, "  done");
+            } else if (proof.startsWith("apply ") || proof.startsWith("apply(")) {
+                // Sub-goal not closed — add apply(...) to working lines
+                // Insert a placeholder on next line; sledgeLines will replace it with SLEDGEHAMMER_CMD
+                workingLines.set(currentDoneLine - 1, "  " + proof);
+                workingLines.add(currentDoneLine, "  oops (* placeholder *)");
                 currentDoneLine = currentDoneLine + 1;
-                dual.println("   ↩ Sub-goal not closed. Inserted: " + proof);
-                dual.println("   ↩ Continuing sledgehammer on next sub-goal (line "
+                dual.println("   ↩ Sub-goal not closed. Applied: " + proof);
+                dual.println("   ↩ Running sledgehammer on remaining sub-goals (line "
                     + currentDoneLine + ")...");
             } else {
+                Files.write(Paths.get(thyAbsPath), veryOriginalLines, StandardCharsets.UTF_8);
                 dual.println("   ❓ Unexpected proof format: " + proof);
                 return false;
             }
         }
 
+        // Max iterations reached — restore original
+        Files.write(Paths.get(thyAbsPath), veryOriginalLines, StandardCharsets.UTF_8);
         dual.println("   ❌ Reached max iterations (" + MAX_SLEDGEHAMMER_ITERATIONS
             + ") without closing proof.");
         return false;
@@ -344,7 +376,7 @@ public class RunIsabelleHandler extends AbstractHandler {
         LinkedHashMap<String, Integer> lemmaLineNumbers = new LinkedHashMap<>();
         File thyFile = new File(theoryPath + ".thy");
         if (thyFile.exists()) {
-            List<String> fileLines = Files.readAllLines(Paths.get(theoryPath + ".thy"));
+            List<String> fileLines = Files.readAllLines(Paths.get(theoryPath + ".thy"), StandardCharsets.UTF_8);
             String lastLemma = null;
             boolean hasCounterexampleTool = false;
             for (int i = 0; i < fileLines.size(); i++) {
@@ -381,29 +413,37 @@ public class RunIsabelleHandler extends AbstractHandler {
                 sessionId, theoryPath);
             writer.write(command);
             writer.flush();
-            dual.logOnly("➡ Sent: " + command.trim());
+            dual.println("➡ Sent: " + command.trim());
 
-            long startTime = System.currentTimeMillis();
+            final boolean[] timedOutFlag = {false};
+            final boolean[] cancelledFlag = {false};
+
+            // Timeout thread — destroys process after timeoutMs
+            Thread timeoutThread = new Thread(() -> {
+                try {
+                    long start = System.currentTimeMillis();
+                    while (System.currentTimeMillis() - start < timeoutMs) {
+                        Thread.sleep(500);
+                        if (monitor.isCanceled()) {
+                            cancelledFlag[0] = true;
+                            process.destroy();
+                            return;
+                        }
+                    }
+                    timedOutFlag[0] = true;
+                    process.destroy();
+                } catch (InterruptedException e) { /* stopped normally */ }
+            });
+            timeoutThread.setDaemon(true);
+            timeoutThread.start();
+
             String response = null;
             // Track current lemma context for real-time NOTE parsing
             String currentNoteLemma = null;
 
-            while (true) {
-                if (monitor.isCanceled()) {
-                    process.destroy();
-                    dual.println("⛔ Cancelled.");
-                    result.timedOut = true;
-                    return result;
-                }
-                if (System.currentTimeMillis() - startTime > timeoutMs) {
-                    process.destroy();
-                    result.timedOut = true;
-                    return result;
-                }
-                if (reader.ready()) {
-                    response = reader.readLine();
-                    if (response == null) break;
-                    dual.logOnly("⬅ [Raw] " + response);
+            // Blocking read — readLine() blocks until data arrives or process ends
+            while ((response = reader.readLine()) != null) {
+                    dual.println("⬅ [Raw] " + response);
 
                     // ── Real-time parsing of NOTE messages ────────────────
                     if (response.startsWith("NOTE")) {
@@ -485,11 +525,20 @@ public class RunIsabelleHandler extends AbstractHandler {
                     }
 
                     if (response.contains("FINISHED")) break;
-                } else {
-                    Thread.sleep(300);
-                }
             }
 
+            // Stop the timeout thread
+            timeoutThread.interrupt();
+
+            if (cancelledFlag[0]) {
+                dual.println("⛔ Cancelled.");
+                result.timedOut = true;
+                return result;
+            }
+            if (timedOutFlag[0]) {
+                result.timedOut = true;
+                return result;
+            }
             if (response == null || !response.contains("FINISHED")) return result;
 
             result.ok = response.contains("\"ok\":true");
@@ -499,13 +548,39 @@ public class RunIsabelleHandler extends AbstractHandler {
                 result.failedFinishLine = extractLineNumber(response, "Failed to finish proof");
             }
 
-            // Parse any remaining lemma results from FINISHED node blocks
-            // (for passed lemmas not caught in real-time)
+            // Parse lemma results from FINISHED node blocks
+            // This catches nitpick/quickcheck results that appear in node messages
             String[] nodeBlocks = response.split("\"node_name\"");
             for (String block : nodeBlocks) {
                 if (!block.contains(targetFileName)) continue;
                 parseLemmaResults(block, lemmaStatus, lemmaLineNumbers,
                     result.lemmaResults, result.reportedLemmas);
+                // Also directly scan for counterexamples in node messages
+                if (block.contains("Nitpick found a counterexample")
+                        && !block.contains("potentially spurious")) {
+                    extractCounterexamplesFromBlock(block, "Nitpick",
+                        lemmaLineNumbers, result, dual);
+                }
+                if (block.contains("Quickcheck found a counterexample")) {
+                    extractCounterexamplesFromBlock(block, "Quickcheck",
+                        lemmaLineNumbers, result, dual);
+                }
+                // Extract sledgehammer "Try this:" from node messages if not already found
+                if (result.sledgehammerProof == null && block.contains("Try this:")) {
+                    String[] msgParts = block.split("\"message\":\"");
+                    for (String part : msgParts) {
+                        if (!part.contains("Try this:")) continue;
+                        // Extract just the Try this portion
+                        int tryIdx = part.indexOf("Try this:");
+                        if (tryIdx < 0) continue;
+                        String candidate = extractTryThis(part.substring(tryIdx));
+                        if (candidate != null) {
+                            result.sledgehammerProof = candidate;
+                            dual.println("   💡 Sledgehammer (from FINISHED): " + candidate);
+                            break;
+                        }
+                    }
+                }
                 break;
             }
             result.lemmaStatus = lemmaStatus;
@@ -513,9 +588,40 @@ public class RunIsabelleHandler extends AbstractHandler {
         return result;
     }
 
+    // ── Extract counterexamples directly from a FINISHED node block ──────────
+    private void extractCounterexamplesFromBlock(String block, String tool,
+            LinkedHashMap<String, Integer> lemmaLineNumbers,
+            TheoryResult result, DualOutput dual) {
+        try {
+            // Find all message entries containing the counterexample
+            String[] msgEntries = block.split("\\{\"kind\":\"writeln\"");
+            for (String entry : msgEntries) {
+                String keyword = tool + " found a counterexample";
+                if (!entry.contains(keyword)) continue;
+                if (tool.equals("Nitpick") && entry.contains("potentially spurious")) continue;
+
+                String msg = extractMessageField("{\"kind\":\"writeln\"" + entry);
+                int lineNum = extractLineFromNote("{\"kind\":\"writeln\"" + entry);
+
+                String lemmaName = findLemmaForLine(lineNum, lemmaLineNumbers, null);
+                if (lemmaName == null) continue;
+                if (result.reportedLemmas.contains(lemmaName)) continue;
+
+                String ceText = msg.replace("\\n", "\n   ").replace("\\\\", "");
+                List<String> lines = new ArrayList<>();
+                lines.add("🔍 " + tool + " counterexample for " + lemmaName + ":");
+                lines.add("   " + ceText);
+                result.lemmaResults.put(lemmaName, lines);
+                result.reportedLemmas.add(lemmaName);
+                dual.println("🔍 " + tool + " counterexample for " + lemmaName + ":");
+                dual.println("   " + ceText);
+            }
+        } catch (Exception e) { /* ignore parse errors */ }
+    }
+
     // ── Find line number of apply (deadlock_free' ...) ────────────────────────
     private int findApplyDeadlockFreeLine(String thyAbsPath) throws IOException {
-        List<String> lines = Files.readAllLines(Paths.get(thyAbsPath));
+        List<String> lines = Files.readAllLines(Paths.get(thyAbsPath), StandardCharsets.UTF_8);
         for (int i = 0; i < lines.size(); i++) {
             String trimmed = lines.get(i).trim();
             if (trimmed.startsWith("apply (deadlock_free") || 
@@ -528,7 +634,7 @@ public class RunIsabelleHandler extends AbstractHandler {
 
     // ── Find line number of first 'done' ─────────────────────────────────────
     private int findDoneLine(String thyAbsPath) throws IOException {
-        List<String> lines = Files.readAllLines(Paths.get(thyAbsPath));
+        List<String> lines = Files.readAllLines(Paths.get(thyAbsPath), StandardCharsets.UTF_8);
         for (int i = 0; i < lines.size(); i++) {
             if (lines.get(i).trim().equals("done")) return i + 1;
         }
@@ -537,36 +643,36 @@ public class RunIsabelleHandler extends AbstractHandler {
 
     // ── Remove lines from startLine to endLine (inclusive, 1-based) ──────────
     private void removeLines(String filePath, int startLine, int endLine) throws IOException {
-        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        List<String> lines = Files.readAllLines(Paths.get(filePath), StandardCharsets.UTF_8);
         // Remove from end to start to preserve line numbers
         for (int i = endLine - 1; i >= startLine - 1; i--) {
             if (i >= 0 && i < lines.size()) lines.remove(i);
         }
-        Files.write(Paths.get(filePath), lines);
+        Files.write(Paths.get(filePath), lines, StandardCharsets.UTF_8);
     }
 
     // ── Insert a line at position lineNumber (1-based), shifting rest down ────
     private void insertLine(String filePath, int lineNumber, String content) throws IOException {
-        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        List<String> lines = Files.readAllLines(Paths.get(filePath), StandardCharsets.UTF_8);
         lines.add(lineNumber - 1, content);
-        Files.write(Paths.get(filePath), lines);
+        Files.write(Paths.get(filePath), lines, StandardCharsets.UTF_8);
     }
 
     // ── Insert a line after lineNumber (1-based) ──────────────────────────────
     private void insertLineAfter(String filePath, int lineNumber, String content)
             throws IOException {
-        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        List<String> lines = Files.readAllLines(Paths.get(filePath), StandardCharsets.UTF_8);
         lines.add(lineNumber, content); // lineNumber is 1-based, add() is 0-based = insert after
-        Files.write(Paths.get(filePath), lines);
+        Files.write(Paths.get(filePath), lines, StandardCharsets.UTF_8);
     }
 
     // ── Replace a specific line (1-based) ────────────────────────────────────
     private void replaceLine(String filePath, int lineNumber, String newContent)
             throws IOException {
-        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        List<String> lines = Files.readAllLines(Paths.get(filePath), StandardCharsets.UTF_8);
         if (lineNumber > 0 && lineNumber <= lines.size()) {
             lines.set(lineNumber - 1, newContent);
-            Files.write(Paths.get(filePath), lines);
+            Files.write(Paths.get(filePath), lines, StandardCharsets.UTF_8);
         }
     }
 
@@ -629,32 +735,90 @@ public class RunIsabelleHandler extends AbstractHandler {
             int idx = response.indexOf("Try this:");
             if (idx < 0) return null;
 
-            // Find by( or apply(
-            int byIdx = response.indexOf("by (", idx);
-            int applyIdx = response.indexOf("apply (", idx);
-
-            int start;
-            if (byIdx >= 0 && (applyIdx < 0 || byIdx < applyIdx)) {
-                start = byIdx;
-            } else if (applyIdx >= 0) {
-                start = applyIdx;
-            } else {
-                return null;
+            // Get the text after "Try this: "
+            int afterTryThis = idx + 9; // length of "Try this:"
+            while (afterTryThis < response.length()
+                    && response.charAt(afterTryThis) == ' ') {
+                afterTryThis++;
             }
 
-            // Find matching closing paren
-            int depth = 0;
-            for (int i = start; i < response.length(); i++) {
-                char c = response.charAt(i);
-                if (c == '(') depth++;
-                else if (c == ')') {
-                    depth--;
-                    if (depth == 0) {
-                        return response.substring(start, i + 1)
-                            .replace("\\n", " ")
-                            .replace("\\\\", "\\")
-                            .trim();
+            // Find by( or apply( with parentheses
+            int byParenIdx = response.indexOf("by (", idx);
+            int applyParenIdx = response.indexOf("apply (", idx);
+
+            // Find by without parentheses (e.g. "by auto", "by blast")
+            int bySimpleIdx = response.indexOf("by ", idx);
+
+            // Find apply without parentheses (e.g. "apply blast")
+            int applySimpleIdx = response.indexOf("apply ", idx);
+
+            // Determine what starts first after "Try this:"
+            int start = -1;
+            boolean hasParens = false;
+            boolean isApply = false;
+
+            // Check by(... first
+            if (byParenIdx >= 0 && (start < 0 || byParenIdx < start)) {
+                start = byParenIdx;
+                hasParens = true;
+                isApply = false;
+            }
+            // Check apply(... 
+            if (applyParenIdx >= 0 && (start < 0 || applyParenIdx < start)) {
+                start = applyParenIdx;
+                hasParens = true;
+                isApply = true;
+            }
+            // Check by simple (only if closer than paren versions)
+            if (bySimpleIdx >= 0 && (start < 0 || bySimpleIdx < start)) {
+                start = bySimpleIdx;
+                hasParens = false;
+                isApply = false;
+            }
+            // Check apply simple
+            if (applySimpleIdx >= 0 && (start < 0 || applySimpleIdx < start)) {
+                start = applySimpleIdx;
+                hasParens = false;
+                isApply = true;
+            }
+
+            if (start < 0) return null;
+
+            if (hasParens) {
+                // Find matching closing paren
+                int depth = 0;
+                for (int i = start; i < response.length(); i++) {
+                    char c = response.charAt(i);
+                    if (c == '(') depth++;
+                    else if (c == ')') {
+                        depth--;
+                        if (depth == 0) {
+                            return response.substring(start, i + 1)
+                                .replace("\\n", " ")
+                                .replace("\\\\", "\\")
+                                .trim();
+                        }
                     }
+                }
+            } else {
+                // No parens — extract until space+paren (timing info) or end of meaningful text
+                // e.g. "by auto (12 ms)" → extract "by auto"
+                // e.g. "apply blast (2 ms)" → extract "apply blast"
+                int end = start;
+                // Skip the keyword (by/apply) and tactic name
+                // Find the timing "(N ms)" or end of string/quote
+                int timingIdx = response.indexOf(" (", start);
+                int quoteIdx = response.indexOf("\"", start);
+                int newlineIdx = response.indexOf("\\n", start);
+
+                if (timingIdx >= 0) end = timingIdx;
+                if (quoteIdx >= 0 && (end < 0 || quoteIdx < end)) end = quoteIdx;
+                if (newlineIdx >= 0 && (end < 0 || newlineIdx < end)) end = newlineIdx;
+
+                if (end > start) {
+                    return response.substring(start, end).replace("\\\\", "\\").trim();
+                } else {
+                    return response.substring(start).replace("\\\\", "\\").trim();
                 }
             }
         } catch (Exception e) { /* ignore */ }
@@ -703,18 +867,22 @@ public class RunIsabelleHandler extends AbstractHandler {
                 currentLemma = msgLines.length >= 2
                     ? msgLines[1].trim().replace(":", "") : "unknown";
 
-            } else if (message.contains("found a counterexample")
-                    || message.contains("Nitpick found")
-                    || message.contains("Quickcheck found")) {
+            } else if ((message.contains("Nitpick found a counterexample")
+                        && !message.contains("potentially spurious"))
+                    || message.contains("Quickcheck found a counterexample")) {
                 String ce = message.replace("\\n", "\n   ").replace("\\\\", "");
+                String tool = message.contains("Nitpick") ? "Nitpick" : "Quickcheck";
                 String targetLemma = findLemmaForLine(lineNumber, lemmaLineNumbers, currentLemma);
                 if (targetLemma != null && !reportedLemmas.contains(targetLemma)) {
                     List<String> result = new ArrayList<>();
-                    result.add("🔍 Counterexample for " + targetLemma + ":");
+                    result.add("🔍 " + tool + " counterexample for " + targetLemma + ":");
                     result.add("   " + ce);
                     lemmaResults.put(targetLemma, result);
                     reportedLemmas.add(targetLemma);
                 }
+            } else if (message.contains("potentially spurious")) {
+                // NOTE: Nitpick potentially spurious counterexamples are intentionally
+                // ignored — they are unreliable and may be false positives.
             } else if (message.contains("No counterexample found")
                     || message.contains("no counterexample")) {
                 if (currentLemma != null && !reportedLemmas.contains(currentLemma)) {
@@ -887,9 +1055,13 @@ public class RunIsabelleHandler extends AbstractHandler {
             String response;
             String sid = null;
             while ((response = reader.readLine()) != null) {
+                out.println("⬅ [Session Raw] " + response);
                 if (response.contains("FINISHED") && response.contains("\"session_id\"")) {
                     out.println("⬅ [Session Start] FINISHED");
                     sid = response.split("\"session_id\":\"")[1].split("\"")[0];
+                    break;
+                } else if (response.contains("FAILED")) {
+                    out.println("⬅ [Session Start] FAILED: " + response);
                     break;
                 } else if (response.contains("\"message\"")) {
                     try {
