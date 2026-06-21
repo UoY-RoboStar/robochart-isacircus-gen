@@ -101,21 +101,7 @@ for(chanpara in channelparas.select(cp|cp.declList.decls.size()>0)){%]
 	}if(hasMore){%] |[%}%]
 	
 [%}%]
-\<comment> \<open>ChannelSet Decleration\<close>
-[%var channelsetparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelSetPara));
 
-for(chansetpara in channelsetparas){
-//	var chanset = chansetpara.declList.decls.at(0);
-	var chans = chansetpara.channelSet.expr.communicationList.communications;%]
-
-
-definition "[%= chansetpara.name.word%] = [%if(chans.size()=0){%]{}"[%}%]
-[%if(chans.size()>0){%]	{ [%for(chan in chans){%] [%=chan.channelExpr.name.word%][%if(hasMore){%], 
-	[%}%]
-	[%}%] }"
-	[%}%]
-[%}%]
-      
 abbreviation "assume b Q P \<equiv> (if b then P else aviol \<rightarrow> Q)"
 abbreviation "guar b P \<equiv> (if b then P else gviol \<rightarrow> STOP)"
 abbreviation "SSTOP \<equiv> SSTOP_aux share"  
@@ -135,7 +121,7 @@ where
 	
 lemma [%=z.version%]_trans_core_ddlf:
   "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%=actpara.name.word%]\<cdot>n)  "
-  apply (deadlock_free P_def: [%=actpara.name.word%].simps)
+  apply (deadlock_free' P_def: [%=actpara.name.word%].simps)
   done
   
 lemma [%=z.version%]_trans_core_findcounterexample:

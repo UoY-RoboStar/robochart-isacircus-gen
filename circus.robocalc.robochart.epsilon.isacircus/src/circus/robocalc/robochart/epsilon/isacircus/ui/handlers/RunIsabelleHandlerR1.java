@@ -35,14 +35,14 @@ import org.eclipse.ui.console.MessageConsole;
 import org.eclipse.ui.console.MessageConsoleStream;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-public class RunIsabelleHandler extends AbstractHandler {
+public class RunIsabelleHandlerR1 extends AbstractHandler {
 
     private static final String ISABELLE_NAME = "isabelle";
     private static final int SERVER_PORT = 4711;
     private static final String SESSION_NAME = "RC_HOL-CSP";
 
     // Timeouts
-    private static final long TIMEOUT = 180000;                  // 3 min: deadlock_free' apply
+    private static final long TIMEOUT = 120000;                  // 2 min: deadlock_free' apply
     // Note: no timeout for sledgehammer — it always returns either a proof or "No proof found"
     // Using a very large value (24 hours) effectively means no timeout
     private static final long SLEDGEHAMMER_TIMEOUT = 86400000;   // 24 hours = no effective timeout
@@ -184,16 +184,19 @@ public class RunIsabelleHandler extends AbstractHandler {
 
         if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
 
-        // ── Case A: Timeout → tactic got stuck or took too long ──────────────
+        // ── Case A: Timeout → apply (deadlock_free' ...) got stuck ───────────
         if (result.timedOut) {
             dual.println("\n⏱️ TIMEOUT: apply (deadlock_free' ...) did not complete in "
                 + (TIMEOUT / 1000) + "s — tactic got stuck.");
-            dual.println("   Replacing 'done' with 'oops'...");
+            dual.println("   Removing apply and done, inserting oops...");
 
-            int doneLine = findDoneLine(thyAbsPath);
-            if (doneLine > 0) {
-                replaceLine(thyAbsPath, doneLine, "  oops");
-                dual.println("   ✏️ 'done' replaced with 'oops' at line " + doneLine + ".");
+            int applyLine = findApplyDeadlockFreeLine(thyAbsPath);
+            int doneLine  = findDoneLine(thyAbsPath);
+            if (applyLine > 0 && doneLine > 0) {
+                removeLines(thyAbsPath, applyLine, doneLine);
+                insertLine(thyAbsPath, applyLine, "  oops");
+                dual.println("   ✏️ Lines " + applyLine + "-" + doneLine
+                    + " replaced with 'oops'.");
             }
             runCounterexample(theoryPath, thyAbsPath, dual, monitor);
             return;
@@ -219,13 +222,15 @@ public class RunIsabelleHandler extends AbstractHandler {
                 printLemmaResults(rerun, dual);
                 dual.println("==========================================\n");
             } else {
-                // Sledgehammer exhausted — replace done with oops, keep apply line
+                // Sledgehammer exhausted — replace remaining proof with oops
                 dual.println("\n❌ Sledgehammer could not close the proof.");
-                dual.println("   Replacing 'done' with 'oops' and running counterexample...");
-                int doneLine = findDoneLine(thyAbsPath);
-                if (doneLine > 0) {
-                    replaceLine(thyAbsPath, doneLine, "  oops");
-                    dual.println("   ✏️ 'done' replaced with 'oops' at line " + doneLine + ".");
+                dual.println("   Replacing proof with oops and running counterexample...");
+                int applyLine = findApplyDeadlockFreeLine(thyAbsPath);
+                int doneLine  = findDoneLine(thyAbsPath);
+                if (applyLine > 0 && doneLine > 0) {
+                    removeLines(thyAbsPath, applyLine, doneLine);
+                    insertLine(thyAbsPath, applyLine, "  oops");
+                    dual.println("   ✏️ Proof replaced with 'oops'.");
                 }
                 runCounterexample(theoryPath, thyAbsPath, dual, monitor);
             }

@@ -5445,7 +5445,7 @@ operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
 	var else_pred = createFalsePred();
 	
 	//elseif false then aviol -> Trans(n)
-	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Transc_" + self.FQN()).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Transc_" + self.name).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
 	elseAction = createGuardedAction(else_pred, elseAction);
 	
 	var actions = Sequence{ifAction, elseAction};
@@ -5472,7 +5472,7 @@ operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
 	Trans.declList = new Z!ZDeclList;
 	Trans.declList.decls.add(createVarDeclfromString("n", "NIDS_"+self.FQN()));
 
-	return Trans.createActionPara("Transc_" + self.FQN());	
+	return Trans.createActionPara("Transc_" + self.name);	
 }
 
 operation createTruePred(): Z!TruePred{
@@ -5563,7 +5563,7 @@ operation RC!Transition createTransitionAsCircusAction(): Z!CircusAction{
  * to be used in rule 53-1 Transition Core
  * difference from 54: 
  *  transc instead of trans
- 
+ *  remove FQN() for simplicification for trans and nc, but not the node NID
  */
 operation RC!Transition createTransitionAsCircusAction4TransCore(): Z!CircusAction{
 	var circusAction;
@@ -5578,19 +5578,19 @@ operation RC!Transition createTransitionAsCircusAction4TransCore(): Z!CircusActi
 		var action1 = trigger(self);
 		
 		//to create action2: exit
-		var rightAction1 = createPrefixingAction(createSynchCommunication("exit_"+nc(self).FQN()), createSkipAction());
+		var rightAction1 = createPrefixingAction(createSynchCommunication("exit_"+nc(self).name), createSkipAction());
 		var action2 = createAction2("InterruptAction", "SSTOP".createCallAction(), rightAction1);
 		
 		//to create action3_inner_1: exited
 		var prefixedAction = self.createTrActionAsCircusAction();
 		
 		
-		var action3_inner_1 = createPrefixingAction(createSynchCommunication("exited_"+nc(self).FQN()), prefixedAction);
+		var action3_inner_1 = createPrefixingAction(createSynchCommunication("exited_"+nc(self).name), prefixedAction);
 		
 		
 		//to create action3_inner_2: enter
-		var action3_inner_2 = createPrefixingAction(createSynchCommunication("enter_" + self.target.FQN()), ("Transc_" + nc(self).FQN()).createCallAction(Sequence{"NID_" + self.target.FQN()}.createRefExprSeq(false,false))  );
-				
+		var action3_inner_2 = createPrefixingAction(createSynchCommunication("enter_" + self.target.FQN()), ("Transc_" + nc(self).name).createCallAction(Sequence{"NID_" + self.target.FQN()}.createRefExprSeq(false,false))  );
+		
 		var action3_right = createAction2("SeqAction", action3_inner_1, action3_inner_2);
 		
 		//SStop /\ ( (exited-> [[t.action]]) ; (enter_t.target -> Skip))
@@ -5621,8 +5621,8 @@ operation RC!Transition createTransitionAsCircusAction4TransCore(): Z!CircusActi
 		var action1 = createPrefixingAction(tevent(self), prefixedAction);
 		
 		
-		var action2 = createPrefixingAction(createSynchCommunication("enter_" + self.target.FQN()), ("Transc_" + nc(self).FQN()).createCallAction(Sequence{"NID_" + self.target.FQN()}.createRefExprSeq(false,false)));
-				
+		var action2 = createPrefixingAction(createSynchCommunication("enter_" + self.target.FQN()), ("Transc_" + nc(self).name).createCallAction(Sequence{"NID_" + self.target.FQN()}.createRefExprSeq(false,false)));
+		
 		circusAction = createAction2("SeqAction", action1, action2);
 		
 		if(self.condition != null){
@@ -6526,7 +6526,7 @@ operation RC!Statement createStmtInContextAsAction(): Z!CircusAction{
 		 * Currently, need correct it by hand after the auto-gen
 		 * To be fixed in future 05Dec2025
 		*/
-//		var id = "tbd";
+		var id = "tbd";
 //		var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Trans_" + id).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
 		var elseAction = createPrefixingAction(createSynchCommunication("aviol"), stmt_container.createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
 		elseAction = createGuardedAction(else_pred, elseAction);

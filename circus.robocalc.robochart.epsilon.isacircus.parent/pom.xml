@@ -16,7 +16,7 @@
     <module>../circus.robocalc.robochart.epsilon.isacircus.site</module>
   </modules>
 
-  <build>
+<build>
     <plugins>
       <plugin>
         <groupId>org.eclipse.tycho</groupId>
@@ -25,6 +25,36 @@
         <extensions>true</extensions>
       </plugin>
     </plugins>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.eclipse.m2e</groupId>
+          <artifactId>lifecycle-mapping</artifactId>
+          <version>1.0.0</version>
+          <configuration>
+            <lifecycleMappingMetadata>
+              <pluginExecutions>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.eclipse.tycho</groupId>
+                    <artifactId>tycho-packaging-plugin</artifactId>
+                    <versionRange>[0,)</versionRange>
+                    <goals>
+                      <goal>build-qualifier</goal>
+                      <goal>validate-id</goal>
+                      <goal>validate-version</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <ignore/>
+                  </action>
+                </pluginExecution>
+              </pluginExecutions>
+            </lifecycleMappingMetadata>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
   </build>
 
   <repositories>
