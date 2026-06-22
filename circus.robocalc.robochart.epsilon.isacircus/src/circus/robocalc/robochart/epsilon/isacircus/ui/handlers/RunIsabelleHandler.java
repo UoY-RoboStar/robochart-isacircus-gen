@@ -42,11 +42,18 @@ public class RunIsabelleHandler extends AbstractHandler {
     private static final String SESSION_NAME = "RC_HOL-CSP";
 
     // Timeouts
-    private static final long TIMEOUT = 180000;                  // 3 min: deadlock_free' apply
-    // Note: no timeout for sledgehammer — it always returns either a proof or "No proof found"
-    // Using a very large value (24 hours) effectively means no timeout
-    private static final long SLEDGEHAMMER_TIMEOUT = 86400000;   // 24 hours = no effective timeout
-    private static final long COUNTEREXAMPLE_TIMEOUT = 480000;   // 8 min: quickcheck/nitpick
+    // Only ONE step gets a kill-timeout: verifying the isolated first ddlf lemma.
+    // A timeout there can ONLY mean apply (deadlock_free' ...) is non-terminating,
+    // because the truncated copy contains nothing else that could be slow.
+    private static final long TIMEOUT = 120000;                  // 2 min: deadlock_free' apply (isolated)
+
+    // All other steps must NOT kill the process — they always return a result eventually:
+    //   - sledgehammer always returns a proof or "No proof found"
+    //   - find_counterexample / nitpick / quickcheck always return (may be slow, never hang)
+    // A very large value (24 hours) effectively means "no kill timeout; wait for FINISHED".
+    private static final long NO_KILL_TIMEOUT = 86400000;       // 24 hours = no effective timeout
+    private static final long SLEDGEHAMMER_TIMEOUT = NO_KILL_TIMEOUT;
+    private static final long COUNTEREXAMPLE_TIMEOUT = NO_KILL_TIMEOUT;
 
     // Max sledgehammer iterations to avoid infinite loop
     private static final int MAX_SLEDGEHAMMER_ITERATIONS = 5;
@@ -171,7 +178,24 @@ public class RunIsabelleHandler extends AbstractHandler {
         }
     }
 
-    // ── Run theory file with full decision logic ──────────────────────────────
+    // ── Run theory file with three-step decision logic ────────────────────────
+    //
+    // Step 1: Verify ONLY the first ddlf lemma, in isolation, via a truncated copy
+    //         (prefix + first lemma + "end"), under a kill-timeout. Because the copy
+    //         contains nothing slow except the apply, a timeout there unambiguously
+    //         means apply (deadlock_free' ...) is non-terminating.
+    //
+    //   Outcome A (timeout)        → apply is stuck → delete apply+done, insert oops,
+    //                                then run counterexample search on the full file.
+    //   Outcome C (FINISHED, ok)   → proof complete → report DEADLOCK FREE, done.
+    //   Outcome B (FINISHED, fail) → "Failed to finish proof" → go to sledgehammer.
+    //
+    // Step 2 (only after B): sledgehammer loop on the FULL file, NO kill-timeout.
+    //   success → report DEADLOCK FREE (proof closed by ...).
+    //   failure → keep apply, replace ONLY done with oops, run counterexample search.
+    //
+    // Step 3 (counterexample search): run the full file, NO kill-timeout; wait for
+    //   nitpick/quickcheck to return naturally and report the counterexample.
     private void runTheoryFile(String theoryPath, String thyAbsPath,
             DualOutput dual, org.eclipse.core.runtime.IProgressMonitor monitor)
             throws IOException, InterruptedException {
@@ -179,63 +203,174 @@ public class RunIsabelleHandler extends AbstractHandler {
         dual.println("➡ Loading: " + theoryPath + ".thy");
         dual.println("⬅ [Theory Execution] Loading dependencies, this may take a while...");
 
-        // Run first pass with TIMEOUT
-        TheoryResult result = executeTheory(theoryPath, TIMEOUT, dual, monitor);
+        // ── Step 1: isolate the first ddlf lemma into a truncated copy ────────
+        int applyLine = findApplyDeadlockFreeLine(thyAbsPath);
+        int doneLine  = findDoneLine(thyAbsPath);
+        if (applyLine <= 0 || doneLine <= 0) {
+            dual.println("\n⚠️  Could not locate 'apply (deadlock_free' ...)' or 'done'.");
+            dual.println("   Falling back to running the whole file (no kill-timeout).");
+            TheoryResult whole = executeTheory(theoryPath, NO_KILL_TIMEOUT, dual, monitor);
+            if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
+            dual.println("\n========== VERIFICATION RESULT ==========");
+            printLemmaResults(whole, dual);
+            dual.println("==========================================\n");
+            return;
+        }
+
+        String[] truncated = createTruncatedDdlfCopy(theoryPath, thyAbsPath, doneLine, dual);
+        String ddlfTheoryPath = truncated[0];   // path WITHOUT .thy
+        String ddlfAbsPath    = truncated[1];   // path WITH .thy
+
+        TheoryResult result;
+        try {
+            dual.println("\n── Step 1: verifying first ddlf lemma in isolation "
+                + "(kill-timeout " + (TIMEOUT / 1000) + "s) ──");
+            result = executeTheory(ddlfTheoryPath, TIMEOUT, dual, monitor);
+        } finally {
+            // Always clean up the temporary truncated copy
+            try { Files.deleteIfExists(Paths.get(ddlfAbsPath)); } catch (Exception e) { /* ignore */ }
+        }
 
         if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
 
-        // ── Case A: Timeout → tactic got stuck or took too long ──────────────
+        // ── Outcome A: timeout → apply (deadlock_free' ...) is non-terminating ─
         if (result.timedOut) {
-            dual.println("\n⏱️ TIMEOUT: apply (deadlock_free' ...) did not complete in "
-                + (TIMEOUT / 1000) + "s — tactic got stuck.");
-            dual.println("   Replacing 'done' with 'oops'...");
+            dual.println("\n⏱️ TIMEOUT after " + (TIMEOUT / 1000) + "s on the isolated ddlf lemma.");
+            dual.println("   Since this copy contained only the apply, this means");
+            dual.println("   apply (deadlock_free' ...) does not terminate.");
+            dual.println("   → Deleting apply AND done, inserting oops, then searching for a counterexample.");
 
-            int doneLine = findDoneLine(thyAbsPath);
-            if (doneLine > 0) {
-                replaceLine(thyAbsPath, doneLine, "  oops");
-                dual.println("   ✏️ 'done' replaced with 'oops' at line " + doneLine + ".");
+            // Re-locate on the FULL file (line numbers are from the original, unchanged file)
+            int aLine = findApplyDeadlockFreeLine(thyAbsPath);
+            int dLine = findDoneLine(thyAbsPath);
+            if (aLine > 0 && dLine > 0) {
+                removeLines(thyAbsPath, aLine, dLine);   // delete BOTH apply and done
+                insertLine(thyAbsPath, aLine, "  oops");
+                dual.println("   ✏️ Lines " + aLine + "-" + dLine + " replaced with 'oops'.");
             }
             runCounterexample(theoryPath, thyAbsPath, dual, monitor);
             return;
         }
 
-        // ── Case B: ok:false + "Failed to finish proof" on done line ─────────
-        if (!result.ok && result.failedFinishLine > 0) {
-            dual.println("\n⚠️  'done' failed at line " + result.failedFinishLine
-                + ": apply completed but proof not closed.");
-            dual.println("   Running sledgehammer...");
+        // ── Outcome C: FINISHED + ok → proof complete, DEADLOCK FREE ──────────
+        if (result.ok) {
+            dual.println("\n========== VERIFICATION RESULT ==========");
+            dual.println("✅ DEADLOCK FREE: apply (deadlock_free' ...) closed the proof.");
+            printLemmaResults(result, dual);
+            dual.println("==========================================\n");
+            return;
+        }
+
+        // ── Outcome B: FINISHED + "Failed to finish proof" → sledgehammer ─────
+        if (result.failedFinishLine > 0) {
+            dual.println("\n⚠️  apply completed but the proof is not closed "
+                + "('Failed to finish proof').");
+            dual.println("   → Running sledgehammer (no kill-timeout; it always returns).");
+
+            // The done line in the FULL file (the truncated copy's numbering matches the
+            // prefix, but we operate on the full file from here on).
+            int fullDoneLine = findDoneLine(thyAbsPath);
 
             boolean resolved = runSledgehammerLoop(
-                theoryPath, thyAbsPath, result.failedFinishLine, dual, monitor);
+                theoryPath, thyAbsPath, fullDoneLine, dual, monitor);
 
             if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
 
             if (resolved) {
-                // Sledgehammer closed the proof — re-run to verify
-                dual.println("\n   Re-running verification on updated file...");
-                TheoryResult rerun = executeTheory(theoryPath, TIMEOUT, dual, monitor);
-                if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
+                // ── Step 2 success: sledgehammer closed the proof → DEADLOCK FREE ─
                 dual.println("\n========== VERIFICATION RESULT ==========");
-                printLemmaResults(rerun, dual);
+                dual.println("✅ DEADLOCK FREE: proof closed by sledgehammer.");
+                dual.println("   (The ddlf lemma is now proved; see the updated 'by ...' in the file.)");
                 dual.println("==========================================\n");
             } else {
-                // Sledgehammer exhausted — replace done with oops, keep apply line
+                // ── Step 2 failure: keep apply, replace ONLY done with oops ──────
                 dual.println("\n❌ Sledgehammer could not close the proof.");
-                dual.println("   Replacing 'done' with 'oops' and running counterexample...");
-                int doneLine = findDoneLine(thyAbsPath);
-                if (doneLine > 0) {
-                    replaceLine(thyAbsPath, doneLine, "  oops");
-                    dual.println("   ✏️ 'done' replaced with 'oops' at line " + doneLine + ".");
+                dual.println("   → Keeping apply, replacing ONLY 'done' with oops, "
+                    + "then searching for a counterexample.");
+                int dLine = findDoneLine(thyAbsPath);
+                if (dLine > 0) {
+                    replaceLine(thyAbsPath, dLine, "  oops");   // keep apply; replace done only
+                    dual.println("   ✏️ Line " + dLine + " ('done') replaced with 'oops'.");
                 }
                 runCounterexample(theoryPath, thyAbsPath, dual, monitor);
             }
             return;
         }
 
-        // ── Case C: ok:true or other errors ──────────────────────────────────
+        // ── Fallback: FINISHED, not ok, but no recognised failure marker ──────
         dual.println("\n========== VERIFICATION RESULT ==========");
+        dual.println("⚠️  Verification finished but the result is inconclusive "
+            + "(no proof success, no 'Failed to finish proof').");
         printLemmaResults(result, dual);
         dual.println("==========================================\n");
+    }
+
+    // ── Create a truncated copy containing only the first ddlf lemma ──────────
+    // The copy keeps everything up to and including the first 'done' line, then
+    // closes ALL still-open scopes with the right number of 'end' lines.
+    //
+    // A RoboChart .thy opens two scopes that are still open at the first lemma:
+    //   theory <name> ... begin      (theory scope)
+    //   locale <name> begin          (locale scope)
+    // so two 'end's are needed. Rather than hard-code 2, we count how many
+    // 'begin's are still unclosed at the 'done' line and emit that many 'end's,
+    // which is correct regardless of how many scopes the file opens.
+    //
+    // Returns {pathWithoutExt, pathWithExt}.
+    private String[] createTruncatedDdlfCopy(String theoryPath, String thyAbsPath,
+            int doneLine, DualOutput dual) throws IOException {
+
+        List<String> lines = Files.readAllLines(Paths.get(thyAbsPath), StandardCharsets.UTF_8);
+
+        String origName = theoryPath.substring(theoryPath.lastIndexOf("/") + 1);
+        String newName  = origName + "_ddlf_check";
+        String dir      = thyAbsPath.substring(0, thyAbsPath.lastIndexOf("/") + 1);
+        String newAbs   = dir + newName + ".thy";
+        String newPath  = dir + newName;   // without .thy
+
+        List<String> out = new ArrayList<>();
+        int openScopes = 0;   // unclosed 'begin' count within the kept range
+
+        // Keep prefix + the first lemma (up to and including 'done')
+        for (int i = 0; i < doneLine && i < lines.size(); i++) {
+            String line = lines.get(i);
+            String trimmed = line.trim();
+
+            // Rewrite the theory header so the theory name matches the new file name
+            if (trimmed.startsWith("theory ")) {
+                line = line.replaceFirst("theory\\s+\\S+", "theory " + newName);
+            }
+
+            // Track scope nesting: count 'begin' / 'end' as whole words.
+            // (Handles 'theory X ... begin', a lone 'begin', and lone 'end'.)
+            openScopes += countWord(trimmed, "begin");
+            openScopes -= countWord(trimmed, "end");
+
+            out.add(line);
+        }
+
+        // The 'done' line we just included does not change scope nesting.
+        // Whatever scopes remain open must each be closed with one 'end'.
+        if (openScopes < 1) openScopes = 1;   // safety: always close at least the theory
+        out.add("");
+        for (int k = 0; k < openScopes; k++) {
+            out.add("end");
+        }
+
+        Files.write(Paths.get(newAbs), out, StandardCharsets.UTF_8);
+        dual.println("   📄 Truncated copy created: " + newName + ".thy "
+            + "(prefix + first ddlf lemma + " + openScopes + " end).");
+        return new String[]{ newPath, newAbs };
+    }
+
+    // Count occurrences of a whole-word keyword (begin/end) in a line.
+    // Whole-word so we don't match inside identifiers like 'beginning' or names.
+    private int countWord(String line, String word) {
+        int count = 0;
+        java.util.regex.Matcher m =
+            java.util.regex.Pattern.compile("\\b" + word + "\\b").matcher(line);
+        while (m.find()) count++;
+        return count;
     }
 
     // ── Sledgehammer loop: iterates until proof closed or exhausted ───────────
@@ -334,27 +469,22 @@ public class RunIsabelleHandler extends AbstractHandler {
         return false;
     }
 
-    // ── Run counterexample search ─────────────────────────────────────────────
+    // ── Run counterexample search (NO kill-timeout) ───────────────────────────
+    // nitpick / quickcheck always return eventually; we wait for FINISHED.
     private void runCounterexample(String theoryPath, String thyAbsPath,
             DualOutput dual, org.eclipse.core.runtime.IProgressMonitor monitor)
             throws IOException, InterruptedException {
 
         if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
-        dual.println("\n🔍 Running counterexample search (quickcheck + nitpick)...");
-        dual.println("   Timeout: " + (COUNTEREXAMPLE_TIMEOUT / 1000) + "s");
+        dual.println("\n🔍 Running counterexample search (find_counterexample / nitpick / quickcheck)...");
+        dual.println("   No kill-timeout: waiting for the search to return naturally.");
 
-        TheoryResult result = executeTheory(theoryPath, COUNTEREXAMPLE_TIMEOUT, dual, monitor);
+        TheoryResult result = executeTheory(theoryPath, NO_KILL_TIMEOUT, dual, monitor);
 
         if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
 
         dual.println("\n========== COUNTEREXAMPLE RESULT ==========");
-        if (result.timedOut) {
-            dual.println("⏱️ TIMEOUT: No counterexample found within "
-                + (COUNTEREXAMPLE_TIMEOUT / 1000) + "s.");
-            dual.println("   Result inconclusive.");
-        } else {
-            printLemmaResults(result, dual);
-        }
+        printLemmaResults(result, dual);
         dual.println("==========================================\n");
     }
 
