@@ -2,7 +2,7 @@
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
 theory HOLCSP_[%=baseName%]_[%=ts%]
-	imports "RC_HOL-CSP.RoboChart_Library"
+	imports "RC_HOL-CSP.RoboChart_Library" HOL.Real
 begin
 
 subsection \<open> Model \<close>
