@@ -35,7 +35,7 @@ import org.eclipse.ui.console.MessageConsole;
 import org.eclipse.ui.console.MessageConsoleStream;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-public class RunIsabelleHandler extends AbstractHandler {
+public class RunIsabelleHandlerR0 extends AbstractHandler {
 
     private static final String ISABELLE_NAME = "isabelle";
     private static final int SERVER_PORT = 4711;
@@ -45,7 +45,7 @@ public class RunIsabelleHandler extends AbstractHandler {
     // Only ONE step gets a kill-timeout: verifying the isolated first ddlf lemma.
     // A timeout there can ONLY mean apply (deadlock_free' ...) is non-terminating,
     // because the truncated copy contains nothing else that could be slow.
-    private static final long TIMEOUT = 60000;                  // 1 min: deadlock_free' apply (isolated)
+    private static final long TIMEOUT = 120000;                  // 2 min: deadlock_free' apply (isolated)
 
     // All other steps must NOT kill the process — they always return a result eventually:
     //   - sledgehammer always returns a proof or "No proof found"
@@ -203,41 +203,12 @@ public class RunIsabelleHandler extends AbstractHandler {
         dual.println("➡ Loading: " + theoryPath + ".thy");
         dual.println("⬅ [Theory Execution] Loading dependencies, this may take a while...");
 
-        // ── Pre-check: is the ddlf lemma already concluded with 'oops'? ───────
-        // The ddlf lemma (name ending in '_ddlf') records its verdict in its
-        // proof terminator: 'done' means not-yet-decided (verify it), 'oops'
-        // means a previous run already judged it unprovable (failed) — so we
-        // skip re-verifying the apply and go straight to counterexample search.
-        String ddlfEnding = findDdlfLemmaEnding(thyAbsPath);   // "done", "oops", or null
-
-        if ("oops".equals(ddlfEnding)) {
-            dual.println("\nℹ️  The ddlf lemma already ends with 'oops' "
-                + "(previously judged unprovable).");
-            dual.println("   → Skipping apply verification; going straight to counterexample search.");
-            runCounterexample(theoryPath, thyAbsPath, dual, monitor);
-            return;
-        }
-
-        if (ddlfEnding == null) {
-            // Could not find a '_ddlf' lemma with a recognisable done/oops ending.
-            dual.println("\n⚠️  Could not locate the '_ddlf' lemma's proof terminator.");
+        // ── Step 1: isolate the first ddlf lemma into a truncated copy ────────
+        int applyLine = findApplyDeadlockFreeLine(thyAbsPath);
+        int doneLine  = findDoneLine(thyAbsPath);
+        if (applyLine <= 0 || doneLine <= 0) {
+            dual.println("\n⚠️  Could not locate 'apply (deadlock_free' ...)' or 'done'.");
             dual.println("   Falling back to running the whole file (no kill-timeout).");
-            TheoryResult whole = executeTheory(theoryPath, NO_KILL_TIMEOUT, dual, monitor);
-            if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
-            dual.println("\n========== VERIFICATION RESULT ==========");
-            printLemmaResults(whole, dual);
-            dual.println("==========================================\n");
-            return;
-        }
-
-        // ── ddlf lemma ends with 'done' → verify it via a truncated copy ──────
-        // (Step 1 = the truncated-copy generation + apply-verification stage.)
-        int doneLine = findDoneLine(thyAbsPath);
-        if (doneLine <= 0) {
-            // Shouldn't happen (ddlfEnding == "done" implies a done line exists),
-            // but guard anyway.
-            dual.println("\n⚠️  ddlf lemma reported 'done' ending but no 'done' line found; "
-                + "running whole file.");
             TheoryResult whole = executeTheory(theoryPath, NO_KILL_TIMEOUT, dual, monitor);
             if (monitor.isCanceled()) { dual.println("⛔ Cancelled."); return; }
             dual.println("\n========== VERIFICATION RESULT ==========");
@@ -352,7 +323,7 @@ public class RunIsabelleHandler extends AbstractHandler {
         List<String> lines = Files.readAllLines(Paths.get(thyAbsPath), StandardCharsets.UTF_8);
 
         String origName = theoryPath.substring(theoryPath.lastIndexOf("/") + 1);
-        String newName  = origName + "_ddlf_check_" + System.currentTimeMillis();
+        String newName  = origName + "_ddlf_check";
         String dir      = thyAbsPath.substring(0, thyAbsPath.lastIndexOf("/") + 1);
         String newAbs   = dir + newName + ".thy";
         String newPath  = dir + newName;   // without .thy
@@ -771,42 +742,6 @@ public class RunIsabelleHandler extends AbstractHandler {
                 dual.println("   " + ceText);
             }
         } catch (Exception e) { /* ignore parse errors */ }
-    }
-
-    // ── Determine how the '_ddlf' lemma's proof terminates: "done" or "oops" ──
-    // Locates the lemma whose name ends in '_ddlf', then scans its proof body
-    // (until the next 'lemma'/'theorem'/'end') for a 'done' or 'oops' terminator.
-    // Returns "done", "oops", or null if not found.
-    private String findDdlfLemmaEnding(String thyAbsPath) throws IOException {
-        List<String> lines = Files.readAllLines(Paths.get(thyAbsPath), StandardCharsets.UTF_8);
-
-        int ddlfLemmaLine = -1;
-        for (int i = 0; i < lines.size(); i++) {
-            String t = lines.get(i).trim();
-            // Match: lemma <name>_ddlf:   (name ends with _ddlf, before the colon)
-            if (t.startsWith("lemma ")) {
-                String rest = t.substring("lemma ".length()).trim();
-                int colon = rest.indexOf(':');
-                String name = (colon >= 0 ? rest.substring(0, colon) : rest).trim();
-                if (name.endsWith("_ddlf")) {
-                    ddlfLemmaLine = i;
-                    break;
-                }
-            }
-        }
-        if (ddlfLemmaLine < 0) return null;
-
-        // Scan forward from the ddlf lemma to its proof terminator.
-        for (int i = ddlfLemmaLine + 1; i < lines.size(); i++) {
-            String t = lines.get(i).trim();
-            if (t.equals("done") || t.endsWith(" done")) return "done";
-            if (t.equals("oops") || t.endsWith(" oops")) return "oops";
-            // Stop at the next lemma/theorem/end without a terminator found
-            if (t.startsWith("lemma ") || t.startsWith("theorem ") || t.equals("end")) {
-                return null;
-            }
-        }
-        return null;
     }
 
     // ── Find line number of apply (deadlock_free' ...) ────────────────────────
