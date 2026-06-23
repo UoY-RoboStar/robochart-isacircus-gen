@@ -16,13 +16,10 @@ jobs:
       - name: Setup java
         uses: actions/setup-java@v1
         with:
-          java-version: '21'
+          java-version: '11'
 
       - name: Checkout ${{ github.ref }}
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.ROBOSTAR_GITHUB_ACTIONS_TOKEN }}
-          submodules: 'recursive'
 
       - name: Build with Maven
         run: mvn clean install
