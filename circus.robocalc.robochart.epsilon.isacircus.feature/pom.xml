@@ -9,7 +9,7 @@
     <groupId>circus.robocalc</groupId>
     <artifactId>circus.robocalc.robochart.epsilon.isacircus.parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <relativePath>../circus.robocalc.robochart.epsilon.isacircus.parent/pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
 
   <artifactId>circus.robocalc.robochart.epsilon.isacircus.feature</artifactId>

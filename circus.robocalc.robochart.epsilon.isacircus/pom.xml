@@ -6,12 +6,12 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>circus.robocalc</groupId>
-    <artifactId>circus.robocalc.robochart.epsilon.isacircus.parent</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-    <relativePath>../circus.robocalc.robochart.epsilon.isacircus.parent/pom.xml</relativePath>
+  <groupId>circus.robocalc</groupId>
+  <artifactId>circus.robocalc.robochart.epsilon.isacircus.parent</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <relativePath>../pom.xml</relativePath>
   </parent>
-
+  
   <artifactId>circus.robocalc.robochart.epsilon.isacircus</artifactId>
   <packaging>eclipse-plugin</packaging>
 
