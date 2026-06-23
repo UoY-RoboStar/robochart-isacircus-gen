@@ -36,26 +36,6 @@ An Eclipse plugin for translating RoboChart models to Isabelle/Circus theory fil
 
 
 
-\### Option 1: Update Site URL
-
-
-
-In Eclipse: Help > Install New Software > Add > enter URL:
-
-
-
-&#x20;   https://uoy-robostar.github.io/robochart-isacircus-gen/
-
-
-
-\### Option 2: Download ZIP
-
-
-
-Download the update site ZIP from the \[Releases page](https://github.com/UoY-RoboStar/robochart-isacircus-gen/releases), then in Eclipse: Help > Install New Software > Add > Archive > select the ZIP file.
-
-
-
 \## Usage
 
 
