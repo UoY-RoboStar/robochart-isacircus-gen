@@ -50,11 +50,11 @@ jobs:
           remote-user: ${{ secrets.ROBOSTAR_WEB_USER }}
           remote-root: ${{ secrets.ROBOSTAR_WEB_ROOT }}
           remote-baseurl: 'https://robostar.cs.york.ac.uk'
-          remote-relative-path: 'robotool/robochart2isacircus/'
+          remote-relative-path: 'robotool/robochart-isacircus-gen/'
           maven-target: 'circus.robocalc.robochart.epsilon.isacircus.site/target/repository/'
 
       - if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         name: Create commit comment
         uses: peter-evans/commit-comment@v1
         with:
-          body: 'Successfully deployed at: https://robostar.cs.york.ac.uk/robotool/robochart2isacircus/${{ steps.deploy.outputs.dest }}'
+          body: 'Successfully deployed at: https://robostar.cs.york.ac.uk/robotool/robochart-isacircus-gen/${{ steps.deploy.outputs.dest }}'
