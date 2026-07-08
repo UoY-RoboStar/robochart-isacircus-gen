@@ -35,7 +35,7 @@ import org.eclipse.ui.console.MessageConsole;
 import org.eclipse.ui.console.MessageConsoleStream;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-public class RunIsabelleHandler extends AbstractHandler {
+public class RunIsabelleHandlerR1 extends AbstractHandler {
 
     private static final String ISABELLE_NAME = "isabelle";
     private static final int SERVER_PORT = 4711;
@@ -54,6 +54,9 @@ public class RunIsabelleHandler extends AbstractHandler {
     private static final long NO_KILL_TIMEOUT = 86400000;       // 24 hours = no effective timeout
     private static final long SLEDGEHAMMER_TIMEOUT = NO_KILL_TIMEOUT;
     private static final long COUNTEREXAMPLE_TIMEOUT = NO_KILL_TIMEOUT;
+
+    // Max sledgehammer iterations to avoid infinite loop
+    private static final int MAX_SLEDGEHAMMER_ITERATIONS = 5;
 
     // Sledgehammer command with extended provers for better coverage
     private static final String SLEDGEHAMMER_CMD =
@@ -415,16 +418,15 @@ public class RunIsabelleHandler extends AbstractHandler {
         // Working copy that accumulates apply(...) steps across iterations
         List<String> workingLines = new ArrayList<>(veryOriginalLines);
 
-        int iter = 1;
-        while (true) {
+        for (int iter = 1; iter <= MAX_SLEDGEHAMMER_ITERATIONS; iter++) {
             if (monitor.isCanceled()) {
                 // Restore on cancel
                 Files.write(Paths.get(thyAbsPath), veryOriginalLines, StandardCharsets.UTF_8);
                 return false;
             }
 
-            dual.println("\n   [Sledgehammer iteration " + iter + "]");
-            iter++;
+            dual.println("\n   [Sledgehammer iteration " + iter + "/"
+                + MAX_SLEDGEHAMMER_ITERATIONS + "]");
 
             // Replace current target line with sledgehammer in working copy
             List<String> sledgeLines = new ArrayList<>(workingLines);
@@ -488,6 +490,12 @@ public class RunIsabelleHandler extends AbstractHandler {
                 return false;
             }
         }
+
+        // Max iterations reached — restore original
+        Files.write(Paths.get(thyAbsPath), veryOriginalLines, StandardCharsets.UTF_8);
+        dual.println("   ❌ Reached max iterations (" + MAX_SLEDGEHAMMER_ITERATIONS
+            + ") without closing proof.");
+        return false;
     }
 
     // ── Run counterexample search (NO kill-timeout) ───────────────────────────
