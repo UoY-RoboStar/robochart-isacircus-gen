@@ -109,11 +109,8 @@ for(chansetpara in channelsetparas){
 	var chans = chansetpara.channelSet.expr.communicationList.communications;%]
 
 
-definition "[%= chansetpara.name.word%] = [%if(chans.size()=0){%]{}"[%}%]
-[%if(chans.size()>0){%]	{ [%for(chan in chans){%] [%=chan.channelExpr.name.word%][%if(hasMore){%], 
-	[%}%]
-	[%}%] }"
-	[%}%]
+[*printed by parseBasicChannelSetExpr, so that parameterised channels become range c (see there)*]
+definition "[%= chansetpara.name.word%] = [%=chansetpara.channelSet.expr.parseExpr()%]"
 [%}%]
       
 abbreviation "assume b Q P \<equiv> (if b then P else aviol \<rightarrow> Q)"
@@ -445,7 +442,8 @@ end
 
 
 [%operation Z!HideAction parseHideAction(): String{
-	return  "(" + self.circusAction.parseAction() + " \\" + self.channelSet.parseChannelSet() + ")";
+	//space after \ : the channel set may be a name (e.g. enteredSS_in_stmbd_<stm>), not only {...} or (...)
+	return  "(" + self.circusAction.parseAction() + " \\ " + self.channelSet.parseChannelSet() + ")";
 }%]
 
 [*
@@ -513,7 +511,29 @@ end
 
 
 [%operation Z!ZName parse(): String{
-	return  self.word;
+	//renaming left-hand sides can be event values too, e.g. c__in\<^bold>.x (see holEvent)
+	return  self.word.holEvent();
+}%]
+
+[*RC2Z.eol writes event values with the CyPhyCircus channel-instantiation syntax c\<^bold>.v (needed by circusM2T.egl).
+  In HOL-CSP an event value is a datatype constructor application, so inside renamings and channel sets it must be
+  written (c v): \<^bold>. is only valid in a prefix c\<^bold>.v \<rightarrow> P, and \<cdot> is HOLCF continuous-function application,
+  which does not type-check for chan_event constructors ("Clash of types _ => _ and _ -> _").
+  Prefixes are unaffected: there the \<^bold>. comes from parseField, not from a name; (c v) \<rightarrow> P would also be valid.*]
+[%operation String holEvent(): String{
+	var marker = "\\<^bold>.";
+	if(self.indexOf(marker) < 0){
+		return self;
+	}
+	var result = "";
+	var rest = self;
+	var i = rest.indexOf(marker);
+	while(i >= 0){
+		result = result + rest.substring(0, i) + " ";
+		rest = rest.substring(i + marker.length());
+		i = rest.indexOf(marker);
+	}
+	return "(" + result + rest + ")";
 }%]
 
 
@@ -758,7 +778,8 @@ end
 		if(self.name.word = "boolean"){
 			return "bool";
 		} else {
-			return self.name.word;
+			//an event value such as internal__X\<^bold>.NID_Y (from RC2Z.eol) is printed as HOL application (internal__X NID_Y)
+			return self.name.word.holEvent();
 		}
 		
 	} //else 
@@ -1039,16 +1060,56 @@ end
 }%]
 
 
+[*An event set in HOL-CSP. chan_event is a datatype: a channel without a value (e.g. terminate) is itself an event,
+  but a channel with a value (e.g. set_EXT_x :: T => chan_event) is a function, so it cannot be put in {...}.
+  Such channels are printed as range c (all events of c), and the parts are joined with \<union>:
+    { terminate, (internal__X NID_Y) }                     only events
+    ({ terminate } \<union> range set_EXT_x \<union> range set_EXT_y)   events and parameterised channels
+    range set_EXT_x                                        a single parameterised channel
+  A concrete event value such as internal__X\<^bold>.NID_Y is an event, not a channel (see holEvent).*]
 [%operation Z!BasicChannelSetExpr parseBasicChannelSetExpr(): String{
-	var cs_str : String;
+	var paramChans = paramChannelNames();
+	var events = new Sequence;
+	var ranges = new Sequence;
 	for (commu in self.communicationList.communications){
-		cs_str = cs_str + commu.parseCommu();
-		if (hasMore){
-			cs_str = cs_str + ",";
+		var w = "";
+		if(commu.channelExpr.isDefined() and commu.channelExpr.isTypeOf(Z!RefExpr) and commu.channelExpr.name.isDefined()){
+			w = commu.channelExpr.name.word;
+		}
+		if(paramChans.includes(w)){
+			ranges.add("range " + w);
+		} else {
+			events.add(commu.parseCommu());
 		}
 	}
-//	return  "\\<lbrace> " + cs_str +" \\<rbrace>";
-	return  "{ " + cs_str +" }";
+	var parts = new Sequence;
+	if(events.size() > 0 or ranges.size() = 0){
+		parts.add("{ " + events.concat(",") + " }");
+	}
+	parts.addAll(ranges);
+	if(parts.size() = 1){
+		return parts.first();
+	}
+	return "(" + parts.concat(" \\<union> ") + ")";
+}%]
+
+[*Names of the channels declared with a value type, i.e. whose chan_event constructor takes an argument
+  (the same test as the chan_event declaration at the top of this template: type SYNCH means no value).*]
+[%@cached
+operation paramChannelNames(): Set{
+	var names = new Set;
+	for(chanpara in Z!ChannelPara.all()){
+		if(chanpara.declList.isDefined()){
+			for(chandecl in chanpara.declList.decls){
+				if(chandecl.expr.isDefined() and chandecl.expr.parseExpr() <> "SYNCH"){
+					for(chan in chandecl.channelNameList.names){
+						names.add(chan.word);
+					}
+				}
+			}
+		}
+	}
+	return names;
 }%]
 
 
