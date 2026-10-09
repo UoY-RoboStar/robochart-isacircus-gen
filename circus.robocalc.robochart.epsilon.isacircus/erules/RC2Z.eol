@@ -4724,6 +4724,8 @@ operation renameTriggerEventsPairL(nc:RC!NodeContainer): Sequence<String>{
 	var pairL = new Sequence<String>;
 	
 	for(t in nc.transitions.select(l|l.trigger.isDefined())){
+		//NOTE: the HOL-CSP templates (holEvent in circusM2T_HOLCSP*.egl) rely on this exact "\\<^bold>." marker
+		//to print the event as (c v); change both together. See the comment above holEvent for the background.
 		pairL.add(t.trigger.event.name +"__in" +"\\<^bold>.x" ); //syntax for Isacircus
 //		pairL.add(t.trigger.event.name +"__in" +"\\<cdot>x" );
 //		pairL.add(t.trigger.event.FQN()+"__in" +"\\<cdot>x" );
@@ -4884,6 +4886,8 @@ operation tevent_str(t: RC!Transition): String{
 	if(t.trigger = null){
 //		tevent_string = "internal__" + nc(t).FQN()  + ".NID_" + t.source.FQN();
 //		tevent_string = "internal__" + nc(t).FQN()  + "\\<cdot>NID_" + t.source.FQN();
+		//NOTE: the HOL-CSP templates (holEvent in circusM2T_HOLCSP*.egl) rely on this exact "\\<^bold>." marker
+		//to print the event as (c v); change both together. See the comment above holEvent for the background.
 		tevent_string = "internal__" + nc(t).FQN()  + "\\<^bold>.NID_" + t.source.FQN(); //syntax for isacircus
 	} 
 	
@@ -4891,6 +4895,8 @@ operation tevent_str(t: RC!Transition): String{
 //		tevent_string = t.trigger.event.FQN() + "__in.NID_" + t.source.FQN();
 //		tevent_string = t.trigger.event.name + "__in.NID_" + t.source.FQN();
 //		tevent_string = t.trigger.event.name + "__in\\<cdot>NID_" + t.source.FQN();
+		//NOTE: the HOL-CSP templates (holEvent in circusM2T_HOLCSP*.egl) rely on this exact "\\<^bold>." marker
+		//to print the event as (c v); change both together. See the comment above holEvent for the background.
 		tevent_string = t.trigger.event.name + "__in\\<^bold>.NID_" + t.source.FQN(); //syntax for isacircus
 	}
 	

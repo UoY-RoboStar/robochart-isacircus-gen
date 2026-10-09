@@ -519,7 +519,22 @@ end
   In HOL-CSP an event value is a datatype constructor application, so inside renamings and channel sets it must be
   written (c v): \<^bold>. is only valid in a prefix c\<^bold>.v \<rightarrow> P, and \<cdot> is HOLCF continuous-function application,
   which does not type-check for chan_event constructors ("Clash of types _ => _ and _ -> _").
-  Prefixes are unaffected: there the \<^bold>. comes from parseField, not from a name; (c v) \<rightarrow> P would also be valid.*]
+  Prefixes are unaffected: there the \<^bold>. comes from parseField, not from a name; (c v) \<rightarrow> P would also be valid.
+
+  Design background:
+  - RC2Z.eol produces ONE Z model that is shared by circusM2T.egl (IsaCircus/CyPhyCircus), circusM2T_HOLCSP.egl and
+    circusM2T_HOLCSP_trans_core.egl. Event values in renamings and channel sets are stored there as plain name strings
+    (e.g. RefExpr "internal__X\<^bold>.NID_Y"), not as structured expressions.
+  - circusM2T.egl prints that string unchanged (\<^bold>. is the IsaCircus syntax, confirmed by Simon); the HOL-CSP
+    templates translate it here, at the two places where names are printed (ZName.parse and the RefExpr case of parseExpr).
+  - It cannot simply be done in RC2Z.eol: whichever syntax the EOL writes into the shared string, one of the targets is wrong.
+  Dependency / risk: this relies on RC2Z.eol writing exactly "\<^bold>." (tevent_str and renameTriggerEventsPairL).
+    If that marker is changed in the EOL (e.g. back to \<cdot>), this translation silently stops working and the
+    HOL-CSP output is wrong without any error. Change both together.
+  Long-term: store event values in the Z model as structured applications (ApplExpr: channel applied to argument),
+    printed by each template in its own syntax; then holEvent can be removed. This also helps project_triggers
+    (binding the event arguments). Note that renaming left-hand sides (AssignmentPairs.lhsElement) are a ZNameList,
+    i.e. names only, so they need a different representation.*]
 [%operation String holEvent(): String{
 	var marker = "\\<^bold>.";
 	if(self.indexOf(marker) < 0){
