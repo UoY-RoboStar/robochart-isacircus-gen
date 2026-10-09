@@ -1,6 +1,11 @@
 [*14052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
+[*This template generates the "Trans core" theory: only Transc_<nc> and the lemma
+  deadlock_free (\<sqinter> n \<in> UNIV. Transc_<nc>\<cdot>n).
+  Transc is Trans without the always-enabled branches (share, interrupt, terminate), so this lemma
+  checks that in every node some transition is always enabled (complete guards); the full Trans is
+  trivially deadlock-free and cannot show this. See Rule 53-1 (createTransitionsCoreAsActionPara) in RC2Z.eol.*]
 theory HOLCSP_trans_core_[%=baseName%]_[%=ts%]
 	imports "RC_HOL-CSP.RoboChart_Library" HOL.Real
 begin

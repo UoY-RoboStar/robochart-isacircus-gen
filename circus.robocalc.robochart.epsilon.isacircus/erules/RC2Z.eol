@@ -212,6 +212,20 @@ var terminate_chanpara = Sequence{"terminate"}.createChannelPara("terminate_chan
 
 
 
+/* FQN pre-processing (restored from the commented-out block further below).
+   Every variable and constant declared directly in a state machine is renamed to <name>_<stm FQN>,
+   so all generated names (get_/set_/setL_/setR_ channels, Memory, guards, Isabelle variables) stay
+   unique even when two state machines declare a variable with the same name.
+   All references (RefExp.ref, VarRef.name, trigger parameters) point to the Variable objects,
+   so they pick up the new names automatically; this must run before any transformation below.
+   Deliberately NOT restored from the old block:
+   - declareSharedVarAndConstAsLocalVar / Shared2FQLocalVariablesAndConst: shared (required) variables
+     are now handled by sharedMemory_x and set_EXT_x, and the name-based redirection breaks on x[i] = e;
+   - renaming events: event channels keep their names (they are matched by connections). */
+for(stm in RC!StateMachineDef.all()){
+	FQNllLocalVariables(stm);
+}
+
 //To consider different configuration of the RoboChart models which can be a module, or controller, or just a stm.
 if(RC!RCModule.all().size()>0){
 	"line 165, createModuleAsProcessPara(m) is run".println();
@@ -2583,7 +2597,7 @@ operation varMemory(stm: RC!Context): Z!ActionPara{
 	
 	else if(vars.size()=1) {
 		
-		var action_name = "Memory_"+ vars.at(0).name + "_" + stm.FQN();
+		var action_name = "Memory_"+ vars.at(0).name;
 		var ParaSeq = Sequence{vars.at(0).getInitialOrDefaultValueAsExpr()};//Para here means parameter
 		varMemory = action_name.createCallAction(ParaSeq);
 		//By assigning initial or default value as parameter of this CallAction, 
@@ -2592,11 +2606,11 @@ operation varMemory(stm: RC!Context): Z!ActionPara{
 	
 	else if(vars.size()>1){
 		("line 1600, vars = " + vars).println();
-		var action_name0 = "Memory_"+ vars.at(0).name + "_" + stm.FQN();
+		var action_name0 = "Memory_"+ vars.at(0).name;
 		var ParaSeq0 = Sequence{vars.at(0).getInitialOrDefaultValueAsExpr()};	("line 1602, ParaSeq0 = " + ParaSeq0).println();
 		var action0 = action_name0.createCallAction(ParaSeq0);
 		
-		var action_name1 = "Memory_"+ vars.at(1).name + "_" + stm.FQN();
+		var action_name1 = "Memory_"+ vars.at(1).name;
 //		("line 1606, vars.at(1) = " + vars.at(1)).println();
 //		("line 1606, vars.at(1).type = " + vars.at(1).type).println();		
 //		("line 1606, vars.at(1).type.type() = " + vars.at(1).type.type().name).println();		
@@ -2617,7 +2631,7 @@ operation varMemory(stm: RC!Context): Z!ActionPara{
 		while(vars.size()>0){
 			("line 1627, v = " + vars.at(0) + ", type.type.NAME = " + vars.at(0).type.type.name  + ", v.type.type()" + vars.at(0).type.type()).println();
 		
-			var action_name = "Memory_"+ vars.at(0).name + "_" + stm.FQN();
+			var action_name = "Memory_"+ vars.at(0).name;
 			var ParaSeq = Sequence{vars.at(0).getInitialOrDefaultValueAsExpr()};
 			var action = action_name.createCallAction(ParaSeq);
 		
@@ -2726,8 +2740,9 @@ only assigned as initial or default, that is a one time thing, so it can be done
 */
 operation Memory(v: RC!Variable,stm: RC!Context): Z!ActionPara{
 
-//	v_FQN is the fully qualified name of v
-	var v_FQN = v.name + "_" + stm.FQN();
+//	v_FQN is the fully qualified name of v: stm variables are already renamed to <name>_<stm FQN>
+//	by the FQN pre-processing (FQNllLocalVariables), so the suffix must not be added again here
+	var v_FQN = v.name;
 	return IndividualVarMemory(v,v_FQN).createActionPara("Memory_" + v_FQN);
 
 }
@@ -2998,7 +3013,17 @@ operation findTrStOwnerOfStmt(stmt: RC!Statement): String{
 
 	if(c.isDefined() and c.isKindOf(RC!Transition)){
 		var nc = c.eContainer();
-		return "Transc_" + nc.FQN();
+		//The same statement is translated twice: once inside Trans_<nc> (Rule 53) and once inside
+		//Transc_<nc> (Rule 53-1, the "Trans core" used for the ddlf check). The assume fallback must
+		//return to the process currently being generated, so the prefix is read from the marker that
+		//Rule 53 / Rule 53-1 put on the node container before translating its transitions.
+		//nc.~transPrefix is an EOL extended property: a runtime-only "label" on the model object,
+		//not part of the RoboChart metamodel and never saved to the .rct file.
+		var prefix = nc.~transPrefix;
+		if(prefix.isUndefined()){
+			prefix = "Trans_"; //not called from Rule 53/53-1: default to the full Trans process
+		}
+		return prefix + nc.FQN();
 	}
 
 	if(c.isDefined() and c.isKindOf(RC!Action)){
@@ -4256,7 +4281,10 @@ operation ncCoreBehaviour(nc: RC!NodeContainer): Z!ActionPara{
 	//create transition action: Q
 	var transActionPara = nc.createTransitionsAsActionPara();
 	
-	//to create the transition_core for the ddlf check in Isabelle
+	//to create the transition_core (Transc_) for the ddlf check in Isabelle: Trans without its always-enabled
+	//branches (share, interrupt, terminate), so the ddlf lemma checks that the guards are complete.
+	//See the comment above Rule 53-1 (createTransitionsCoreAsActionPara) for why it is needed.
+	//Must run after Rule 53 above: each rule sets nc.~transPrefix before translating the transitions.
 	var transCoreActionPara = nc.createTransitionsCoreAsActionPara();
 	
 	var initial_name = nc.nodes.selectOne(n|n.instanceOf(RC!Initial)).FQN();
@@ -5290,7 +5318,12 @@ operation Z!CircusChannelSet createChanSetPara(name: String): Z!ChannelSetPara{
 
 //CSP Rule 53, modified: Trans is an action because it will be prefixed in rule 41
 operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
-	
+
+	//Mark this node container as "now generating Trans_": EOL extended property (runtime-only label
+	//on the model object, not saved). findTrStOwnerOfStmt reads it so that the assume fallbacks of the
+	//statements below return to Trans_<nc>(n). Rule 53-1 sets it to "Transc_" when it runs afterwards.
+	self.~transPrefix = "Trans_";
+
 	var trans;
 
 	
@@ -5395,6 +5428,27 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 
 
 /* Rule 53-1, this is a variant of rule 53, to create the Trans_core for the purpose of ddlf check
+ *
+ * Purpose: proving that Trans is deadlock-free is done by proving that Transc (the Trans core) is
+ * deadlock-free. Proving it on Trans itself would be meaningless, because the extra branches below
+ * make Trans deadlock-free regardless of the guards. The generated theory HOLCSP_trans_core_<model>_<ts>.thy
+ * (from circusM2T_HOLCSP_trans_core.egl) contains Transc and this ddlf lemma.
+ *
+ * WHY Transc (the "Trans core") exists, next to Trans:
+ * Trans_<nc>(n) (Rule 53) always offers share -> Trans(n), the interrupt branch and terminate -> Skip,
+ * whatever the node n and the variable values are. So Trans is trivially deadlock-free, and a ddlf check
+ * on Trans (or on the full model) cannot detect a node where NO transition is enabled, e.g. a state whose
+ * outgoing guards do not cover all variable values (the machine would only be able to do "share" there).
+ * Transc_<nc>(n) is Trans without those always-enabled branches. Hence
+ *     deadlock_free (|~| n : UNIV. Transc_<nc>(n))
+ * holds iff from every node (except final), for every value of the variables read, some transition is
+ * enabled, i.e. the guards are complete. The final node gets (n = final) & (terminate -> Skip) so that
+ * terminating is not reported as a deadlock.
+ * Transc is only used by circusM2T_HOLCSP_trans_core.egl, which generates a separate theory containing
+ * Transc and that ddlf lemma; the full model (circusM2T.egl, circusM2T_HOLCSP.egl) uses Trans.
+ * Both are generated from the same transitions, so findTrStOwnerOfStmt uses nc.~transPrefix
+ * (set in Rule 53 / 53-1) to make each assume fallback return to the right process.
+ *
  * difference from rule 53:
  * 1. to remove 3 branches which will be always enabled in the context of Transitions
  * 	1) interrupt.id(nc) branch
@@ -5403,7 +5457,11 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
  * 2. ENRICHMENT for final: add a branch for final: (n= final) & (terminate -> Skip)
  */
 operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
-	
+
+	//Mark this node container as "now generating Transc_" (see Rule 53 and findTrStOwnerOfStmt), so the
+	//assume fallbacks of the statements below return to Transc_<nc>(n) instead of Trans_<nc>(n).
+	self.~transPrefix = "Transc_";
+
 	var trans;
 	
 	var tran_seq = new Sequence<Z!CircusAction>;
