@@ -376,12 +376,87 @@ end
 }%]
 
 
+[*Literal arguments are printed with the type of the called action's parameter, e.g. Memory_x(0) -> Memory_x((0::nat)),
+  sharedMemory_y([]) -> sharedMemory_y(([]::(nat list))).
+  In an "actions ... where" block every equation is type-checked on its own, so a polymorphic literal such as 0 or []
+  in a call cannot be matched to the parameter type declared in the called action's own equation.
+  The type is not inferred here: it is read from the Z model, where the EOL declared the parameter with the RoboChart
+  variable's type (IndividualVarMemory / IndividualSharedVarMemory: value : <type of the variable>).
+  Non-literal arguments (e.g. Trans(NID_i0_...), Memory_x(x__v)) are printed unchanged.*]
 [%operation Z!CallAction parseCallAction(): String{
 	if(self.exprList.isDefined()){
-		return  self.name.word + "(" + self.exprList.parseZExprList() + ")";
+		var argTypes = paramTypesOf(self.name.word);
+		var list_str : String;
+		list_str = "";
+		var i = 0;
+		for(expr in self.exprList.exprs){
+			if(expr.isTypeOf(Z!VarDecl)){
+				//same as parseZExprList: a VarDecl argument is printed as its names
+				for(vname in expr.nameList.names){
+					list_str = list_str + vname.parse();
+					if(hasMore){
+						list_str = list_str + ",";
+					}
+				}
+			} else {
+				var arg_str = expr.parseExpr();
+				if(i < argTypes.size() and isLiteralExpr(expr)){
+					arg_str = "(" + arg_str + "::" + argTypes.at(i) + ")";
+				}
+				list_str = list_str + arg_str;
+			}
+			if(hasMore){
+				list_str = list_str + ",";
+			}
+			i++;
+		}
+		return  self.name.word + "(" + list_str + ")";
 	} else {
 		return  self.name.word;
 	}
+}%]
+
+[*Types of the parameters of the action paragraph called action_name, as Isabelle type strings, in declaration order.
+  Empty if there is no such paragraph or it is not a ParamAction.*]
+[%operation paramTypesOf(action_name: String): Sequence{
+	var types = new Sequence;
+	var para = Z!ActionPara.all().selectOne(p|p.name.isDefined() and p.name.word = action_name);
+	if(para.isDefined() and para.circusAction.isDefined() and para.circusAction.isTypeOf(Z!ParamAction) and para.circusAction.declList.isDefined()){
+		for(d in para.circusAction.declList.decls){
+			if(d.isTypeOf(Z!VarDecl) and d.expr.isDefined()){
+				for(n in d.nameList.names){
+					types.add(d.expr.parseExpr());
+				}
+			}
+		}
+	}
+	return types;
+}%]
+
+[*A literal whose type Isabelle cannot infer on its own: number, True/False, sequence literal (incl. []),
+  or a tuple of such literals (default value of a product type).*]
+[%operation isLiteralExpr(e: Any): Boolean{
+	if(e.isTypeOf(Z!NumExpr)){
+		return true;
+	}
+	if(e.isTypeOf(Z!ApplExpr) and e.leftExpr.isDefined() and e.leftExpr.isTypeOf(Z!RefExpr) and e.leftExpr.name.word = "<,,>"){
+		return true;
+	}
+	if(e.isTypeOf(Z!RefExpr) and e.explicit = false and e.mixFix = false and e.name.isDefined()){
+		var w = e.name.word;
+		if(w = "True" or w = "False" or w.matches("-?[0-9]+(\\.[0-9]+)?([eE]-?[0-9]+)?")){
+			return true;
+		}
+	}
+	if(e.isTypeOf(Z!TupleExpr) and e.exprList.isDefined()){
+		for(x in e.exprList.exprs){
+			if(not isLiteralExpr(x)){
+				return false;
+			}
+		}
+		return true;
+	}
+	return false;
 }%]
 
 [%operation Z!SeqAction parseSeqAction(): String{
