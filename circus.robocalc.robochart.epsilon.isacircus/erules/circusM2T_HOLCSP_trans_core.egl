@@ -677,12 +677,36 @@ end
 		return self.parseSequence();
 	} //else
 	
-	if(self.isTypeOf(Z!ApplExpr) and self.mixFix = false){//this is a RC!CallExpr
-		if(self.rightExpr.isTypeOf(Z!TupleExpr)){//this is a RC!CallExpr
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_cat_"){
+		return self.parseCat();
+	} //else
+
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_oplus_"){
+		return self.parseSeqUpdate();
+	} //else
+
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_recupd_"){
+		return self.parseRecordUpdate();
+	} //else
+
+	if(self.isTypeOf(Z!ApplExpr) and self.mixFix = false){
+		if(self.rightExpr.isTypeOf(Z!TupleExpr)){//this is a RC!CallExpr, arguments are always a TupleExpr
 			return self.parseApplExprAsCallExpr();}
-		if(self.rightExpr.isTypeOf(Z!NumExpr)){//this is a RC!Array to represent a sequence member
-			return self.parseApplExprAsSeqMember();}
-	} //else 
+		//otherwise this is a RC!ArrayExp on a sequence, s[i]; the index may be any expression
+		return self.parseApplExprAsSeqMember();
+	} //else
+
+	if(self.isTypeOf(Z!LetExpr)){
+		return self.parseLetExpr();
+	} //else
+
+	if(self.isTypeOf(Z!CondExpr)){
+		return self.parseCondExpr();
+	} //else
+
+	if(self.isTypeOf(Z!BindSelExpr)){//record field selection r.f
+		return "(" + self.name.word + " " + self.expr.parseExpr() + ")";
+	} //else
 	
 	if(self.isTypeOf(Z!RefExpr) and self.explicit = false and self.mixFix = false){//create RefExpr as Reference: explicit = false, mixFix = false
 		if(self.name.word = "boolean"){
@@ -787,12 +811,63 @@ end
 }%]
 
 
+[*RoboChart sequences are indexed from 1, Isabelle lists (nth "!", list_update "xs[i := e]") from 0.
+  SEQ_INDEX_OFFSET is subtracted from every RoboChart index; set it to 0 to reproduce the old output (x ! i unshifted).*]
+[%operation seqIndexOffset(): Integer{
+	return 1;
+}%]
+
+[*RoboChart index as an Isabelle (0-based) index*]
+[%operation Z!Expr parseSeqIndex(): String{
+	var offset = seqIndexOffset();
+	if(offset = 0){
+		return self.parseExpr();
+	}
+	if(self.isTypeOf(Z!NumExpr)){
+		return (self.numeral.value - offset).asString();
+	}
+	return "(" + self.parseExpr() + " - " + offset + ")";
+}%]
+
+[*s[i] -> (s ! (i - 1))*]
 [%operation Z!ApplExpr parseApplExprAsSeqMember(): String{
-	var str : String;
+	return "(" + self.leftExpr.parseExpr() + " ! " + self.rightExpr.parseSeqIndex() + ")";
+}%]
 
-	str = self.leftExpr.parseExpr() + " ! " + self.rightExpr.numeral.value;
+[*s ^ t -> (s @ t)*]
+[%operation Z!ApplExpr parseCat(): String{
+	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() +" @ " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
+}%]
 
-	return str;
+[*s (+) {(i, e)} from s[i] = e  ->  (s[i - 1 := e])*]
+[%operation Z!ApplExpr parseSeqUpdate(): String{
+	var base = self.rightExpr.exprList.exprs.at(0);
+	var maplet = self.rightExpr.exprList.exprs.at(1).exprList.exprs.at(0);
+	return "(" + base.parseExpr() + "[" + maplet.exprList.exprs.at(0).parseSeqIndex() + " := " + maplet.exprList.exprs.at(1).parseExpr() + "])";
+}%]
+
+[*r with f := e from r.f = e  ->  (r\<lparr>f := e\<rparr>)*]
+[%operation Z!ApplExpr parseRecordUpdate(): String{
+	var es = self.rightExpr.exprList.exprs;
+	return "(" + es.at(0).parseExpr() + "\\<lparr>" + es.at(1).parseExpr() + " := " + es.at(2).parseExpr() + "\\<rparr>)";
+}%]
+
+[*let x == e1; y == e2 @ b  ->  (let x = e1; y = e2 in b)*]
+[%operation Z!LetExpr parseLetExpr(): String{
+	var decls_str : String;
+	decls_str = "";
+	for(d in self.schText.declList.decls){
+		decls_str = decls_str + d.name.word + " = " + d.expr.parseExpr();
+		if(hasMore){
+			decls_str = decls_str + "; ";
+		}
+	}
+	return "(let " + decls_str + " in " + self.expr.parseExpr() + ")";
+}%]
+
+[*if p then a else b  ->  (if p then a else b)*]
+[%operation Z!CondExpr parseCondExpr(): String{
+	return "(if " + self.pred.parseMemPred() + " then " + self.leftExpr.parseExpr() + " else " + self.rightExpr.parseExpr() + ")";
 }%]
 
 
@@ -812,16 +887,32 @@ end
 [*TO DO: 
 (1) only tuple with two members are implemented here, for tuple with more than 2, is not covered
 *]
+[*self.expr may be any expression, e.g. (IDEAL_LIGHTING(model))[1] -> (fst (IDEAL_LIGHTING((model)))).
+  Isabelle tuples are right-nested pairs, (a, b, c) = (a, (b, c)), so component k of an n-tuple is
+  fst (snd^(k-1) t) for k < n and snd^(n-1) t for k = n. The Z model does not carry n, so only
+  pairs are handled exactly; for k > 2 the component is assumed NOT to be the last one.*]
 [%operation Z!TupleSelExpr parseTupleSelExpr(): String{
 	var  str : String;
+	//parenthesise: "fst f(x)" would parse as "(fst f) x"
+	var t = "(" + self.expr.parseExpr() + ")";
 
 	if(self.numeral.value = 1){
-		str = "fst " + self.expr.name.word;
+		str = "fst " + t;
 	}
 	if(self.numeral.value = 2){
-		str = "snd " + self.expr.name.word;
+		str = "snd " + t;
 	}
-	
+	if(self.numeral.value > 2){
+		("parseTupleSelExpr: component " + self.numeral.value + " of a tuple with more than 2 members, check by hand").println();
+		str = t;
+		var i = 1;
+		while(i < self.numeral.value){
+			str = "snd (" + str + ")";
+			i++;
+		}
+		str = "fst (" + str + ")";
+	}
+
 	return "(" + str + ")";
 }%]
 
@@ -858,11 +949,11 @@ end
 }%]
 
 [%operation Z!ApplExpr parseIff(): String{
-	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() + " ???????? " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
+	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() + " \\<longleftrightarrow> " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
 }%]
 
 [%operation Z!ApplExpr parseImplies(): String{
-	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() +" => " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
+	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() +" \\<longrightarrow> " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
 }%]
 
 [%operation Z!ApplExpr parsePlus(): String{
@@ -924,8 +1015,10 @@ end
 			str = str + "\\<times>";
 		}
 	}
-	
-	return  str;
+
+	//always parenthesise: in Isabelle type constructors bind tighter than \<times>,
+	//so "A\<times>B list" would mean A \<times> (B list) instead of (A \<times> B) list
+	return  "(" + str + ")";
 }%]
   
  

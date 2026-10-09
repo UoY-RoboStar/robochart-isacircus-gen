@@ -3,12 +3,12 @@ parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly p
 ????????????????*]
 
 theory IsaCircus_enriched_[%=baseName%]_[%=ts%] 
-	imports Axiomatic_Circus
+	imports "Test_Generation.Ax_CyPhyCircus" Action_Command_Compat
 begin
 
 subsection \<open> Prelude \<close>
 
-lit_vars
+declare [[literal_variables]]
 unbundle Circus_Syntax
 
 hide_const (open) sum
@@ -81,8 +81,8 @@ for(chanpara in channelparas){%]
 [%=chan.word%] [*[%if(chandecl.expr.name.word = "SYNCH"){%] :: unit [%} else{%] :: [%if(chandecl.expr.name.word = "Value"){%]real[%}else{%][%=chandecl.expr.name.word%][%}}*]
 [%if(chandecl.expr.parseExpr() = "SYNCH"){%] :: unit [%} else{%] :: [%if(chandecl.expr.parseExpr() = "Value"){%]real[%} else {%]"[%=chandecl.expr.parseExpr()%]"[%}}if(hasMore){%] [%}%]
 
-		[%}if(hasMore){%] |[%}
-	}if(hasMore){%] |[%}%]
+		[%}%] [*if(hasMore){%] |[%}%]*]
+	[%}%][*if(hasMore){%] |[%}%]*]
 	
 [%}%]
 
@@ -94,10 +94,10 @@ for(chansetpara in channelsetparas){
 //	var chanset = chansetpara.declList.decls.at(0);
 	var chans = chansetpara.channelSet.expr.communicationList.communications;%]
 	
-definition "[%= chansetpara.name.word%] = \<lbrace> 
+definition "[%= chansetpara.name.word%] = [%if(chans.size()>0){%]\<lbrace> 
 	[%for(chan in chans){%]	  [%=chan.channelExpr.name.word%][%if(hasMore){%], 
 	[%}%]
-	[%}%] \<rbrace>"
+	[%}%] \<rbrace>"[%} else {%]({} :: mychan set)"[%}%]
 [%}%]
 
 definition relu :: "real \<Rightarrow> real" where
@@ -141,16 +141,16 @@ end
 [%var actparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ActionPara));
 if(procparas.size()=0 and actparas.size()>0){%]
 abbreviation "assume b Q P \<equiv> (if b then P else aviol \<rightarrow> Q)"
-abbreviation "guar b P \<equiv> (if b then P else gviol \<rightarrow> STOP)"
+abbreviation "guar b P \<equiv> (if b then P else gviol \<rightarrow> Stop)"
 
-actions  is "(mychan, unit) action" where 
+actions  is "(mychan, unit) cyphyaction" where 
 "SSTOP = share  \<rightarrow>  SSTOP" |
 [%for(actpara in actparas){
 	if(actpara.circusAction.instanceOf(Z!ParamAction)){%]
 " [%= actpara.name.word%]([%=actpara.circusAction.declList.parseZDeclList()%]) = [%} else {%]
 " [%= actpara.name.word%] = [%}%]
 	[%=actpara.circusAction.parseAction()%] "
-
+[%if(hasMore){%] | [%}%]
 [%}%]
 end
 [%}%]
@@ -201,12 +201,13 @@ end
 	return  "(" + self.circusProcess.parseProc() + " \\<Zhide> " + self.channelSet.parseChannelSet() + ")";
 }%]
 
+[*P [ a \<mapsto> b, ... ] -> cRename (cCompleteRenaming (...)) (P), see renamingRelation*]
 [%operation Z!RenameProcess parseRenameProcess(): String{
-	return  "(" + self.circusProcess.parseProc()  + "\r\n" + "	 [ " + self.assignmentPairs.parseAssignmentPairs() + " ])";
+	return  "(cRename (cCompleteRenaming " + renamingRelation(self.assignmentPairs) + ") (" + self.circusProcess.parseProc() + "))";
 }%]
 
 [%operation Z!ParallelProcess parseParallelProcess(): String{
-	return  "(" + self.leftProcess.parseProc() + " \\<lbrakk> | " + self.channelSet.parseChannelSet() + " | \\<rbrakk> " + self.rightProcess.parseProc() + ")";
+	return  "(" + self.leftProcess.parseProc() + " \\<lbrakk> \\<^bold>0 | " + self.channelSet.parseChannelSet() + " | \\<^bold>0 \\<rbrakk> " + self.rightProcess.parseProc() + ")";
 }%]
 
 [%operation Z!CallProcess parseCallProcess(): String{
@@ -308,7 +309,7 @@ end
 		return self.parseRenameAction();
 	} 
 	if(self.instanceOf(Z!StopAction)){
-		return "STOP";
+		return "Stop";
 	}
 	if(self.instanceOf(Z!IfGuardedCommand)){
 		return self.parseIfGuardedCommand();
@@ -432,7 +433,7 @@ end
 }%]
 
 [%operation Z!ParallelAction parseParallelAction(): String{
-	return  "(" + self.leftAction.parseAction() + "\r\n" + "		\\<lbrakk> | " + self.channelSet.parseChannelSet() + " | \\<rbrakk> " + "\r\n" + "		" + self.rightAction.parseAction() + ")";
+	return  "(" + self.leftAction.parseAction() + "\r\n" + "		\\<lbrakk> \\<^bold>0 | " + self.channelSet.parseChannelSet() + " | \\<^bold>0 \\<rbrakk> " + "\r\n" + "		" + self.rightAction.parseAction() + ")";
 }%]
 
 
@@ -452,8 +453,40 @@ end
 }%]
 
 
+[*A [ a \<mapsto> b, ... ] -> cRename (cCompleteRenaming (...)) (A), see renamingRelation*]
 [%operation Z!RenameAction parseRenameAction(): String{
-	return  "(" + self.circusAction.parseAction() + " [ " + self.assignmentPairs.parseAssignmentPairs() + " ])";
+	return  "(cRename (cCompleteRenaming " + renamingRelation(self.assignmentPairs) + ") (" + self.circusAction.parseAction() + "))";
+}%]
+
+[*The renaming relation for cCompleteRenaming, as a union of csbasic products:
+    a \<mapsto> b, c \<mapsto> d  ->  ((csbasic (a) \<times> csbasic (b)) \<union> (csbasic (c) \<times> csbasic (d)))
+    a \<mapsto> b              ->  (csbasic (a) \<times> csbasic (b))
+    (no pairs)         ->  ({})
+  The "[ a \<mapsto> b ]" notation cannot be parsed inside an Isabelle equation.*]
+[%operation renamingRelation(pairs: Any): String{
+	if(pairs.isUndefined() or pairs.lhsElement.isUndefined() or pairs.lhsElement.names.size() = 0){
+		return "({})";
+	}
+	var rel : String;
+	rel = "";
+	var i = 0;
+	var n = pairs.lhsElement.names.size();
+	while(i < n){
+		var pair = "(csbasic (" + pairs.lhsElement.names.at(i).parse() + ") \\<times> csbasic (" + pairs.rhsElement.exprs.at(i).parseExpr() + "))";
+		if(n = 1){
+			rel = pair;
+		} else {
+			rel = rel + pair;
+			if(i < n - 1){
+				rel = rel + " \\<union> \r\n	";
+			}
+		}
+		i++;
+	}
+	if(n > 1){
+		rel = "(" + rel + ")";
+	}
+	return rel;
 }%]
 
 
@@ -678,12 +711,36 @@ end
 		return self.parseSequence();
 	} //else
 	
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_cat_"){
+		return self.parseCat();
+	} //else
+
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_oplus_"){
+		return self.parseSeqUpdate();
+	} //else
+
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_recupd_"){
+		return self.parseRecordUpdate();
+	} //else
+
 	if(self.isTypeOf(Z!ApplExpr) and self.mixFix = false){
-		if(self.rightExpr.isTypeOf(Z!TupleExpr)){//this is a RC!CallExpr
+		if(self.rightExpr.isTypeOf(Z!TupleExpr)){//this is a RC!CallExpr, arguments are always a TupleExpr
 			return self.parseApplExprAsCallExpr();}
-		if(self.rightExpr.isTypeOf(Z!NumExpr)){//this is a RC!Array to represent a sequence member
-			return self.parseApplExprAsSeqMember();}
-	} //else 
+		//otherwise this is a RC!ArrayExp on a sequence, s[i]; the index may be any expression
+		return self.parseApplExprAsSeqMember();
+	} //else
+
+	if(self.isTypeOf(Z!LetExpr)){
+		return self.parseLetExpr();
+	} //else
+
+	if(self.isTypeOf(Z!CondExpr)){
+		return self.parseCondExpr();
+	} //else
+
+	if(self.isTypeOf(Z!BindSelExpr)){//record field selection r.f
+		return "(" + self.name.word + " " + self.expr.parseExpr() + ")";
+	} //else
 	
 	if(self.isTypeOf(Z!RefExpr) and self.explicit = false and self.mixFix = false){//create RefExpr as Reference: explicit = false, mixFix = false
 		if(self.name.word = "boolean"){
@@ -788,12 +845,63 @@ end
 }%]
 
 
+[*RoboChart sequences are indexed from 1, Isabelle lists (nth "!", list_update "xs[i := e]") from 0.
+  SEQ_INDEX_OFFSET is subtracted from every RoboChart index; set it to 0 to reproduce the old output (x ! i unshifted).*]
+[%operation seqIndexOffset(): Integer{
+	return 1;
+}%]
+
+[*RoboChart index as an Isabelle (0-based) index*]
+[%operation Z!Expr parseSeqIndex(): String{
+	var offset = seqIndexOffset();
+	if(offset = 0){
+		return self.parseExpr();
+	}
+	if(self.isTypeOf(Z!NumExpr)){
+		return (self.numeral.value - offset).asString();
+	}
+	return "(" + self.parseExpr() + " - " + offset + ")";
+}%]
+
+[*s[i] -> (s ! (i - 1))*]
 [%operation Z!ApplExpr parseApplExprAsSeqMember(): String{
-	var str : String;
+	return "(" + self.leftExpr.parseExpr() + " ! " + self.rightExpr.parseSeqIndex() + ")";
+}%]
 
-	str = self.leftExpr.parseExpr() + " ! " + self.rightExpr.numeral.value;
+[*s ^ t -> (s @ t)*]
+[%operation Z!ApplExpr parseCat(): String{
+	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() +" @ " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
+}%]
 
-	return str;
+[*s (+) {(i, e)} from s[i] = e  ->  (s[i - 1 := e])*]
+[%operation Z!ApplExpr parseSeqUpdate(): String{
+	var base = self.rightExpr.exprList.exprs.at(0);
+	var maplet = self.rightExpr.exprList.exprs.at(1).exprList.exprs.at(0);
+	return "(" + base.parseExpr() + "[" + maplet.exprList.exprs.at(0).parseSeqIndex() + " := " + maplet.exprList.exprs.at(1).parseExpr() + "])";
+}%]
+
+[*r with f := e from r.f = e  ->  (r\<lparr>f := e\<rparr>)*]
+[%operation Z!ApplExpr parseRecordUpdate(): String{
+	var es = self.rightExpr.exprList.exprs;
+	return "(" + es.at(0).parseExpr() + "\\<lparr>" + es.at(1).parseExpr() + " := " + es.at(2).parseExpr() + "\\<rparr>)";
+}%]
+
+[*let x == e1; y == e2 @ b  ->  (let x = e1; y = e2 in b)*]
+[%operation Z!LetExpr parseLetExpr(): String{
+	var decls_str : String;
+	decls_str = "";
+	for(d in self.schText.declList.decls){
+		decls_str = decls_str + d.name.word + " = " + d.expr.parseExpr();
+		if(hasMore){
+			decls_str = decls_str + "; ";
+		}
+	}
+	return "(let " + decls_str + " in " + self.expr.parseExpr() + ")";
+}%]
+
+[*if p then a else b  ->  (if p then a else b)*]
+[%operation Z!CondExpr parseCondExpr(): String{
+	return "(if " + self.pred.parseMemPred() + " then " + self.leftExpr.parseExpr() + " else " + self.rightExpr.parseExpr() + ")";
 }%]
 [%operation Z!TupleExpr parseTupleExpr(): String{
 	var tup_str : String;
@@ -812,16 +920,32 @@ end
 [*TO DO: 
 (1) only tuple with two members are implemented here, for tuple with more than 2, is not covered
 *]
+[*self.expr may be any expression, e.g. (IDEAL_LIGHTING(model))[1] -> (fst (IDEAL_LIGHTING((model)))).
+  Isabelle tuples are right-nested pairs, (a, b, c) = (a, (b, c)), so component k of an n-tuple is
+  fst (snd^(k-1) t) for k < n and snd^(n-1) t for k = n. The Z model does not carry n, so only
+  pairs are handled exactly; for k > 2 the component is assumed NOT to be the last one.*]
 [%operation Z!TupleSelExpr parseTupleSelExpr(): String{
 	var  str : String;
+	//parenthesise: "fst f(x)" would parse as "(fst f) x"
+	var t = "(" + self.expr.parseExpr() + ")";
 
 	if(self.numeral.value = 1){
-		str = "fst " + self.expr.name.word;
+		str = "fst " + t;
 	}
 	if(self.numeral.value = 2){
-		str = "snd " + self.expr.name.word;
+		str = "snd " + t;
 	}
-	
+	if(self.numeral.value > 2){
+		("parseTupleSelExpr: component " + self.numeral.value + " of a tuple with more than 2 members, check by hand").println();
+		str = t;
+		var i = 1;
+		while(i < self.numeral.value){
+			str = "snd (" + str + ")";
+			i++;
+		}
+		str = "fst (" + str + ")";
+	}
+
 	return "(" + str + ")";
 }%]
 
@@ -858,11 +982,11 @@ end
 }%]
 
 [%operation Z!ApplExpr parseIff(): String{
-	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() + " ???????? " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
+	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() + " \\<longleftrightarrow> " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
 }%]
 
 [%operation Z!ApplExpr parseImplies(): String{
-	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() +" => " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
+	return  "("+ self.rightExpr.exprList.exprs.at(0).parseExpr() +" \\<longrightarrow> " + self.rightExpr.exprList.exprs.at(1).parseExpr() +")";
 }%]
 
 [%operation Z!ApplExpr parsePlus(): String{
@@ -903,6 +1027,10 @@ end
 
 
 [%operation Z!BasicChannelSetExpr parseBasicChannelSetExpr(): String{
+	//an empty "\<lbrace> \<rbrace>" cannot be parsed by Isabelle; give the empty set its type instead
+	if(self.communicationList.isUndefined() or self.communicationList.communications.size() = 0){
+		return "({} :: mychan set)";
+	}
 	var cs_str : String;
 	for (commu in self.communicationList.communications){
 		cs_str = cs_str + commu.parseCommu();
@@ -923,8 +1051,10 @@ end
 			str = str + "\\<times>";
 		}
 	}
-	
-	return  str;
+
+	//always parenthesise: in Isabelle type constructors bind tighter than \<times>,
+	//so "A\<times>B list" would mean A \<times> (B list) instead of (A \<times> B) list
+	return  "(" + str + ")";
 }%]
   
  

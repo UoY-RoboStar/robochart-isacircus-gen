@@ -2456,7 +2456,8 @@ operation createStateMachineDefAsActionPara(stm: RC!StateMachineDef): Z!ActionPa
 	//TBC the direction of renaming
 	
 	action = action.createRenameAction(renamepairL, renamepairR);
-	action = createParallelAction(Set{"shared"}, action, createSkipAction());
+	//synchronise on the declared channel set shared_variable_events_in_stmbd_<stm> by name (a RefExpr), not on a channel "shared"
+	action = createParallelAction("shared_variable_events_in_stmbd_" + stm.FQN(), action, createSkipAction());
 	
 	var sharedVarSync = new Set<String>;
 	for(v in requiredVariables(stm)){
@@ -2545,7 +2546,8 @@ operation machineBody(stm: RC!StateMachineBody): Z!ActionPara{
 	var parallelL = ncBehaviour(stm).name.word.createCallAction();
 	var parallelR = createSkipAction();
 	var channelSet = Set{"interrupt_" + stm.FQN()};//sync on interrupt means stm can not be interrupted according to Pedro
-	var machineBody = createParallelAction(channelSet, parallelL,parallelR).createHideAction(Sequence{"enteredSS_"+stm.FQN()});
+	//hide the declared channel set enteredSS_in_stmbd_<stm> by name (a RefExpr), not as a single channel "enteredSS_<stm>"
+	var machineBody = createParallelAction(channelSet, parallelL,parallelR).createHideAction("enteredSS_in_stmbd_"+stm.FQN());
 	
 	return machineBody.createActionPara("machineBody_"+ stm.FQN());
 }
@@ -2833,10 +2835,21 @@ operation RC!Type defaultValueAsZExpr(): Z!Expr{
 	}
 	
 	if(self.type().name = "SeqType"){
-	
+
 	("line 1830, self = "  + self).println();
-//	("line 1831, self.values = "  + self.values).println();
-//		TO　DO: SET Default value for SeqType
+		//default of Seq(T) is the empty sequence <>, encoded as in createSeqExpr: "<,,>" applied to an empty set
+		var seqExpr = new Z!ApplExpr;
+		seqExpr.mixFix = true;
+		seqExpr.leftExpr = "<,,>".createRefExpr(false,false);
+		var emptySet = new Set<Z!Expr>;
+		seqExpr.rightExpr = emptySet.createSetExpr();
+		return seqExpr;
+	}
+
+	if(self.type().name = "SetType"){
+		//default of Set(T) is the empty set {}
+		var emptySet = new Set<Z!Expr>;
+		return emptySet.createSetExpr();
 	}
 
 	if(self.type().name = "ProductType"){
@@ -2976,24 +2989,26 @@ operation nc(stmt: RC!Statement): RC!NodeContainer{
 }
 
 operation findTrStOwnerOfStmt(stmt: RC!Statement): String{
-    for(nc in RC!NodeContainer.all()){
-        for(tr in nc.transitions){
-            if(tr.action = stmt){
-                return "Transc_" + nc.FQN();
-            }
-        }
-    }
+	//walk up the containment tree so that nested statements (e.g. inside SeqStatement or IfStmt)
+	//are also resolved to the Transition or State Action that owns them
+	var c = stmt;
+	while(c.isDefined() and not (c.isKindOf(RC!Transition) or c.isKindOf(RC!Action))){
+		c = c.eContainer();
+	}
 
-		
-	for(st in nc.nodes.select(s|s.instanceOf(RC!State))){
-		if(st.actions.size()>0){
-			for(action in st.actions){
-				if(action.action = stmt){
-					return st.name + nc.FQN();
-				}
-			}
-		}
-	}	
+	if(c.isDefined() and c.isKindOf(RC!Transition)){
+		var nc = c.eContainer();
+		return "Transc_" + nc.FQN();
+	}
+
+	if(c.isDefined() and c.isKindOf(RC!Action)){
+		var st = c.eContainer();
+		var nc = st.eContainer();
+		return st.name + nc.FQN();
+	}
+
+	("findTrStOwnerOfStmt: no owner found for " + stmt).println();
+	return null;
 }
 
 operation clone(type : RC!Type) : RC!Type   {
@@ -3566,10 +3581,12 @@ operation RC!NodeContainer createchanParaNC()  {
 		for(ri in self.rInterfaces){
 			for(vl in ri.variableList.select(l|l.modifier = VariableModifier#VAR)){
 				for(v in vl.vars){
-					
+
 					var type_expr = v.type.createTypeExpr();
-					
-					var var_seq = Sequence{"set_EXT_" + v.name};
+
+					//get_x and set_x are used by the stm to read/write the shared variable and by
+					//sharedMemory_x (Rule 37), so they must be declared together with set_EXT_x
+					var var_seq = Sequence{"get_" + v.name, "set_" + v.name, "set_EXT_" + v.name};
 					//TBC with Pedro: v to be FQN at which level? stm or ctrl or pkg?
 					
 					shared_var_chanpara.declList.decls.add(var_seq.createChannelDecl(type_expr));
@@ -3924,9 +3941,22 @@ operation RC!Type createTypeExpr(): Z!Expr{
 		return self.ref.name.createRefExpr(false, false);
 	} 
 	
-	//TO DO
-	if(self.isTypeOf(RelationType)){  
-		
+	//total function A -> B, e.g. const IDEAL_LIGHTING : nat -> real * real
+	//Generic Operator Application "_->_" with operands A and B; the EGLs print it as "A \<Rightarrow> B"
+	if(self.isTypeOf(FunctionType)){
+		var refExpr = new Z!RefExpr;
+		refExpr.mixFix = true;
+		refExpr.explicit = true;
+		refExpr.name = "_->_".createZName();
+		refExpr.exprList = new Z!ZExprList;
+		refExpr.exprList.exprs.add(self.domain.createTypeExpr());
+		refExpr.exprList.exprs.add(self.range.createTypeExpr());
+		return refExpr;
+	}
+
+	//TO DO: a general relation A <-> B (not a function) has no printer in the EGLs yet
+	if(self.isTypeOf(RelationType)){
+		("createTypeExpr: relation types are not supported yet: " + self).println();
 //		return ??
 	}
 	
@@ -4233,7 +4263,8 @@ operation ncCoreBehaviour(nc: RC!NodeContainer): Z!ActionPara{
 
 	var commu = createSynchCommunication("enter_" + initial_name);
 	
-	var prefixAction = createPrefixingAction(commu, transActionPara.name.word.createCallAction());
+	//Trans is parameterised by the current node, so start it at the initial junction: Trans(NID_<initial FQN>)
+	var prefixAction = createPrefixingAction(commu, transActionPara.name.word.createCallAction(Sequence{"NID_" + initial_name}.createRefExprSeq(false,false)));
 	
 //	//a action paragraph is created for transAction because transAction is defined standalone in auto-gen CSPM 
 //	var transProcPara = transProc.createProcessPara("trans_proc_" + nc.FQN(), true);
@@ -4665,8 +4696,8 @@ operation renameTriggerEventsPairL(nc:RC!NodeContainer): Sequence<String>{
 	var pairL = new Sequence<String>;
 	
 	for(t in nc.transitions.select(l|l.trigger.isDefined())){
-		
-		pairL.add(t.trigger.event.name +"__in" +"\\<cdot>x" );
+		pairL.add(t.trigger.event.name +"__in" +"\\<^bold>.x" ); //syntax for Isacircus
+//		pairL.add(t.trigger.event.name +"__in" +"\\<cdot>x" );
 //		pairL.add(t.trigger.event.FQN()+"__in" +"\\<cdot>x" );
 		//in Isabelle, event1\<cdot>x means the set of events that take all values of the first type of event1  when the tirgger's type is a product.
 		//what about the case the trigger's type is not a product, but only NIDS?
@@ -4823,14 +4854,16 @@ operation tevent_str(t: RC!Transition): String{
  	var tevent_string;
  	
 	if(t.trigger = null){
-		tevent_string = "internal__" + nc(t).FQN()  + ".NID_" + t.source.FQN();
-		tevent_string = "internal__" + nc(t).FQN()  + "\\<cdot>NID_" + t.source.FQN();
+//		tevent_string = "internal__" + nc(t).FQN()  + ".NID_" + t.source.FQN();
+//		tevent_string = "internal__" + nc(t).FQN()  + "\\<cdot>NID_" + t.source.FQN();
+		tevent_string = "internal__" + nc(t).FQN()  + "\\<^bold>.NID_" + t.source.FQN(); //syntax for isacircus
 	} 
 	
 	else {
 //		tevent_string = t.trigger.event.FQN() + "__in.NID_" + t.source.FQN();
 //		tevent_string = t.trigger.event.name + "__in.NID_" + t.source.FQN();
-		tevent_string = t.trigger.event.name + "__in\\<cdot>NID_" + t.source.FQN();
+//		tevent_string = t.trigger.event.name + "__in\\<cdot>NID_" + t.source.FQN();
+		tevent_string = t.trigger.event.name + "__in\\<^bold>.NID_" + t.source.FQN(); //syntax for isacircus
 	}
 	
 	return tevent_string;
@@ -6460,7 +6493,135 @@ operation createOutputCommunication(
 
 
 
-//to create a internal sync communication 
+//same as createOutputCommunication, but takes an already transformed Z expression
+//used in Rule 66 when the value written is built from an ArrayAssignable/VarSelection
+operation createOutputCommunicationFromZExpr(
+	chan_name: String,
+	zexpr: Z!Expr,
+	type: String
+	): Z!Communication{
+
+	var commu = new Z!Communication;
+
+	commu.commUsage = Z!CommUsage#Normal;
+	commu.indexed = false;
+	commu.multiSych = 0;
+	commu.channelExpr = chan_name.createRefExpr(false,false);
+
+	commu.fieldList = new Z!CircusFieldList;
+
+	commu.commPattern = Z!CommPattern#Output;
+	var field = new Z!DotField;
+	field.expr = zexpr;
+
+	if(type = "OUTPUT"){
+		field.outputField = true;
+	} else
+	if(type = "SYNC"){
+		field.outputField = false;
+	}
+
+	commu.fieldList.fields = Sequence{field};
+
+	return commu;
+}
+
+
+/******************************************
+Assignable Section (Rule 66 auxiliary)
+
+RoboChart Assignable = VarRef | ArrayAssignable | VarSelection
+  x = e        ->  set_x!(e)
+  x[i] = e     ->  set_x!(x (+) {i |-> e})              Z: _oplus_
+  x.f = e      ->  set_x!(x with field f := e)          Z: _recupd_ (custom, printed as x(|f := e|))
+  x[i].f = e   ->  set_x!(x (+) {i |-> (x i) with f := e})
+The update is built recursively from the innermost Assignable outwards.
+***********************************************/
+
+//name of the variable at the root of an Assignable, e.g. modelScore for modelScore[model]
+operation RC!Assignable rootVarName(): String{
+	if(self.isTypeOf(RC!VarRef)){
+		return self.name.name;
+	}
+	if(self.isTypeOf(RC!ArrayAssignable)){
+		return self.value.rootVarName();
+	}
+	if(self.isTypeOf(RC!VarSelection)){
+		return self.receiver.rootVarName();
+	}
+	("rootVarName: unsupported Assignable " + self).println();
+	return null;
+}
+
+//Z expression that reads the current value of an Assignable
+//  VarRef x             -> x
+//  ArrayAssignable a[i] -> a i        (Application, mixFix = false)
+//  VarSelection r.f     -> r.f        (BindSelExpr)
+operation RC!Assignable createReadExpr(): Z!Expr{
+	if(self.isTypeOf(RC!VarRef)){
+		return self.name.name.createRefExpr(false,false);
+	}
+	if(self.isTypeOf(RC!ArrayAssignable)){
+		var expr = new Z!ApplExpr;
+		expr.mixFix = false; //CZT: C.6.22 (Application)
+		expr.leftExpr = self.value.createReadExpr();
+		expr.rightExpr = self.arrayIndex().createExpr();
+		return expr;
+	}
+	if(self.isTypeOf(RC!VarSelection)){
+		var expr = new Z!BindSelExpr;
+		expr.expr = self.receiver.createReadExpr();
+		expr.name = self.member.name.createZName();
+		return expr;
+	}
+	("createReadExpr: unsupported Assignable " + self).println();
+	return null;
+}
+
+//value of the root variable after assigning new_value to this Assignable
+operation RC!Assignable createUpdatedValueExpr(new_value: Z!Expr): Z!Expr{
+	if(self.isTypeOf(RC!VarRef)){
+		return new_value;
+	}
+	if(self.isTypeOf(RC!ArrayAssignable)){
+		//a (+) {i |-> new_value}; a maplet is a pair, as in createSeqExpr
+		var maplet = Sequence{self.arrayIndex().createExpr(), new_value}.createTupleExpr();
+		var upd = createOperatorApplExpr("_oplus_",
+			Sequence{self.value.createReadExpr(), Set{maplet}.createSetExpr()});
+		return self.value.createUpdatedValueExpr(upd);
+	}
+	if(self.isTypeOf(RC!VarSelection)){
+		var upd = createOperatorApplExpr("_recupd_",
+			Sequence{self.receiver.createReadExpr(), self.member.name.createRefExpr(false,false), new_value});
+		return self.receiver.createUpdatedValueExpr(upd);
+	}
+	("createUpdatedValueExpr: unsupported Assignable " + self).println();
+	return null;
+}
+
+//the (single) index of an ArrayAssignable; sequences have exactly one index
+operation RC!ArrayAssignable arrayIndex(): RC!Expression{
+	if(self.parameters.size() <> 1){
+		("arrayIndex: only one index is supported, found " + self.parameters.size() + " in " + self).println();
+	}
+	return self.parameters.first();
+}
+
+//CZT: C.6.21 (Function Operator Application) with an arbitrary operator and operands
+operation createOperatorApplExpr(operator: String, operands: Sequence): Z!ApplExpr{
+	var expr = new Z!ApplExpr;
+	expr.mixFix = true;
+	expr.leftExpr = operator.createRefExpr(false,false);
+	var exprs = new Sequence<Z!Expr>;
+	for(o in operands){
+		exprs.add(o);
+	}
+	expr.rightExpr = exprs.createTupleExpr();
+	return expr;
+}
+
+
+//to create a internal sync communication
 operation createSynchCommunication(
 	channel_name:String
 	): Z!Communication{
@@ -6584,9 +6745,13 @@ operation RC!Assignment createAssignmentStmtAsAction(): Z!CircusAction{
 	
 	/* CallAction permits a name to be an action.	*/
 	var leftAction = "SSTOP".createCallAction();
-	var chan_name = "set_" + self.left.name.name;
-	
-	var prefix = createOutputCommunication(chan_name, self.right, "OUTPUT");
+
+	//the channel is always set_x for the root variable x, even if the left side is x[i] or x.f;
+	//for x[i] = e the value written is x (+) {i |-> e}, for x.f = e it is x with field f updated
+	var chan_name = "set_" + self.left.rootVarName();
+	var new_value = self.left.createUpdatedValueExpr(self.right.createExpr());
+
+	var prefix = createOutputCommunicationFromZExpr(chan_name, new_value, "OUTPUT");
 
 	var rightAction = createPrefixingAction(prefix, createSkipAction());
 	//PrefixingAction is a type of Action1, so can not use createAction2()
@@ -7114,24 +7279,25 @@ operation RC!SeqStatement createSeqStmtAsAction(): Z!CircusAction{
 
 //CSP Rule 70 - auxilary
 operation OrderedSet<Any> createSeqAsAction(): Z!CircusAction{
-	var seq = self.clone();
-	if(seq.size()= 0){
+	//self is the containment list SeqStatement.statements. Do NOT clone() it and removeAt():
+	//the clone is still a containment list of the same owner, so removing from it nulls the
+	//statement's eContainer and detaches it from the model (it then has no owning transition
+	//in later passes, e.g. createTransitionsCoreAsActionPara). Walk it by index instead.
+	return createSeqAsActionFrom(self, 0);
+}
+
+//CSP Rule 70 - auxilary: [[s_i ; s_i+1 ; ... ; s_n]]
+operation createSeqAsActionFrom(stmts: Any, i: Integer): Z!CircusAction{
+	if(i >= stmts.size()){
 		return null; //TO DO: need to confirm
-	} else
-	if(seq.size()= 1){
-
-		return seq.at(0).createStmtInContextAsAction();
-		
-	} else	
-	if(seq.size()>1){
-//		var leftAction = seq.at(0).createStmtAsAction();
-		var leftAction = seq.at(0).createStmtInContextAsAction();
-		seq.removeAt(0);
-		var rightAction = seq.createSeqAsAction();
-		"line 6672".println();
-		return createAction2("SeqAction", leftAction, rightAction);
-
 	}
+	var leftAction = stmts.at(i).createStmtInContextAsAction();
+	if(i = stmts.size() - 1){
+		return leftAction;
+	}
+	var rightAction = createSeqAsActionFrom(stmts, i + 1);
+	"line 6672".println();
+	return createAction2("SeqAction", leftAction, rightAction);
 }
 
 
@@ -7659,8 +7825,20 @@ operation RC!Expression createExpr():Z!Expr{
 	if(self.isTypeOf(RC!RefExp)){
 	("line 7410, self = " + self).println();
 	("line 7410, self.ref = " + self.ref).println();
-	("line 7410, self.ref.type = " + self.ref.type).println();
+	//self.ref may be a let Declaration, which has no type
 		return self.ref.name.createRefExpr(false, false);
+	} //else
+
+	if(self.isTypeOf(RC!Cat)){
+		return self.createApplExpr("_cat_");
+	} //else
+
+	if(self.isTypeOf(RC!LetExpression)){
+		return self.createLetExpr();
+	} //else
+
+	if(self.isTypeOf(RC!IfExpression)){
+		return self.createCondExpr();
 	} //else
 	
 	if(self.isTypeOf(RC!BooleanExp)){
@@ -7694,29 +7872,19 @@ operation RC!Expression createExpr():Z!Expr{
 	if(self.isTypeOf(RC!ArrayExp)){
 	("line 7408,self = "+ self).println();
 	("line 7408,self.value = "+ self.value).println();
-	("line 7408,self.value.type() = "+ self.value.type()).println();
-	("line 7408,self.value.isTypeOf(RefExp) = "+ self.value.isTypeOf(RefExp)).println();
-	("line 7408,self.value.ref = "+ self.value.ref).println();
-	("line 7408,self.value.ref.name = "+ self.value.ref.name).println();
-	self.parameters.println();
-	for (v in RC!Variable.all().selectOne(v| v.name = self.value.ref.name)){
-		("line 7420, I found the var for the array and the type is " + v.type).println();
-		("line 7420, array is a member of product type =  " + v.type.type().name ).println();	
-		if(v.type.type().name = "ProductType"){
-		"line 7419".println();
-			return self.createTupleSelExpr(v.name);
-		}	
-		if(v.type.type().name = "SeqType"){
-		"line 7423".println();
-			return self.createApplExprforSeqMember(v.name);
-		}	
-	}
-//		if(self.value){
-//			return self.createTupleSelExpr();
-//		}
-//		else
-//		{}
+		//the indexed value may be a variable, a let name, a parenthesised expression or a call,
+		//e.g. (imagesWithLight[k])[2] or (IDEAL_LIGHTING(model))[1],
+		//so decide tuple selection vs sequence application from its RoboChart type
+		var base_type = self.value.rcType();
+		("line 7420, base type of the indexed value = " + base_type).println();
+		if(base_type.isDefined() and base_type.isKindOf(RC!ProductType)){
+			return self.createTupleSelExprGeneral();
 		}
+		if(base_type.isDefined() and base_type.isKindOf(RC!SeqType)){
+			return self.createApplExprforSeqMemberGeneral();
+		}
+		("createExpr: cannot determine the type indexed by " + self + ", value = " + self.value).println();
+	}
 	//TO DO
 /*	if(self.isTypeOf(RC!IfExpression)  or 
 	   self.isTypeOf(RC!ResultExp) or 
@@ -7797,11 +7965,139 @@ operation RC!ArrayExp createApplExprforSeqMember(v_name: String): Z!ApplExpr{
 	
 	expr.leftExpr = v_name.createRefExpr(false,false);
 
-	expr.rightExpr = new Z!NumExpr; //A number literal expression (C.6.30)
-	expr.rightExpr.numeral = new Z!ZNumeral;
-	("line 7515, TupleSelExpr.parameters.at(0).value = " + self.parameters.at(0).value).println();
-	expr.rightExpr.numeral.value = self.parameters.at(0).value;
+	//a literal index such as x[2] stays a NumExpr (C.6.30);
+	//a non-literal index such as x[model] or x[pos+1] is transformed as a general expression
+	if(self.parameters.at(0).isTypeOf(RC!IntegerExp)){
+		expr.rightExpr = new Z!NumExpr;
+		expr.rightExpr.numeral = new Z!ZNumeral;
+		expr.rightExpr.numeral.value = self.parameters.at(0).value;
+	} else {
+		expr.rightExpr = self.parameters.at(0).createExpr();
+	}
 	
 	return 	expr;
 
+}
+
+/******************************************
+General indexing, let and conditional expressions
+
+These generalise createTupleSelExpr/createApplExprforSeqMember above, which only
+accept a variable name as the indexed value.
+***********************************************/
+
+//RoboChart type of an expression, for the cases needed to decide how x[i] is indexed.
+//Returns null when the type cannot be determined.
+operation RC!Expression rcType(): RC!Type{
+	if(self.isTypeOf(RC!RefExp)){
+		if(self.ref.isKindOf(RC!Function)){
+			return null; //a function name on its own, not its result
+		}
+		if(self.ref.isKindOf(RC!TypedNamedElement)){
+			return self.ref.type.resolveType();
+		}
+		if(self.ref.isKindOf(RC!Declaration)){ //name introduced by let
+			return self.ref.value.rcType();
+		}
+		return null;
+	}
+	if(self.isTypeOf(RC!ParExp)){
+		return self.exp.rcType();
+	}
+	if(self.isTypeOf(RC!ArrayExp)){
+		var t = self.value.rcType();
+		if(t.isUndefined()){
+			return null;
+		}
+		if(t.isKindOf(RC!SeqType)){
+			return t.domain.resolveType();
+		}
+		if(t.isKindOf(RC!ProductType) and self.parameters.first().isTypeOf(RC!IntegerExp)){
+			return t.types.at(self.parameters.first().value - 1).resolveType();
+		}
+		return null;
+	}
+	if(self.isTypeOf(RC!CallExp)){
+		var f = self.`function`;
+		if(f.isTypeOf(RC!RefExp) and f.ref.isKindOf(RC!Function)){ //function declaration: its type is the result type
+			return f.ref.type.resolveType();
+		}
+		var ft = f.rcType(); //constant/variable of function type, e.g. IDEAL_LIGHTING : nat -> real * real
+		if(ft.isDefined() and ft.isKindOf(RC!RelationType)){
+			return ft.range.resolveType();
+		}
+		return null;
+	}
+	if(self.isTypeOf(RC!LetExpression)){
+		return self.expression.rcType();
+	}
+	if(self.isTypeOf(RC!IfExpression)){
+		return self.ifexp.rcType();
+	}
+	return null;
+}
+
+//follow named types (NameType) to the type they stand for
+operation RC!Type resolveType(): RC!Type{
+	if(self.isTypeOf(RC!TypeRef) and self.ref.isTypeOf(RC!NameType)){
+		return self.ref.type.resolveType();
+	}
+	return self;
+}
+
+//tuple selection e.n for any expression e, e.g. (IDEAL_LIGHTING(model))[1] -> (IDEAL_LIGHTING model).1
+operation RC!ArrayExp createTupleSelExprGeneral(): Z!TupleSelExpr{
+	var tupleSelExpr = new Z!TupleSelExpr;
+	tupleSelExpr.expr = self.value.createExpr();
+	tupleSelExpr.numeral = new Z!ZNumeral;
+	if(not self.parameters.first().isTypeOf(RC!IntegerExp)){
+		("createTupleSelExprGeneral: tuple index must be a number literal in " + self).println();
+	}
+	tupleSelExpr.numeral.value = self.parameters.first().value;
+	return tupleSelExpr;
+}
+
+//sequence application e i for any expression e, e.g. imagesWithLight[imagesWithPoorLight[image]]
+operation RC!ArrayExp createApplExprforSeqMemberGeneral(): Z!ApplExpr{
+	var expr = new Z!ApplExpr;
+	expr.mixFix = false; //CZT: C.6.22 (Application)
+	expr.leftExpr = self.value.createExpr();
+	
+	if(self.parameters.first().isTypeOf(RC!IntegerExp)){
+		expr.rightExpr = new Z!NumExpr;
+		expr.rightExpr.numeral = new Z!ZNumeral;
+		expr.rightExpr.numeral.value = self.parameters.first().value;
+	} else {
+		expr.rightExpr = self.parameters.first().createExpr();
+	}
+	return expr;
+}
+
+//CZT: let x == e1 @ e2 is a LetExpr whose schText declares x == e1 (ConstDecl) and whose expr is e2
+operation RC!LetExpression createLetExpr(): Z!LetExpr{
+	var letExpr = new Z!LetExpr;
+	
+	var declList = new Z!ZDeclList;
+	for(d in self.declarations){
+		var constDecl = new Z!ConstDecl;
+		constDecl.name = d.name.createZName();
+		constDecl.expr = d.value.createExpr();
+		declList.decls.add(constDecl);
+	}
+	
+	var schText = new Z!ZSchText;
+	schText.declList = declList;
+	letExpr.schText = schText;
+	
+	letExpr.expr = self.expression.createExpr();
+	return letExpr;
+}
+
+//CZT: if p then e1 else e2 is a CondExpr; the RoboChart condition c becomes the predicate c \in {True}
+operation RC!IfExpression createCondExpr(): Z!CondExpr{
+	var condExpr = new Z!CondExpr;
+	condExpr.pred = self.condition.createExpr().createMemPredEquality();
+	condExpr.leftExpr = self.ifexp.createExpr();
+	condExpr.rightExpr = self.elseexp.createExpr();
+	return condExpr;
 }
