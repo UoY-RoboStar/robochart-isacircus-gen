@@ -236,6 +236,9 @@ where
 [simp del] :\<open>[%= actpara.nameWithSig()%] = 
 	[%=actpara.circusAction.parseAction()%] \<close> 
 [%}%]
+
+[*end of locale actions; the end below closes the theory (issue M: before, only one end was printed)*]
+end
 [%}%]
 end
 
