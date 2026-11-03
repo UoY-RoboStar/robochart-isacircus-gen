@@ -50,7 +50,11 @@ definition below_[%=enumType.name.word%]_def:
 instance proof
 qed (rule below_[%=enumType.name.word%]_def)
 end
+ [%}%]
 
+[*Discrete cpo instances for the basic types that can be parameters of the Memory fixrec processes (issue K).
+  Emitted once; before, only int was emitted, and inside the loop over free types (once per free type).
+  Not covered yet: records, sequences and other composite types used as variable types.*]
 instantiation int :: discrete_cpo
 begin
 
@@ -59,8 +63,37 @@ definition below_int_def [simp]:
 
 instance
   by standard (simp)
-end 
- [%}%]
+end
+
+instantiation nat :: discrete_cpo
+begin
+
+definition below_nat_def [simp]:
+  "(x::nat) \<sqsubseteq> y \<longleftrightarrow> x = y"
+
+instance
+  by standard (simp)
+end
+
+instantiation bool :: discrete_cpo
+begin
+
+definition below_bool_def [simp]:
+  "(x::bool) \<sqsubseteq> y \<longleftrightarrow> x = y"
+
+instance
+  by standard (simp)
+end
+
+instantiation real :: discrete_cpo
+begin
+
+definition below_real_def [simp]:
+  "(x::real) \<sqsubseteq> y \<longleftrightarrow> x = y"
+
+instance
+  by standard (simp)
+end
 
 
 [*record type declaration*]
