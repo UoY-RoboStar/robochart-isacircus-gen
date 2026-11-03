@@ -2835,11 +2835,13 @@ operation RC!Type defaultValueAsZExpr(): Z!Expr{
 //		if(self.ref.name = "String"){
 //			return createNumExpr(0);//TO DO
 //		}
-		if(self.ref.name = "Boolean"){
+		//RoboChart writes the type as "boolean"; the old comparison with "Boolean" never matched, so bool variables
+		//got the default 0 (issue L). The default true is the one of the RoboChart CSP-M generator.
+		if(self.ref.name.toLowerCase() = "boolean"){
 			return createBooleanExpr(true);
 		} 
 		
-		if(self.ref.name != "Boolean" and self.ref.name != "int") {
+		if(self.ref.name.toLowerCase() != "boolean" and self.ref.name != "int") {
 			return createNumExpr(0);
 		}
 		
