@@ -206,12 +206,17 @@ end
 	return  "(" + self.circusProcess.parseProc() + " \\ " + self.channelSet.parseChannelSet() + ")";
 }%]
 
+[*A renaming without pairs (e.g. no shared variables) is printed as its operand alone; "P \<lbrakk>  \<rbrakk> \<lbrakk>\<rbrakk>"
+  does not parse (issue B). The empty case used to print "(" + operand without the closing parenthesis.*]
+[%operation Z!AssignmentPairs hasRenamePairs(): Boolean{
+	return self.isDefined() and self.lhsElement.isDefined() and self.lhsElement.names.size() > 0;
+}%]
 [%operation Z!RenameProcess parseRenameProcess(): String{
-	if(self.assignmentPairs.size()>0){
+	if(self.assignmentPairs.isDefined() and self.assignmentPairs.hasRenamePairs()){
 	return  "(" + self.circusProcess.parseProc()  + "\r\n" + "	\\<lbrakk> " + self.assignmentPairs.parseAssignmentPairs() + " \\<rbrakk> \\<lbrakk>\\<rbrakk>)";
 	}
 	else {
-	return  "(" + self.circusProcess.parseProc();
+	return  "(" + self.circusProcess.parseProc() + ")";
 	}
 }%]
 
@@ -456,10 +461,10 @@ end
 
 
 [%operation Z!RenameAction parseRenameAction(): String{
-	if(self.assignmentPairs.size()>0){
+	if(self.assignmentPairs.isDefined() and self.assignmentPairs.hasRenamePairs()){
 	return  "(" + self.circusAction.parseAction() + " \\<lbrakk> " + self.assignmentPairs.parseAssignmentPairs() + " \\<rbrakk> \\<lbrakk>\\<rbrakk>)";}
 	else {
-	return  "(" + self.circusProcess.parseProc();
+	return  "(" + self.circusAction.parseAction() + ")";
 	}
 }%]
 
