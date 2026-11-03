@@ -110,7 +110,7 @@ for(chansetpara in channelsetparas){
 
 
 [*printed by parseBasicChannelSetExpr, so that parameterised channels become range c (see there)*]
-definition "[%= chansetpara.name.word%] = [%=chansetpara.channelSet.expr.parseExpr()%]"
+definition [%= chansetpara.name.word%] :: "chan_event set" where "[%= chansetpara.name.word%] = [%=chansetpara.channelSet.expr.parseExpr()%]"
 [%}%]
       
 abbreviation "assume b Q P \<equiv> (if b then P else aviol \<rightarrow> Q)"
@@ -1097,8 +1097,12 @@ end
 			events.add(commu.parseCommu());
 		}
 	}
+	//empty set: "{  }" does not parse; give the type, since an empty set alone has none (issue A)
+	if(events.size() = 0 and ranges.size() = 0){
+		return "({} :: chan_event set)";
+	}
 	var parts = new Sequence;
-	if(events.size() > 0 or ranges.size() = 0){
+	if(events.size() > 0){
 		parts.add("{ " + events.concat(",") + " }");
 	}
 	parts.addAll(ranges);

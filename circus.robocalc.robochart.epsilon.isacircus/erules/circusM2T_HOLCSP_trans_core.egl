@@ -1059,8 +1059,12 @@ end
 			events.add(commu.parseCommu());
 		}
 	}
+	//empty set: "{  }" does not parse; give the type, since an empty set alone has none (issue A)
+	if(events.size() = 0 and ranges.size() = 0){
+		return "({} :: chan_event set)";
+	}
 	var parts = new Sequence;
-	if(events.size() > 0 or ranges.size() = 0){
+	if(events.size() > 0){
 		parts.add("{ " + events.concat(",") + " }");
 	}
 	parts.addAll(ranges);
