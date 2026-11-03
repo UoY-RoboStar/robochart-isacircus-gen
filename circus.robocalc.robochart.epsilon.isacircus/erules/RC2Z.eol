@@ -3005,6 +3005,15 @@ operation nc(stmt: RC!Statement): RC!NodeContainer{
 	}
 }
 
+//true iff the statement belongs to a transition action (not to an entry/during/exit action of a state); issue J
+operation isOwnedByTransition(stmt: RC!Statement): Boolean{
+	var c = stmt;
+	while(c.isDefined() and not (c.isKindOf(RC!Transition) or c.isKindOf(RC!Action))){
+		c = c.eContainer();
+	}
+	return c.isDefined() and c.isKindOf(RC!Transition);
+}
+
 operation findTrStOwnerOfStmt(stmt: RC!Statement): String{
 	//walk up the containment tree so that nested statements (e.g. inside SeqStatement or IfStmt)
 	//are also resolved to the Transition or State Action that owns them
@@ -6712,7 +6721,11 @@ operation createSynchCommunication(
 operation RC!Statement createStmtInContextAsAction(): Z!CircusAction{
 	var action1 = self.createStmtAsAction();
 	var stmt_container =  findTrStOwnerOfStmt(self);
-	if(usedVariables(self).size()=0){
+	//Issue J: the assume fallback aviol -> P(n) only makes sense for transition actions, where P is Trans_<nc>
+	//(or Transc_<nc>) and n its node parameter. For a statement of a state action (entry/during/exit) the
+	//fallback named <state><nc FQN>, a constant that does not exist, applied to a free n. For now such
+	//statements get no assume wrapper; statements on transitions keep "assume True" as a placeholder.
+	if(usedVariables(self).size()=0 or not isOwnedByTransition(self)){
 		return readState(usedVariables(self), action1);
 	} else
 	//an extra step introduced to change action1 into "if inv_on_usedVariables(self) then action else aviol -> action"
