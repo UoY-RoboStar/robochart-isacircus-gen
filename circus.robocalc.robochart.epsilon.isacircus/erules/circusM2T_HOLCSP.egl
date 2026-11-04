@@ -129,7 +129,7 @@ for(chanpara in channelparas.select(cp|cp.declList.decls.size()>0)){%]
 		var chans = chandecl.channelNameList.names;%]
 
 		[%for(chan in chans){%]
-"[%=chan.word%]" [*[%if(chandecl.expr.name.word = "SYNCH"){%] :: unit [%} else{%] :: [%if(chandecl.expr.name.word = "Value"){%]real[%}else{%][%=chandecl.expr.name.word%][%}}*][%if(chandecl.expr.parseExpr() = "SYNCH"){%]  [%} else{%] [%if(chandecl.expr.parseExpr() = "Value"){%]"real"[%} else {%]"[%=chandecl.expr.parseExpr()%]" [%}} if(hasMore){%] |[%}%]
+"[%=chan.word%]" [*[%if(chandecl.expr.name.word = "SYNCH"){%] :: unit [%} else{%] :: [%if(chandecl.expr.name.word = "Value"){%]real[%}else{%][%=chandecl.expr.name.word%][%}}*][%if(chandecl.expr.parseExpr() = "SYNCH"){%]  [%} else{%] [%if(chandecl.expr.parseExpr() = "Value"){%]"real"[%} else {%][%=chandecl.expr.chanArgs()%]" [%}} if(hasMore){%] |[%}%]
 		[%}if(hasMore){%] |[%}
 	}if(hasMore){%] |[%}%]
 	
@@ -638,6 +638,22 @@ end
 
 
 
+[*Arguments of a chan_event constructor (issue E). RC2Z.eol declares the node-indexed event channel e__in with
+  the product NIDS x T; it is used curried (e__in NID, e__in NID v), so it is declared with two arguments. Only
+  this product is split: a user product type T (e.g. int*int) stays one tuple argument, so that e__in n v and
+  e_in v take the same value v.*]
+[%operation Z!Expr isNidsProduct(): Boolean{
+	return self.isTypeOf(Z!ProdExpr) and self.exprList.exprs.size() = 2
+		and self.exprList.exprs.at(0).parseExpr().startsWith("NIDS_");
+}%]
+[*returns the arguments without the final closing quote, which is static text in the declaration line (keeps
+  the spacing of the output unchanged)*]
+[%operation Z!Expr chanArgs(): String{
+	if(self.isNidsProduct()){
+		return "\"" + self.exprList.exprs.at(0).parseExpr() + "\" \"" + self.exprList.exprs.at(1).parseExpr();
+	}
+	return "\"" + self.parseExpr();
+}%]
 [%operation Z!Field parseField(): String{
 	
 	var field_str : String;
@@ -746,8 +762,8 @@ end
 	}
 	return "(\\<exists>" + bound.concat(" ") + ". " + body + ")";
 }%]
-[*Number of curried arguments of a chan_event constructor: 0 for SYNCH, the number of components for a product
-  type (the curried form of issue E), 1 otherwise. Names that are not channels (none expected) count as 0.*]
+[*Number of curried arguments of a chan_event constructor: 0 for SYNCH, 2 for NIDS x T (curried, issue E),
+  1 otherwise (a user product type is one tuple argument). Names that are not channels count as 0.*]
 [%@cached
 operation channelArities(): Map{
 	var m = new Map;
@@ -757,8 +773,8 @@ operation channelArities(): Map{
 				var n = 0;
 				if(chandecl.expr.isDefined() and chandecl.expr.parseExpr() <> "SYNCH"){
 					n = 1;
-					if(chandecl.expr.isTypeOf(Z!ProdExpr)){
-						n = chandecl.expr.exprList.exprs.size();
+					if(chandecl.expr.isNidsProduct()){
+						n = 2;
 					}
 				}
 				for(chan in chandecl.channelNameList.names){
