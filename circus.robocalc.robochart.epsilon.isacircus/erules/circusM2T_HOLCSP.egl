@@ -1301,8 +1301,16 @@ operation channelArities(): Map{
 		if(commu.channelExpr.isDefined() and commu.channelExpr.isTypeOf(Z!RefExpr) and commu.channelExpr.name.isDefined()){
 			w = commu.channelExpr.name.word;
 		}
-		if(paramChans.includes(w)){
-			ranges.add("range " + w);
+		//issue H: a channel applied to fewer values than it takes (e.g. newModel__in NID with newModel__in :: NIDS
+		//=> nat => chan_event, written newModel__in\<^bold>.NID by RC2Z.eol) is a function, not an event: all its
+		//completions are meant, i.e. range (newModel__in NID). Bare channel names are the case of no given value.
+		var parts = w.relSplit();
+		if(w <> "" and parts.relRest() > 0){
+			if(parts.size() = 1){
+				ranges.add("range " + w);
+			} else {
+				ranges.add("range " + w.holEvent());
+			}
 		} else {
 			events.add(commu.parseCommu());
 		}
