@@ -610,10 +610,34 @@ end
 //	if(self.commPattern = Z!CommPattern#Input or self.commPattern =  Z!CommPattern#Output){
 	{
 		commu_str = self.channelExpr.parseExpr();
+		//issue D: a trigger with a parameter is the channel with a value field and an input field, c.a?x
+		//(DotField, InputField); printed as c\<^bold>.a\<^bold>?x it does not parse. The leading value fields are
+		//applied to the channel when an input or output field follows: (c a)\<^bold>?x, a read on the channel c a.
+		//Without a following input/output field, c\<^bold>.a stays (write notation, = write0).
+		var fields = self.fieldList.fields;
+		var k = 0;
+		while(k < fields.size() and fields.at(k).isTypeOf(Z!DotField) and fields.at(k).outputField = false){
+			k++;
+		}
+		var start = 0;
+		if(k > 0 and k < fields.size()){
+			var j = 0;
+			var app = commu_str;
+			while(j < k){
+				app = app + " " + fields.at(j).expr.parseExpr();
+				j++;
+			}
+			commu_str = "(" + app + ")";
+			start = k;
+		}
 //		var field = self.fieldList.fields.at(0);
 //		commu_str = commu_str + field.parseField();
+		var idx = 0;
 		for(field in self.fieldList.fields){
-			commu_str = commu_str + field.parseField();
+			if(idx >= start){
+				commu_str = commu_str + field.parseField();
+			}
+			idx++;
 		}
 		
 //		if(field.outputField = true){
