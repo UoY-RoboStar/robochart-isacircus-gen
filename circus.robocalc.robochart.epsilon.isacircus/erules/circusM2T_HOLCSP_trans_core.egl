@@ -709,8 +709,12 @@ end
 	}
 	return "(\\<exists>" + bound.concat(" ") + ". " + body + ")";
 }%]
+[*CSP-M renaming: an event in the domain (some left-hand side) is renamed only to its targets; an event outside
+  the domain is unchanged. The last clause states the latter; without it those events would be blocked.
+  Duplicate pairs (e.g. one trigger on several transitions) give one clause.*]
 [%operation Z!AssignmentPairs parseRelRenaming(): String{
-	var clauses = new Sequence;
+	var clauses = new OrderedSet;
+	var domain = new OrderedSet;
 	var i = 0;
 	while(i < self.lhsElement.names.size()){
 		var lp = self.lhsElement.names.at(i).word.relSplit();
@@ -720,8 +724,14 @@ end
 			bound.add("rn_x");
 		}
 		clauses.add(relClause(bound, "rn_a = " + lp.relTerm(new Sequence) + " \\<and> rn_b = " + rp.relTerm(new Sequence)));
+		var lbound = new Sequence;
+		if(lp.relHasX()){
+			lbound.add("rn_x");
+		}
+		domain.add(relClause(lbound, "rn_a = " + lp.relTerm(new Sequence)));
 		i++;
 	}
+	clauses.add("(" + domain.collect(d | "\\<not> " + d).concat(" \\<and> ") + " \\<and> rn_b = rn_a)");
 	return "(\\<lambda>rn_a rn_b. " + clauses.concat("\r\n\t  \\<or> ") + ")";
 }%]
 [%operation Z!AssignmentPairs parseAssignmentPairs(): String{
