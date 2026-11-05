@@ -53,6 +53,8 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
     // The .rct file selected by the user, passed from execute() to run()
     IFile inputFile;
 
+    static final String ROBOCHART_NS_URI = "http://www.robocalc.circus/RoboChart";
+
     /**
      * Entry point called by Eclipse when the menu item is clicked.
      * Retrieves the selected file, checks it is a .rct file,
@@ -213,7 +215,18 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         for (String w : loaded.warnings) {
             CompileLog.warning(w);
         }
-        InMemoryEmfModel rcModel = new InMemoryEmfModel("RC", loaded.resource);
+        // The RC model gets the RoboChart package explicitly (precaution, 5 Nov 2026): without packages,
+        // InMemoryEmfModel replaces the empty package registry of the resource set by the global one and looks
+        // RC!X up by name in every registered metamodel (findAny); several RoboTool metamodels (Circus, PRISM,
+        // physmod, roboarch) have classes with RoboChart's names. The former EmfModel was restricted to RoboChart
+        // by setMetamodelUri. In dev-tools this does not change the output (GenAll option rcpkg).
+        final EPackage robochartPackage = EPackage.Registry.INSTANCE.getEPackage(ROBOCHART_NS_URI);
+        if (robochartPackage == null) {
+            CompileLog.error("the RoboChart metamodel " + ROBOCHART_NS_URI + " is not registered", null);
+            throw new InvocationTargetException(new IllegalStateException(ROBOCHART_NS_URI + " not registered"),
+                "The RoboChart metamodel " + ROBOCHART_NS_URI + " is not registered.");
+        }
+        InMemoryEmfModel rcModel = new InMemoryEmfModel("RC", loaded.resource, robochartPackage);
         rcModel.setModelFileUri(org.eclipse.emf.common.util.URI.createFileURI(rctAbsPath)); // RC2Z.eol reads RC.modelFile
         CompileLog.info("RC.modelFile = " + rcModel.getModelFile() + " (modelFileUri " + rcModel.getModelFileUri() + ")");
         monitor.worked(1);
@@ -325,7 +338,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
                 "platform:/plugin/circus.robocalc.robochart.epsilon.isacircus/erules/CircusM2T.egx"));
             System.out.println("[DEBUG] EGX parsed OK");
             // the same resolved RoboChart model as in Step 1 (not a second single-file load)
-            InMemoryEmfModel rcModelForM2T = new InMemoryEmfModel("RC", loaded.resource);
+            InMemoryEmfModel rcModelForM2T = new InMemoryEmfModel("RC", loaded.resource, robochartPackage);
             rcModelForM2T.setModelFileUri(org.eclipse.emf.common.util.URI.createFileURI(rctAbsPath));
             egxModule.getContext().getModelRepository().addModel(circusModelForM2T);
             egxModule.getContext().getModelRepository().addModel(rcModelForM2T);
