@@ -127,11 +127,11 @@ datatype chan_event  =
 [%z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara)).println();
 var channelparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara));
 
-for(chanpara in channelparas.select(cp|cp.declList.decls.size()>0)){%]
+for(chanpara in channelparas.select(cp|cp.declList.decls.exists(d|d.keptChans().size()>0))){%]
 \<comment> \<open>[%=chanpara.name.word%]\<close>
 [%//	var chandecl = chanpara.declList.decls.at(0);
-	for(chandecl in chanpara.declList.decls){
-		var chans = chandecl.channelNameList.names;%]
+	for(chandecl in chanpara.declList.decls.select(d|d.keptChans().size()>0)){
+		var chans = chandecl.keptChans();%]
 
 		[%for(chan in chans){%]
 "[%=chan.word%]" [*[%if(chandecl.expr.name.word = "SYNCH"){%] :: unit [%} else{%] :: [%if(chandecl.expr.name.word = "Value"){%]real[%}else{%][%=chandecl.expr.name.word%][%}}*][%if(chandecl.expr.parseExpr() = "SYNCH"){%]  [%} else{%] [%if(chandecl.expr.parseExpr() = "Value"){%]"real"[%} else {%][%=chandecl.expr.chanArgs()%]" [%}} if(hasMore){%] |[%}%]
@@ -640,6 +640,45 @@ end
 		return "\"" + self.exprList.exprs.at(0).parseExpr() + "\" \"" + self.exprList.exprs.at(1).parseExpr();
 	}
 	return "\"" + self.parseExpr();
+}%]
+[*Issue P (known deviation from the CSP-M, 5 Nov 2026): event channels are declared only for the events the state
+  machine uses. RC2Z.eol declares e_in, e_out, e__in for every event of the state machine, including all events
+  of the interfaces it uses; some of these have types (records of other files) that the theory does not declare.
+  An event is used if one of its channels is mentioned anywhere in the Z model outside the channel declarations;
+  all channels of a used event are kept. Unused events cannot occur in any process, so the behaviour is
+  unchanged; the CSP-M declares them all. Other channel paragraphs (flow, variables, ...) are unchanged.
+  To do before the MakePlan regression: generate the record and enumeration types of imported packages, then
+  this filter can be reconsidered.*]
+[%@cached
+operation usedEventBases(): Set{
+	var used = new Set;
+	for(n in Z!ZName.all()){
+		var inDecl = n.eContainer().isDefined() and n.eContainer().eContainer().isDefined()
+			and n.eContainer().eContainer().isTypeOf(Z!ChannelDecl);
+		if(not inDecl and n.word.isDefined()){
+			used.add(n.word.relSplit().first().eventBase());
+		}
+	}
+	return used;
+}%]
+[%operation String eventBase(): String{
+	if(self.endsWith("__in")){
+		return self.substring(0, self.length() - 4);
+	}
+	if(self.endsWith("_out")){
+		return self.substring(0, self.length() - 4);
+	}
+	if(self.endsWith("_in")){
+		return self.substring(0, self.length() - 3);
+	}
+	return self;
+}%]
+[%operation Z!ChannelDecl keptChans(): Sequence{
+	var para = self.eContainer().eContainer();
+	if(para.isDefined() and para.isTypeOf(Z!ChannelPara) and para.name.word.startsWith("event_channel_stmbd_")){
+		return self.channelNameList.names.select(c | usedEventBases().includes(c.word.eventBase())).asSequence();
+	}
+	return self.channelNameList.names.asSequence();
 }%]
 [%operation Z!Field parseField(): String{
 	
