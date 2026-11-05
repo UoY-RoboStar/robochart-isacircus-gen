@@ -6,3 +6,4 @@ target/
 .project
 .settings/
 CLAUDE.md
+dev-tools/build/
