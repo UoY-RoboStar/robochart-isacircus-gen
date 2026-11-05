@@ -10,8 +10,14 @@ plugin (`circus.robocalc.robochart.epsilon.isacircus.loader.RctLoader`, in the p
 | Tool | Arguments | What it does |
 |---|---|---|
 | `LoadRct` | `<file.rct> <project root> [closure\|all]` | loads the model with `RctLoader`; prints how the files were chosen (closure, folder or project fallback), the files read, the event references of the selected file, and ambiguity warnings |
-| `GenAll` | `<file.rct> <project root> <erules dir> <circus_metamodel.ecore> <out dir> <tag> [closure\|all\|single]` | runs `RC2Z.eol` and `circusM2T_HOLCSP.egl` as the plugin does; writes `<out>/<base>_circus.model` and `<out>/HOLCSP_<base>_<tag>.thy` (theory name `HOLCSP_<base>_<tag>`). `single` loads the selected file alone (the plugin's former behaviour) |
+| `GenAll` | `<file.rct> <project root> <erules dir> <circus_metamodel.ecore> <out dir> <tag> [closure\|all\|single] [extra=<dir>] [rcpkg]` | runs `RC2Z.eol` and `circusM2T_HOLCSP.egl` as the plugin does; writes `<out>/<base>_circus.model` and `<out>/HOLCSP_<base>_<tag>.thy` (theory name `HOLCSP_<base>_<tag>`). `single` loads the selected file alone (the plugin's former behaviour) |
 | `ParseCheck` | `<file.eol\|file.egl>...` | parses the files with the Epsilon engine and prints the parse problems |
+
+`GenAll` options: `extra=<dir>` registers every `.ecore` of `<dir>` in the global EPackage registry before running
+(RoboTool registers all its metamodels; several, e.g. PRISM, physmod, Circus, have classes with RoboChart's
+names); `rcpkg` creates the RC model with the RoboChart package, as the plugin does since 5 Nov 2026; without it
+the RC model looks classes up in the global registry. Test of 5 Nov 2026 (Legitimate item 2, 8 extra metamodels
+from RoboTool's jars): all variants run; the extra metamodels change only the order of commutative operands.
 
 `closure` (default) is what the plugin does: the selected file, the files of its package and, recursively,
 of the imported packages (text scan of the sources under the project root, generated folders such as

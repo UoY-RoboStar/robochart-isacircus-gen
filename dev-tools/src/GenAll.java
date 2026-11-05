@@ -17,6 +17,11 @@ import circus.robocalc.robochart.epsilon.isacircus.loader.RctLoader;
  * Generates the HOL-CSP theory of a .rct without RoboTool: RctLoader (cross-file references resolved),
  * RC2Z.eol, then circusM2T_HOLCSP.egl, as the plugin does.
  * usage: GenAll <file.rct> <project root> <erules dir> <circus_metamodel.ecore> <out dir> <tag> [closure|all|single]
+ *               [extra=<dir>] [rcpkg]
+ * extra=<dir>: register every .ecore of <dir> in the global EPackage registry first (RoboTool registers all its
+ * metamodels; PRISM, physmod, ... have classes with RoboChart's names). rcpkg: create the RC model with the
+ * RoboChart package (as the plugin does since the fix); without it the model looks classes up in the global
+ * registry (the plugin's behaviour before the fix).
  * closure (default): RctLoader with fallback; all: all source files of the project; single: the selected file
  * alone, without RctLoader (the plugin's former behaviour, to test the defensive check of RC2Z.eol).
  * Writes <out>/<base>_circus.model and <out>/HOLCSP_<base>_<tag>.thy (theory HOLCSP_<base>_<tag>).
@@ -25,7 +30,19 @@ public class GenAll {
   public static void main(String[] a) throws Exception {
     com.google.inject.Injector inj = new RoboChartStandaloneSetup().createInjectorAndDoEMFRegistration();
     RctLoader loader = new RctLoader(() -> inj.getInstance(XtextResourceSet.class), false);
-    String modeArg = a.length > 6 ? a[6] : "closure";
+    java.util.List<String> opts = java.util.Arrays.asList(a).subList(Math.min(6, a.length), a.length);
+    String modeArg = opts.contains("all") ? "all" : opts.contains("single") ? "single" : "closure";
+    for (String o : opts) if (o.startsWith("extra=")) {
+      ResourceSet ers = new ResourceSetImpl();
+      ers.getResourceFactoryRegistry().getExtensionToFactoryMap().put("ecore", new EcoreResourceFactoryImpl());
+      for (File e : new File(o.substring(6)).listFiles()) if (e.getName().endsWith(".ecore")) {
+        EPackage ep = (EPackage) ers.getResource(URI.createFileURI(e.getAbsolutePath()), true).getContents().get(0);
+        if (!EPackage.Registry.INSTANCE.containsKey(ep.getNsURI())) {
+          EPackage.Registry.INSTANCE.put(ep.getNsURI(), ep);
+          System.out.println("registered extra metamodel " + ep.getNsURI() + " (" + e.getName() + ")");
+        }
+      }
+    }
     File rct = new File(a[0]).getAbsoluteFile();
     Resource selected;
     if (modeArg.equals("single")) {
@@ -51,7 +68,15 @@ public class GenAll {
     EPackage.Registry.INSTANCE.put(pkg.getNsURI(), pkg);
     Resource.Factory.Registry.INSTANCE.getExtensionToFactoryMap().put("model", new XMIResourceFactoryImpl());
 
-    InMemoryEmfModel rc = new InMemoryEmfModel("RC", selected);
+    InMemoryEmfModel rc;
+    if (opts.contains("rcpkg")) {
+      rc = new InMemoryEmfModel("RC", selected,
+        EPackage.Registry.INSTANCE.getEPackage("http://www.robocalc.circus/RoboChart"));
+      System.out.println("RC model with the RoboChart package");
+    } else {
+      rc = new InMemoryEmfModel("RC", selected);
+      System.out.println("RC model without packages (classes looked up in the global registry)");
+    }
     rc.setModelFileUri(URI.createFileURI(rct.getPath())); // RC2Z.eol reads RC.modelFile for the base name
     File out = new File(a[4]); out.mkdirs();
     String zPath = new File(out, base + "_circus.model").getAbsolutePath();
