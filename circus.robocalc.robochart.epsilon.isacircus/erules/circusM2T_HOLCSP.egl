@@ -99,7 +99,22 @@ if(axParas.select(p|p.box = Z!Box#SchBox).size()>0){
 record [%=ap.zSchText.declList.decls.at(0).name.word%] =
 [%for(vardecl in ap.zSchText.declList.decls.at(0).expr.schText.declList.decls){%]
 	[%=vardecl.nameList.names.at(0).word%] :: "[%=vardecl.expr.parseExpr()%]"
-[%}} }%]
+[%}%]
+
+[*Issue K' (5 Nov 2026): discrete cpo instance for the record type constructor 'a R_ext (R = unit R_ext), needed
+  when a record is (part of) the parameter type of a Memory fixrec. Lists of records then get their instance
+  from HOLCF-Library.List_Cpo (imported by RC_HOL-CSP.RoboChart_Library), products from HOLCF.*]
+instantiation [%=ap.zSchText.declList.decls.at(0).name.word%]_ext :: (type) discrete_cpo
+begin
+
+definition below_[%=ap.zSchText.declList.decls.at(0).name.word%]_ext_def [simp]:
+  "(x::'a [%=ap.zSchText.declList.decls.at(0).name.word%]_ext) \<sqsubseteq> y \<longleftrightarrow> x = y"
+
+instance
+  by standard (simp)
+end
+
+[%} }%]
 
 [*constants and functions declaration and/or definition*]
 [%
