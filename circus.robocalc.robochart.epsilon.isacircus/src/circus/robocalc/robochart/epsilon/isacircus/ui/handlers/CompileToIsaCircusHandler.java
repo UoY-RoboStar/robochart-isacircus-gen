@@ -133,6 +133,8 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         String tempDir = System.getProperty("java.io.tmpdir");
         String circusModelAbsPath = tempDir + "/" + baseName + "_circus.model";
         String rctDirAbsPath = rctAbsPath.substring(0, rctAbsPath.lastIndexOf("/"));
+        CompileLog.info("compile " + rctAbsPath + " (workspace " + inputFile.getFullPath() + ", project root "
+            + inputFile.getProject().getLocation() + ")");
 
         
         /*to be used for hiding the console output from eol and egl code:*/
@@ -170,6 +172,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             // RuntimeResourceSets: the RoboChart textual bundle (runtime dependency, loaded by name) is missing,
             // lacks RoboChartStandaloneSetup, or is wired to another Guice; the message says which
             final String msg = e.getMessage();
+            CompileLog.error("RoboChart language not available: " + msg, e);
             monitor.done();
             org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
                 org.eclipse.jface.dialogs.MessageDialog.openError(
@@ -180,6 +183,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             return;
         } catch (RctLoader.LoadException e) {
             final String msg = e.getMessage();
+            CompileLog.error("loading failed: " + msg, e);
             monitor.done();
             org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
                 org.eclipse.jface.dialogs.MessageDialog.openWarning(
@@ -189,16 +193,29 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             });
             return;
         } catch (java.io.IOException e) {
+            CompileLog.error("RoboChart model loading failed: " + e.getMessage(), e);
             throw new InvocationTargetException(e, "RoboChart model loading failed: " + e.getMessage());
         }
         for (String line : loaded.log) {
-            if (!line.startsWith("reference ")) System.out.println("[IsaCircus] " + line);
+            if (!line.startsWith("reference ")) CompileLog.info(line);
+        }
+        StringBuilder files = new StringBuilder("files read (" + loaded.loadedFiles.size() + "):");
+        for (java.io.File f : loaded.loadedFiles) files.append("\n  ").append(f.getPath());
+        CompileLog.info(files.toString());
+        StringBuilder uris = new StringBuilder("resources of the resource set (" + loaded.resourceUris.size()
+            + "; selected file " + org.eclipse.emf.common.util.URI.createFileURI(rctAbsPath) + ", now "
+            + loaded.resource.getURI() + "):");
+        for (String u : loaded.resourceUris) uris.append("\n  ").append(u);
+        CompileLog.info(uris.toString());
+        for (String line : loaded.log) {
+            if (line.startsWith("reference ")) CompileLog.info(line);
         }
         for (String w : loaded.warnings) {
-            System.out.println("[IsaCircus] WARNING " + w);
+            CompileLog.warning(w);
         }
         InMemoryEmfModel rcModel = new InMemoryEmfModel("RC", loaded.resource);
         rcModel.setModelFileUri(org.eclipse.emf.common.util.URI.createFileURI(rctAbsPath)); // RC2Z.eol reads RC.modelFile
+        CompileLog.info("RC.modelFile = " + rcModel.getModelFile() + " (modelFileUri " + rcModel.getModelFileUri() + ")");
         monitor.worked(1);
 
         // Set up output Circus model (empty, will be populated by EOL and saved to temp dir)
@@ -237,15 +254,16 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
     /**/
     
     eolModule.execute();
-} catch (EolRuntimeException e) {
+} catch (EolRuntimeException | RuntimeException e) {
     // Step 1 (M2M) failed — most likely the RoboChart model uses a feature
     // that is not currently supported by the translation. Show a friendly
     // dialog instead of a technical stack trace, and stop the compilation.
     circusModel.dispose();
     rcModel.dispose();
     monitor.done();
+    CompileLog.error("RC2Z.eol failed: " + CompileLog.describe(e), e);
     // the defensive check of RC2Z.eol (checkNoUnresolvedProxies, issue C) reports its own reason
-    final String reason = e.getReason();
+    final String reason = e instanceof EolRuntimeException ? ((EolRuntimeException) e).getReason() : null;
     if (reason != null && reason.startsWith("Unresolved references")) {
         org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
             org.eclipse.jface.dialogs.MessageDialog.openWarning(
@@ -262,7 +280,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             "The compilation could not be completed.\n\n"
             + "The RoboChart model appears to contain one or more features "
             + "that are not currently supported by the RoboChart-to-IsaCircus translation.\n\n"
-            + "Please modify the model and try again."
+            + "Error in RC2Z.eol (Step 1):\n" + CompileLog.describe(e)
         );
     });
     return; // stop here, do not proceed to Step 2
@@ -320,8 +338,18 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             egxModule.execute();
             System.out.println("[DEBUG] EGX executed OK");
         } catch (Exception e) {
-            System.out.println("[DEBUG] EGX exception: " + e.getMessage());
-            throw new InvocationTargetException(e, "EGX execution failed: " + e.getMessage());
+            CompileLog.error("CircusM2T.egx failed: " + CompileLog.describe(e), e);
+            circusModelForM2T.dispose();
+            rcModel.dispose();
+            monitor.done();
+            final String why = CompileLog.describe(e);
+            org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+                org.eclipse.jface.dialogs.MessageDialog.openError(
+                    org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                    "IsaCircus: generation of the theories failed",
+                    "Step 2 (CircusM2T.egx) failed.\n\n" + why);
+            });
+            return;
         }
         circusModelForM2T.dispose();
         rcModel.dispose();
@@ -337,6 +365,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         }
         monitor.worked(1);
         System.out.println("IsaCircus .thy files generated successfully for: " + baseName);
+        CompileLog.info("generated the theories of " + baseName + " under " + rctDirAbsPath);
         monitor.done();
     }
 }

@@ -56,6 +56,8 @@ public class RctLoader {
 		/** How the files were chosen: "closure", "folder", "project" or "all". */
 		public String level;
 		public List<File> loadedFiles = new ArrayList<>();
+		/** URIs of all resources of the final resource set (selected file, dependencies, library), for the log. */
+		public List<String> resourceUris = new ArrayList<>();
 		public int unresolved;
 		public List<String> warnings = new ArrayList<>();
 		public List<String> log = new ArrayList<>();
@@ -127,6 +129,7 @@ public class RctLoader {
 			res.log.add("level project: " + files.size() + " file(s), " + unresolved + " unresolved reference(s)");
 		}
 		res.loadedFiles.addAll(files);
+		for (Resource r : rs.getResources()) res.resourceUris.add(String.valueOf(r.getURI()));
 		res.unresolved = unresolved;
 		if (unresolved > 0) {
 			throw new LoadException(selected.getName() + ": " + unresolved
