@@ -158,12 +158,26 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         // (UI) factory they were resolved against the workspace index (DirtyStateAwareResourceDescriptions),
         // which does not contain the files when Build Automatically is off: the first test in RoboTool
         // (5 Nov 2026) left 7 references unresolved although all files were loaded. The global registries and
-        // the open editors are not touched.
+        // the open editors are not touched. RuntimeResourceSets loads RoboChartStandaloneSetup by name from the
+        // bundle circus.robocalc.robochart.textual (a runtime dependency NOT declared in MANIFEST.MF, because the
+        // Tycho build cannot resolve that bundle from the update sites of the pom); see its class comment.
         final RctLoader.Result loaded;
         try {
             java.io.File projectRoot = inputFile.getProject().getLocation().toFile();
             loaded = new RctLoader(new RuntimeResourceSets(), false)
                 .load(new java.io.File(rctAbsPath), projectRoot, RctLoader.Mode.CLOSURE);
+        } catch (IllegalStateException e) {
+            // RuntimeResourceSets: the RoboChart textual bundle (runtime dependency, loaded by name) is missing,
+            // lacks RoboChartStandaloneSetup, or is wired to another Guice; the message says which
+            final String msg = e.getMessage();
+            monitor.done();
+            org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+                org.eclipse.jface.dialogs.MessageDialog.openError(
+                    org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                    "RoboChart language not available",
+                    "The compilation could not be started.\n\n" + msg);
+            });
+            return;
         } catch (RctLoader.LoadException e) {
             final String msg = e.getMessage();
             monitor.done();
