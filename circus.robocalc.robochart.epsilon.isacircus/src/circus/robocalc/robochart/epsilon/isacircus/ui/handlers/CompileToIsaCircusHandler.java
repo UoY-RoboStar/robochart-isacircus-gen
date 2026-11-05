@@ -20,6 +20,7 @@ import org.eclipse.epsilon.emc.emf.EmfModel;
 import org.eclipse.epsilon.emc.emf.InMemoryEmfModel;
 
 import circus.robocalc.robochart.epsilon.isacircus.loader.RctLoader;
+import circus.robocalc.robochart.epsilon.isacircus.loader.RuntimeResourceSets;
 import org.eclipse.epsilon.eol.EolModule;
 import org.eclipse.epsilon.eol.exceptions.EolRuntimeException;
 import org.eclipse.epsilon.eol.exceptions.models.EolModelLoadingException;
@@ -152,12 +153,16 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         // generated folders excluded), falls back to the folder and then the project if references remain
         // unresolved, reports duplicate definitions of referenced names, and returns the selected file's
         // contents alone in their own resource set, so that RC2Z.eol (RC!X.all()) sees only that file.
-        // A plain ResourceSetImpl: RoboTool registers the .rct resource factory; without scope load options
-        // Xtext resolves cross-file references against the resource set, not the workspace index.
+        // The resource sets come from RuntimeResourceSets: a separate runtime (non-UI) RoboChart injector, so
+        // that cross-file references are resolved against the loaded files only. With the globally registered
+        // (UI) factory they were resolved against the workspace index (DirtyStateAwareResourceDescriptions),
+        // which does not contain the files when Build Automatically is off: the first test in RoboTool
+        // (5 Nov 2026) left 7 references unresolved although all files were loaded. The global registries and
+        // the open editors are not touched.
         final RctLoader.Result loaded;
         try {
             java.io.File projectRoot = inputFile.getProject().getLocation().toFile();
-            loaded = new RctLoader(ResourceSetImpl::new, false)
+            loaded = new RctLoader(new RuntimeResourceSets(), false)
                 .load(new java.io.File(rctAbsPath), projectRoot, RctLoader.Mode.CLOSURE);
         } catch (RctLoader.LoadException e) {
             final String msg = e.getMessage();

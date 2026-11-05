@@ -13,7 +13,10 @@ Require-Bundle: org.eclipse.ui,
  org.eclipse.epsilon.egl.engine;bundle-version="2.4.0",
  org.eclipse.epsilon.emc.emf,
  circus.robocalc.robochart,
- org.eclipse.ui.console
+ org.eclipse.ui.console,
+ circus.robocalc.robochart.textual,
+ org.eclipse.xtext,
+ com.google.inject
 Automatic-Module-Name: circus.robocalc.robochart.epsilon.isacircus.ui
 Export-Package: circus.robocalc.robochart.epsilon.isacircus.ui.handlers
 Bundle-ClassPath: .
