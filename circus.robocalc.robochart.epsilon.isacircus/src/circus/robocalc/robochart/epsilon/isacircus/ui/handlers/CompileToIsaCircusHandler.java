@@ -225,6 +225,17 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
     circusModel.dispose();
     rcModel.dispose();
     monitor.done();
+    // the defensive check of RC2Z.eol (checkNoUnresolvedProxies, issue C) reports its own reason
+    final String reason = e.getReason();
+    if (reason != null && reason.startsWith("Unresolved references")) {
+        org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+            org.eclipse.jface.dialogs.MessageDialog.openWarning(
+                org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                "Unresolved references in the RoboChart model",
+                "The compilation could not be completed.\n\n" + reason);
+        });
+        return;
+    }
     org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
         org.eclipse.jface.dialogs.MessageDialog.openWarning(
             org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
