@@ -6007,7 +6007,16 @@ operation RC!State createSimpleStateAsActionParas() {
 	
 	var exitingAction1 = createAction2("InterruptAction", "SSTOP".createCallAction(), createPrefixingAction(createSynchCommunication("exit_"+ nc(self).FQN()), createSkipAction()));
 	var exitingAction2 = self.createStateActionAsCircusAction("ExitAction");
-	var exitingAction3 = createPrefixingAction(createSynchCommunication("exited_"+ nc(self).FQN()), ("Inactive_" + self.FQN()).createCallAction());
+	// exited is offered under SSTOP: (SSTOP /\ (exited -> Skip)) ; Inactive, as RoboTool's CSP-M
+	// (share__choice(exited -> SKIP) ; Inactive). Changed 6 Nov 2026 to follow the common protocol confirmed
+	// by Pedro: in a composite state the outer during action may write shared variables after the inner
+	// state's exit and before its exited, so the node must accept share there. This aligns the output with
+	// the CSP-M; it is not a bug fix. For flat models both forms are semantically acceptable.
+	// Before: exited -> Inactive (exited not under SSTOP).
+	var exitingAction3 = createAction2("SeqAction",
+		createAction2("InterruptAction", "SSTOP".createCallAction(),
+			createPrefixingAction(createSynchCommunication("exited_"+ nc(self).FQN()), createSkipAction())),
+		("Inactive_" + self.FQN()).createCallAction());
 	var Exiting = createAction2("SeqAction", exitingAction1, createAction2("SeqAction", exitingAction2, exitingAction3));
 	Exiting.createActionPara("Exiting_" + self.FQN());
 //	actionParaSeq.add(Exiting.createActionPara("Exiting"));
@@ -6115,7 +6124,16 @@ operation RC!State createCompositeStateAsActionParas(){
 	*******************************/
 	var exitingAction1 = createAction2("InterruptAction", "SSTOP".createCallAction(), createPrefixingAction(createSynchCommunication("exit_" + nc(self).FQN()), createSkipAction()));
 	var exitingAction2 = self.createStateActionAsCircusAction("ExitAction");
-	var exitingAction3 = createPrefixingAction(createSynchCommunication("exited_"+ nc(self).FQN()), ("Inactive_" + self.FQN()).createCallAction());
+	// exited is offered under SSTOP: (SSTOP /\ (exited -> Skip)) ; Inactive, as RoboTool's CSP-M
+	// (share__choice(exited -> SKIP) ; Inactive). Changed 6 Nov 2026 to follow the common protocol confirmed
+	// by Pedro: in a composite state the outer during action may write shared variables after the inner
+	// state's exit and before its exited, so the node must accept share there. This aligns the output with
+	// the CSP-M; it is not a bug fix. For flat models both forms are semantically acceptable.
+	// Before: exited -> Inactive (exited not under SSTOP).
+	var exitingAction3 = createAction2("SeqAction",
+		createAction2("InterruptAction", "SSTOP".createCallAction(),
+			createPrefixingAction(createSynchCommunication("exited_"+ nc(self).FQN()), createSkipAction())),
+		("Inactive_" + self.FQN()).createCallAction());
 	var Exiting = createAction2("SeqAction", exitingAction1, createAction2("SeqAction", exitingAction2, exitingAction3));
 	Exiting.createActionPara("Exiting_" + self.FQN());
 
