@@ -1,0 +1,95 @@
+diff --git a/circus.robocalc.robochart.epsilon.isacircus/metamodels/circus_metamodel.ecore b/circus.robocalc.robochart.epsilon.isacircus/metamodels/circus_metamodel.ecore
+index 610bfb9..44c3a53 100644
+--- a/circus.robocalc.robochart.epsilon.isacircus/metamodels/circus_metamodel.ecore
++++ b/circus.robocalc.robochart.epsilon.isacircus/metamodels/circus_metamodel.ecore
+@@ -776,6 +776,90 @@
+   <eClassifiers xsi:type="ecore:EClass" name="SchExprAction" eSuperTypes="#//CircusAction">
+     <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
+   </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="WaitAction" eSuperTypes="#//BasicAction">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time: wait expr. From CZT net.sourceforge.czt.circustime.ast.WaitAction."/>
++    </eAnnotations>
++    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="ActionTime1" abstract="true" eSuperTypes="#//Action1">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time unary action with a time expression. From CZT net.sourceforge.czt.circustime.ast.ActionTime1."/>
++    </eAnnotations>
++    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="WaitExprAction" eSuperTypes="#//ActionTime1">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time: nondeterministic wait over expr, binding name in circusAction. From CZT net.sourceforge.czt.circustime.ast.WaitExprAction."/>
++    </eAnnotations>
++    <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName" containment="true"/>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="TimeEndByAction" eSuperTypes="#//ActionTime1">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time end-by deadline: circusAction must terminate within expr. From CZT net.sourceforge.czt.circustime.ast.TimeEndByAction."/>
++    </eAnnotations>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="TimeStartByAction" eSuperTypes="#//ActionTime1">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time start-by deadline: circusAction must start within expr. From CZT net.sourceforge.czt.circustime.ast.TimeStartByAction."/>
++    </eAnnotations>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="ActionTime2" abstract="true" eSuperTypes="#//Action2">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time binary action with a time expression. From CZT net.sourceforge.czt.circustime.ast.ActionTime2."/>
++    </eAnnotations>
++    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="TimeoutAction" eSuperTypes="#//ActionTime2">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time timeout (leftAction, expr, rightAction). From CZT net.sourceforge.czt.circustime.ast.TimeoutAction. Not the same operator as the cyphycircus_toolkit constant Timeout."/>
++    </eAnnotations>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="TimedinterruptAction" eSuperTypes="#//ActionTime2">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time timed interrupt (leftAction, expr, rightAction). From CZT net.sourceforge.czt.circustime.ast.TimedinterruptAction. Candidate target: cyphycircus_toolkit constant Timeout (P △[n] Q)."/>
++    </eAnnotations>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="PrefixingTimeAction" eSuperTypes="#//PrefixingAction">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time prefixing with elapsed-time capture and/or a time expression. From CZT net.sourceforge.czt.circustime.ast.PrefixingTimeAction (its derived isAt.../isPrefixingExpr... flags are not modelled)."/>
++    </eAnnotations>
++    <eStructuralFeatures xsi:type="ecore:EReference" name="channelElapsedTime" eType="#//ZName"
++        containment="true"/>
++    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="ProcessTime1" abstract="true" eSuperTypes="#//Process1">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time unary process with a time expression. From CZT net.sourceforge.czt.circustime.ast.ProcessTime1."/>
++    </eAnnotations>
++    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="TimeEndByProcess" eSuperTypes="#//ProcessTime1">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time end-by deadline on a process. From CZT net.sourceforge.czt.circustime.ast.TimeEndByProcess."/>
++    </eAnnotations>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="TimeStartByProcess" eSuperTypes="#//ProcessTime1">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time start-by deadline on a process. From CZT net.sourceforge.czt.circustime.ast.TimeStartByProcess."/>
++    </eAnnotations>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="ProcessTime2" abstract="true" eSuperTypes="#//Process2">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time binary process with a time expression. From CZT net.sourceforge.czt.circustime.ast.ProcessTime2."/>
++    </eAnnotations>
++    <eStructuralFeatures xsi:type="ecore:EReference" name="expr" eType="#//Expr" containment="true"/>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="TimeoutProcess" eSuperTypes="#//ProcessTime2">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time timeout on processes (leftProcess, expr, rightProcess). From CZT net.sourceforge.czt.circustime.ast.TimeoutProcess."/>
++    </eAnnotations>
++  </eClassifiers>
++  <eClassifiers xsi:type="ecore:EClass" name="TimedinterruptProcess" eSuperTypes="#//ProcessTime2">
++    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++      <details key="documentation" value="Circus Time timed interrupt on processes (leftProcess, expr, rightProcess). From CZT net.sourceforge.czt.circustime.ast.TimedinterruptProcess."/>
++    </eAnnotations>
++  </eClassifiers>
+   <eClassifiers xsi:type="ecore:EClass" name="Name" abstract="true" eSuperTypes="#//Term"/>
+   <eClassifiers xsi:type="ecore:EEnum" name="Fixity">
+     <eLiterals name="INFIX"/>

@@ -1,0 +1,52 @@
+diff --git a/circus.robocalc.robochart.epsilon.isacircus/metamodels/circus_metamodel.ecore b/circus.robocalc.robochart.epsilon.isacircus/metamodels/circus_metamodel.ecore
+index 4472162..610bfb9 100644
+--- a/circus.robocalc.robochart.epsilon.isacircus/metamodels/circus_metamodel.ecore
++++ b/circus.robocalc.robochart.epsilon.isacircus/metamodels/circus_metamodel.ecore
+@@ -5,6 +5,12 @@
+     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+       <details key="documentation" value="net.sourceforge.czt.z.ast"/>
+     </eAnnotations>
++    <eStructuralFeatures xsi:type="ecore:EReference" name="anns" upperBound="-1" eType="#//Ann"
++        containment="true">
++      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
++        <details key="documentation" value="Annotations attached to this term. Corresponds to CZT net.sourceforge.czt.base.ast.Term.getAnns() (Z.xsd: optional element Anns of Term). Not part of the syntax; the M2T does not read it. Differences from CZT: (1) CZT allows any object (xs:any, List&lt;Object&gt;); here only Ann. (2) Here it is an EMF containment, so annotations are returned by eContents()/eAllContents(); in CZT they are not children of the term (getChildren() excludes them). Added 2026-11-05, for tracing Circus terms back to RoboChart elements; not yet populated."/>
++      </eAnnotations>
++    </eStructuralFeatures>
+   </eClassifiers>
+   <eClassifiers xsi:type="ecore:EClass" name="Ann" eSuperTypes="#//Term"/>
+   <eClassifiers xsi:type="ecore:EClass" name="SectTypeEnvAnn" eSuperTypes="#//Ann">
+@@ -41,7 +47,7 @@
+     <eStructuralFeatures xsi:type="ecore:EReference" name="circusActions" upperBound="-1"
+         eType="#//CircusAction" containment="true"/>
+   </eClassifiers>
+-  <eClassifiers xsi:type="ecore:EClass" name="CircusAnn" abstract="true" eSuperTypes="#//ActionList"/>
++  <eClassifiers xsi:type="ecore:EClass" name="CircusAnn" abstract="true" eSuperTypes="#//Ann"/>
+   <eClassifiers xsi:type="ecore:EClass" name="ActionSignatureAnn" eSuperTypes="#//CircusAnn">
+     <eStructuralFeatures xsi:type="ecore:EReference" name="actionSignature" eType="#//ActionSignature"
+         containment="true"/>
+@@ -194,7 +200,7 @@
+     <eStructuralFeatures xsi:type="ecore:EAttribute" name="multiSych" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject"/>
+   </eClassifiers>
+   <eClassifiers xsi:type="ecore:EClass" name="CommunicationList" abstract="true" eSuperTypes="#//Term"/>
+-  <eClassifiers xsi:type="ecore:EClass" name="CircusCommunicationList" eSuperTypes="#//Term">
++  <eClassifiers xsi:type="ecore:EClass" name="CircusCommunicationList" eSuperTypes="#//CommunicationList">
+     <eStructuralFeatures xsi:type="ecore:EReference" name="communications" upperBound="-1"
+         eType="#//Communication" containment="true"/>
+   </eClassifiers>
+@@ -346,7 +352,7 @@
+     <eStructuralFeatures xsi:type="ecore:EReference" name="paras" upperBound="-1"
+         eType="#//Para" containment="true"/>
+   </eClassifiers>
+-  <eClassifiers xsi:type="ecore:EClass" name="ParenAnn" abstract="true" eSuperTypes="#//Term"/>
++  <eClassifiers xsi:type="ecore:EClass" name="ParenAnn" abstract="true" eSuperTypes="#//Ann"/>
+   <eClassifiers xsi:type="ecore:EClass" name="Parent" eSuperTypes="#//Term">
+     <eStructuralFeatures xsi:type="ecore:EAttribute" name="word" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+   </eClassifiers>
+@@ -627,7 +633,6 @@
+     <eStructuralFeatures xsi:type="ecore:EReference" name="rightProcess" eType="#//CircusProcess"
+         containment="true"/>
+   </eClassifiers>
+-  <eClassifiers xsi:type="ecore:EClass" name="ExtChoiceProcessImpl" eSuperTypes="#//Process2"/>
+   <eClassifiers xsi:type="ecore:EClass" name="IntChoiceProcess" eSuperTypes="#//Process2"/>
+   <eClassifiers xsi:type="ecore:EClass" name="SeqProcess" eSuperTypes="#//Process2"/>
+   <eClassifiers xsi:type="ecore:EClass" name="ExtChoiceProcess" eSuperTypes="#//Process2"/>
