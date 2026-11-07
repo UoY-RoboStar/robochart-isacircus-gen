@@ -135,6 +135,11 @@ To extend the operation createchanParaNC() by adding two channels: aviol and gvi
 TBD: Rule 55 and Rule 68
 ******************************/
 
+//Defensive check (generator issue C, 5 Nov 2026): a reference into another file that was not resolved is an
+//EMF proxy without attributes; translated, it gives empty names (_out, __in) and no channel declarations.
+//The plugin loads the files the model depends on (RctLoader); stop here if anything is still unresolved.
+checkNoUnresolvedProxies();
+
 //var pkg =  RC!RCPackage.all().selectOne(p|p.name = "Chemical");
 RC!RCPackage.all().println();
 var pkgs =  RC!RCPackage.all().select(p|p.name != "relation_toolkit" and p.name != "function_toolkit" and p.name != "sequence_toolkit" and p.name != "set_toolkit" and p.name != "core");
@@ -2835,11 +2840,13 @@ operation RC!Type defaultValueAsZExpr(): Z!Expr{
 //		if(self.ref.name = "String"){
 //			return createNumExpr(0);//TO DO
 //		}
-		if(self.ref.name = "Boolean"){
+		//RoboChart writes the type as "boolean"; the old comparison with "Boolean" never matched, so bool variables
+		//got the default 0 (issue L). The default true is the one of the RoboChart CSP-M generator.
+		if(self.ref.name.toLowerCase() = "boolean"){
 			return createBooleanExpr(true);
 		} 
 		
-		if(self.ref.name != "Boolean" and self.ref.name != "int") {
+		if(self.ref.name.toLowerCase() != "boolean" and self.ref.name != "int") {
 			return createNumExpr(0);
 		}
 		
@@ -3001,6 +3008,15 @@ operation nc(stmt: RC!Statement): RC!NodeContainer{
 			}			
 		}
 	}
+}
+
+//true iff the statement belongs to a transition action (not to an entry/during/exit action of a state); issue J
+operation isOwnedByTransition(stmt: RC!Statement): Boolean{
+	var c = stmt;
+	while(c.isDefined() and not (c.isKindOf(RC!Transition) or c.isKindOf(RC!Action))){
+		c = c.eContainer();
+	}
+	return c.isDefined() and c.isKindOf(RC!Transition);
 }
 
 operation findTrStOwnerOfStmt(stmt: RC!Statement): String{
@@ -5991,7 +6007,16 @@ operation RC!State createSimpleStateAsActionParas() {
 	
 	var exitingAction1 = createAction2("InterruptAction", "SSTOP".createCallAction(), createPrefixingAction(createSynchCommunication("exit_"+ nc(self).FQN()), createSkipAction()));
 	var exitingAction2 = self.createStateActionAsCircusAction("ExitAction");
-	var exitingAction3 = createPrefixingAction(createSynchCommunication("exited_"+ nc(self).FQN()), ("Inactive_" + self.FQN()).createCallAction());
+	// exited is offered under SSTOP: (SSTOP /\ (exited -> Skip)) ; Inactive, as RoboTool's CSP-M
+	// (share__choice(exited -> SKIP) ; Inactive). Changed 6 Nov 2026 to follow the common protocol confirmed
+	// by Pedro: in a composite state the outer during action may write shared variables after the inner
+	// state's exit and before its exited, so the node must accept share there. This aligns the output with
+	// the CSP-M; it is not a bug fix. For flat models both forms are semantically acceptable.
+	// Before: exited -> Inactive (exited not under SSTOP).
+	var exitingAction3 = createAction2("SeqAction",
+		createAction2("InterruptAction", "SSTOP".createCallAction(),
+			createPrefixingAction(createSynchCommunication("exited_"+ nc(self).FQN()), createSkipAction())),
+		("Inactive_" + self.FQN()).createCallAction());
 	var Exiting = createAction2("SeqAction", exitingAction1, createAction2("SeqAction", exitingAction2, exitingAction3));
 	Exiting.createActionPara("Exiting_" + self.FQN());
 //	actionParaSeq.add(Exiting.createActionPara("Exiting"));
@@ -6099,7 +6124,16 @@ operation RC!State createCompositeStateAsActionParas(){
 	*******************************/
 	var exitingAction1 = createAction2("InterruptAction", "SSTOP".createCallAction(), createPrefixingAction(createSynchCommunication("exit_" + nc(self).FQN()), createSkipAction()));
 	var exitingAction2 = self.createStateActionAsCircusAction("ExitAction");
-	var exitingAction3 = createPrefixingAction(createSynchCommunication("exited_"+ nc(self).FQN()), ("Inactive_" + self.FQN()).createCallAction());
+	// exited is offered under SSTOP: (SSTOP /\ (exited -> Skip)) ; Inactive, as RoboTool's CSP-M
+	// (share__choice(exited -> SKIP) ; Inactive). Changed 6 Nov 2026 to follow the common protocol confirmed
+	// by Pedro: in a composite state the outer during action may write shared variables after the inner
+	// state's exit and before its exited, so the node must accept share there. This aligns the output with
+	// the CSP-M; it is not a bug fix. For flat models both forms are semantically acceptable.
+	// Before: exited -> Inactive (exited not under SSTOP).
+	var exitingAction3 = createAction2("SeqAction",
+		createAction2("InterruptAction", "SSTOP".createCallAction(),
+			createPrefixingAction(createSynchCommunication("exited_"+ nc(self).FQN()), createSkipAction())),
+		("Inactive_" + self.FQN()).createCallAction());
 	var Exiting = createAction2("SeqAction", exitingAction1, createAction2("SeqAction", exitingAction2, exitingAction3));
 	Exiting.createActionPara("Exiting_" + self.FQN());
 
@@ -6710,7 +6744,11 @@ operation createSynchCommunication(
 operation RC!Statement createStmtInContextAsAction(): Z!CircusAction{
 	var action1 = self.createStmtAsAction();
 	var stmt_container =  findTrStOwnerOfStmt(self);
-	if(usedVariables(self).size()=0){
+	//Issue J: the assume fallback aviol -> P(n) only makes sense for transition actions, where P is Trans_<nc>
+	//(or Transc_<nc>) and n its node parameter. For a statement of a state action (entry/during/exit) the
+	//fallback named <state><nc FQN>, a constant that does not exist, applied to a free n. For now such
+	//statements get no assume wrapper; statements on transitions keep "assume True" as a placeholder.
+	if(usedVariables(self).size()=0 or not isOwnedByTransition(self)){
 		return readState(usedVariables(self), action1);
 	} else
 	//an extra step introduced to change action1 into "if inv_on_usedVariables(self) then action else aviol -> action"
@@ -8164,4 +8202,34 @@ operation RC!IfExpression createCondExpr(): Z!CondExpr{
 	condExpr.leftExpr = self.ifexp.createExpr();
 	condExpr.rightExpr = self.elseexp.createExpr();
 	return condExpr;
+}
+
+
+//Generator issue C: stop with an error if the RoboChart model still contains unresolved cross-references
+//(proxies), e.g. to an interface of another file (uses I, import P::*) that was not loaded.
+operation checkNoUnresolvedProxies(){
+	var problems = new Sequence;
+	for(o in RC.allContents()){
+		for(ref in o.eClass().getEAllReferences()){
+			if(not ref.isContainment() and not ref.isContainer() and not ref.isDerived() and not ref.isTransient()){
+				var v = o.eGet(ref);
+				var targets = new Sequence;
+				if(ref.isMany()){
+					targets.addAll(v);
+				} else if(v.isDefined()){
+					targets.add(v);
+				}
+				for(t in targets){
+					if(t.eIsProxy()){
+						problems.add(o.eClass().getName() + "." + ref.getName() + " -> "
+							+ new Native("org.eclipse.emf.ecore.util.EcoreUtil").getURI(t));
+					}
+				}
+			}
+		}
+	}
+	if(problems.size() > 0){
+		throw "Unresolved references in the RoboChart model (" + problems.size()
+			+ "); the files they point to were not loaded:\n" + problems.concat("\n");
+	}
 }

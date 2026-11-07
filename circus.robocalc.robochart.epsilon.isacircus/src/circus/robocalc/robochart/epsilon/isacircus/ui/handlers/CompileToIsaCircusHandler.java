@@ -17,6 +17,10 @@ import org.eclipse.emf.ecore.xmi.impl.EcoreResourceFactoryImpl;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
 import org.eclipse.epsilon.egl.EgxModule;
 import org.eclipse.epsilon.emc.emf.EmfModel;
+import org.eclipse.epsilon.emc.emf.InMemoryEmfModel;
+
+import circus.robocalc.robochart.epsilon.isacircus.loader.RctLoader;
+import circus.robocalc.robochart.epsilon.isacircus.loader.RuntimeResourceSets;
 import org.eclipse.epsilon.eol.EolModule;
 import org.eclipse.epsilon.eol.exceptions.EolRuntimeException;
 import org.eclipse.epsilon.eol.exceptions.models.EolModelLoadingException;
@@ -48,6 +52,8 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
 
     // The .rct file selected by the user, passed from execute() to run()
     IFile inputFile;
+
+    static final String ROBOCHART_NS_URI = "http://www.robocalc.circus/RoboChart";
 
     /**
      * Entry point called by Eclipse when the menu item is clicked.
@@ -129,6 +135,8 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         String tempDir = System.getProperty("java.io.tmpdir");
         String circusModelAbsPath = tempDir + "/" + baseName + "_circus.model";
         String rctDirAbsPath = rctAbsPath.substring(0, rctAbsPath.lastIndexOf("/"));
+        CompileLog.info("compile " + rctAbsPath + " (workspace " + inputFile.getFullPath() + ", project root "
+            + inputFile.getProject().getLocation() + ")");
 
         
         /*to be used for hiding the console output from eol and egl code:*/
@@ -142,18 +150,85 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         // Output model: Z   — the intermediate Circus .model file, written to temp dir
         monitor.subTask("Step 1/2: RoboChart model to Circus model");
 
-        // Load input RoboChart model
-        EmfModel rcModel = new EmfModel();
-        rcModel.setName("RC");
-        rcModel.setMetamodelUri("http://www.robocalc.circus/RoboChart");
-        rcModel.setModelFile(rctAbsPath);
-        rcModel.setReadOnLoad(true);
-        rcModel.setStoredOnDisposal(false);
+        // Load input RoboChart model with its cross-file references resolved (generator issue C).
+        // Loading the .rct alone left references into other files (import P::*, uses I) as unresolved
+        // proxies, and their events got empty names. RctLoader reads the files the selected file depends
+        // on (its package and the imported packages, found by a text scan of the project's source files;
+        // generated folders excluded), falls back to the folder and then the project if references remain
+        // unresolved, reports duplicate definitions of referenced names, and returns the selected file's
+        // contents alone in their own resource set, so that RC2Z.eol (RC!X.all()) sees only that file.
+        // The resource sets come from RuntimeResourceSets: a separate runtime (non-UI) RoboChart injector, so
+        // that cross-file references are resolved against the loaded files only. With the globally registered
+        // (UI) factory they were resolved against the workspace index (DirtyStateAwareResourceDescriptions),
+        // which does not contain the files when Build Automatically is off: the first test in RoboTool
+        // (5 Nov 2026) left 7 references unresolved although all files were loaded. The global registries and
+        // the open editors are not touched. RuntimeResourceSets loads RoboChartStandaloneSetup by name from the
+        // bundle circus.robocalc.robochart.textual (a runtime dependency NOT declared in MANIFEST.MF, because the
+        // Tycho build cannot resolve that bundle from the update sites of the pom); see its class comment.
+        final RctLoader.Result loaded;
         try {
-            rcModel.load();
-        } catch (EolModelLoadingException e) {
-        	throw new InvocationTargetException(e, "RC model loading failed: " + e.getMessage());
+            java.io.File projectRoot = inputFile.getProject().getLocation().toFile();
+            loaded = new RctLoader(new RuntimeResourceSets(), false)
+                .load(new java.io.File(rctAbsPath), projectRoot, RctLoader.Mode.CLOSURE);
+        } catch (IllegalStateException e) {
+            // RuntimeResourceSets: the RoboChart textual bundle (runtime dependency, loaded by name) is missing,
+            // lacks RoboChartStandaloneSetup, or is wired to another Guice; the message says which
+            final String msg = e.getMessage();
+            CompileLog.error("RoboChart language not available: " + msg, e);
+            monitor.done();
+            org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+                org.eclipse.jface.dialogs.MessageDialog.openError(
+                    org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                    "RoboChart language not available",
+                    "The compilation could not be started.\n\n" + msg);
+            });
+            return;
+        } catch (RctLoader.LoadException e) {
+            final String msg = e.getMessage();
+            CompileLog.error("loading failed: " + msg, e);
+            monitor.done();
+            org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+                org.eclipse.jface.dialogs.MessageDialog.openWarning(
+                    org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                    "Unresolved references in the RoboChart model",
+                    "The compilation could not be completed.\n\n" + msg);
+            });
+            return;
+        } catch (java.io.IOException e) {
+            CompileLog.error("RoboChart model loading failed: " + e.getMessage(), e);
+            throw new InvocationTargetException(e, "RoboChart model loading failed: " + e.getMessage());
         }
+        for (String line : loaded.log) {
+            if (!line.startsWith("reference ")) CompileLog.info(line);
+        }
+        StringBuilder files = new StringBuilder("files read (" + loaded.loadedFiles.size() + "):");
+        for (java.io.File f : loaded.loadedFiles) files.append("\n  ").append(f.getPath());
+        CompileLog.info(files.toString());
+        StringBuilder uris = new StringBuilder("resources of the resource set (" + loaded.resourceUris.size()
+            + "; selected file " + org.eclipse.emf.common.util.URI.createFileURI(rctAbsPath) + ", now "
+            + loaded.resource.getURI() + "):");
+        for (String u : loaded.resourceUris) uris.append("\n  ").append(u);
+        CompileLog.info(uris.toString());
+        for (String line : loaded.log) {
+            if (line.startsWith("reference ")) CompileLog.info(line);
+        }
+        for (String w : loaded.warnings) {
+            CompileLog.warning(w);
+        }
+        // The RC model gets the RoboChart package explicitly (precaution, 5 Nov 2026): without packages,
+        // InMemoryEmfModel replaces the empty package registry of the resource set by the global one and looks
+        // RC!X up by name in every registered metamodel (findAny); several RoboTool metamodels (Circus, PRISM,
+        // physmod, roboarch) have classes with RoboChart's names. The former EmfModel was restricted to RoboChart
+        // by setMetamodelUri. In dev-tools this does not change the output (GenAll option rcpkg).
+        final EPackage robochartPackage = EPackage.Registry.INSTANCE.getEPackage(ROBOCHART_NS_URI);
+        if (robochartPackage == null) {
+            CompileLog.error("the RoboChart metamodel " + ROBOCHART_NS_URI + " is not registered", null);
+            throw new InvocationTargetException(new IllegalStateException(ROBOCHART_NS_URI + " not registered"),
+                "The RoboChart metamodel " + ROBOCHART_NS_URI + " is not registered.");
+        }
+        InMemoryEmfModel rcModel = new InMemoryEmfModel("RC", loaded.resource, robochartPackage);
+        rcModel.setModelFileUri(org.eclipse.emf.common.util.URI.createFileURI(rctAbsPath)); // RC2Z.eol reads RC.modelFile
+        CompileLog.info("RC.modelFile = " + rcModel.getModelFile() + " (modelFileUri " + rcModel.getModelFileUri() + ")");
         monitor.worked(1);
 
         // Set up output Circus model (empty, will be populated by EOL and saved to temp dir)
@@ -192,13 +267,25 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
     /**/
     
     eolModule.execute();
-} catch (EolRuntimeException e) {
+} catch (EolRuntimeException | RuntimeException e) {
     // Step 1 (M2M) failed — most likely the RoboChart model uses a feature
     // that is not currently supported by the translation. Show a friendly
     // dialog instead of a technical stack trace, and stop the compilation.
     circusModel.dispose();
     rcModel.dispose();
     monitor.done();
+    CompileLog.error("RC2Z.eol failed: " + CompileLog.describe(e), e);
+    // the defensive check of RC2Z.eol (checkNoUnresolvedProxies, issue C) reports its own reason
+    final String reason = e instanceof EolRuntimeException ? ((EolRuntimeException) e).getReason() : null;
+    if (reason != null && reason.startsWith("Unresolved references")) {
+        org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+            org.eclipse.jface.dialogs.MessageDialog.openWarning(
+                org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                "Unresolved references in the RoboChart model",
+                "The compilation could not be completed.\n\n" + reason);
+        });
+        return;
+    }
     org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
         org.eclipse.jface.dialogs.MessageDialog.openWarning(
             org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
@@ -206,7 +293,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             "The compilation could not be completed.\n\n"
             + "The RoboChart model appears to contain one or more features "
             + "that are not currently supported by the RoboChart-to-IsaCircus translation.\n\n"
-            + "Please modify the model and try again."
+            + "Error in RC2Z.eol (Step 1):\n" + CompileLog.describe(e)
         );
     });
     return; // stop here, do not proceed to Step 2
@@ -214,7 +301,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
 
         // Disposing circusModel triggers storeOnDisposal, writing _circus.model to temp dir
         circusModel.dispose();
-        rcModel.dispose();
+        // rcModel is disposed after Step 2, which uses the same resolved resource
         monitor.worked(3);
 
         // ── Step 2: EGX/EGL transformation (CircusM2T.egx) ───────────────────
@@ -250,13 +337,9 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             egxModule.parse(new java.net.URI(
                 "platform:/plugin/circus.robocalc.robochart.epsilon.isacircus/erules/CircusM2T.egx"));
             System.out.println("[DEBUG] EGX parsed OK");
-            EmfModel rcModelForM2T = new EmfModel();
-            rcModelForM2T.setName("RC");
-            rcModelForM2T.setMetamodelUri("http://www.robocalc.circus/RoboChart");
-            rcModelForM2T.setModelFile(rctAbsPath);
-            rcModelForM2T.setReadOnLoad(true);
-            rcModelForM2T.setStoredOnDisposal(false);
-            try { rcModelForM2T.load(); } catch (EolModelLoadingException e) { e.printStackTrace(); }
+            // the same resolved RoboChart model as in Step 1 (not a second single-file load)
+            InMemoryEmfModel rcModelForM2T = new InMemoryEmfModel("RC", loaded.resource, robochartPackage);
+            rcModelForM2T.setModelFileUri(org.eclipse.emf.common.util.URI.createFileURI(rctAbsPath));
             egxModule.getContext().getModelRepository().addModel(circusModelForM2T);
             egxModule.getContext().getModelRepository().addModel(rcModelForM2T);
             egxModule.getContext().getFrameStack().put(
@@ -268,10 +351,21 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             egxModule.execute();
             System.out.println("[DEBUG] EGX executed OK");
         } catch (Exception e) {
-            System.out.println("[DEBUG] EGX exception: " + e.getMessage());
-            throw new InvocationTargetException(e, "EGX execution failed: " + e.getMessage());
+            CompileLog.error("CircusM2T.egx failed: " + CompileLog.describe(e), e);
+            circusModelForM2T.dispose();
+            rcModel.dispose();
+            monitor.done();
+            final String why = CompileLog.describe(e);
+            org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+                org.eclipse.jface.dialogs.MessageDialog.openError(
+                    org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                    "IsaCircus: generation of the theories failed",
+                    "Step 2 (CircusM2T.egx) failed.\n\n" + why);
+            });
+            return;
         }
         circusModelForM2T.dispose();
+        rcModel.dispose();
         monitor.worked(3);
 
         // ── Refresh the Eclipse workspace ─────────────────────────────────────
@@ -284,6 +378,7 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         }
         monitor.worked(1);
         System.out.println("IsaCircus .thy files generated successfully for: " + baseName);
+        CompileLog.info("generated the theories of " + baseName + " under " + rctDirAbsPath);
         monitor.done();
     }
 }

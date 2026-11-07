@@ -45,7 +45,11 @@ definition below_[%=enumType.name.word%]_def:
 instance proof
 qed (rule below_[%=enumType.name.word%]_def)
 end
+ [%}%]
 
+[*Discrete cpo instances for the basic types that can be parameters of the Memory fixrec processes (issue K).
+  Emitted once; before, only int was emitted, and inside the loop over free types (once per free type).
+  Not covered yet: records, sequences and other composite types used as variable types.*]
 instantiation int :: discrete_cpo
 begin
 
@@ -54,8 +58,37 @@ definition below_int_def [simp]:
 
 instance
   by standard (simp)
-end 
- [%}%]
+end
+
+instantiation nat :: discrete_cpo
+begin
+
+definition below_nat_def [simp]:
+  "(x::nat) \<sqsubseteq> y \<longleftrightarrow> x = y"
+
+instance
+  by standard (simp)
+end
+
+instantiation bool :: discrete_cpo
+begin
+
+definition below_bool_def [simp]:
+  "(x::bool) \<sqsubseteq> y \<longleftrightarrow> x = y"
+
+instance
+  by standard (simp)
+end
+
+instantiation real :: discrete_cpo
+begin
+
+definition below_real_def [simp]:
+  "(x::real) \<sqsubseteq> y \<longleftrightarrow> x = y"
+
+instance
+  by standard (simp)
+end
 
 
 [*record type declaration*]
@@ -66,7 +99,22 @@ if(axParas.select(p|p.box = Z!Box#SchBox).size()>0){
 record [%=ap.zSchText.declList.decls.at(0).name.word%] =
 [%for(vardecl in ap.zSchText.declList.decls.at(0).expr.schText.declList.decls){%]
 	[%=vardecl.nameList.names.at(0).word%] :: "[%=vardecl.expr.parseExpr()%]"
-[%}} }%]
+[%}%]
+
+[*Issue K' (5 Nov 2026): discrete cpo instance for the record type constructor 'a R_ext (R = unit R_ext), needed
+  when a record is (part of) the parameter type of a Memory fixrec. Lists of records then get their instance
+  from HOLCF-Library.List_Cpo (imported by RC_HOL-CSP.RoboChart_Library), products from HOLCF.*]
+instantiation [%=ap.zSchText.declList.decls.at(0).name.word%]_ext :: (type) discrete_cpo
+begin
+
+definition below_[%=ap.zSchText.declList.decls.at(0).name.word%]_ext_def [simp]:
+  "(x::'a [%=ap.zSchText.declList.decls.at(0).name.word%]_ext) \<sqsubseteq> y \<longleftrightarrow> x = y"
+
+instance
+  by standard (simp)
+end
+
+[%} }%]
 
 [*constants and functions declaration and/or definition*]
 [%
@@ -89,14 +137,14 @@ datatype chan_event  =
 [%z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara)).println();
 var channelparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara));
 
-for(chanpara in channelparas.select(cp|cp.declList.decls.size()>0)){%]
+for(chanpara in channelparas.select(cp|cp.declList.decls.exists(d|d.keptChans().size()>0))){%]
 \<comment> \<open>[%=chanpara.name.word%]\<close>
 [%//	var chandecl = chanpara.declList.decls.at(0);
-	for(chandecl in chanpara.declList.decls){
-		var chans = chandecl.channelNameList.names;%]
+	for(chandecl in chanpara.declList.decls.select(d|d.keptChans().size()>0)){
+		var chans = chandecl.keptChans();%]
 
 		[%for(chan in chans){%]
-"[%=chan.word%]" [*[%if(chandecl.expr.name.word = "SYNCH"){%] :: unit [%} else{%] :: [%if(chandecl.expr.name.word = "Value"){%]real[%}else{%][%=chandecl.expr.name.word%][%}}*][%if(chandecl.expr.parseExpr() = "SYNCH"){%]  [%} else{%] [%if(chandecl.expr.parseExpr() = "Value"){%]"real"[%} else {%]"[%=chandecl.expr.parseExpr()%]" [%}} if(hasMore){%] |[%}%]
+"[%=chan.word%]" [*[%if(chandecl.expr.name.word = "SYNCH"){%] :: unit [%} else{%] :: [%if(chandecl.expr.name.word = "Value"){%]real[%}else{%][%=chandecl.expr.name.word%][%}}*][%if(chandecl.expr.parseExpr() = "SYNCH"){%]  [%} else{%] [%if(chandecl.expr.parseExpr() = "Value"){%]"real"[%} else {%][%=chandecl.expr.chanArgs()%]" [%}} if(hasMore){%] |[%}%]
 		[%}if(hasMore){%] |[%}
 	}if(hasMore){%] |[%}%]
 	
@@ -110,7 +158,7 @@ for(chansetpara in channelsetparas){
 
 
 [*printed by parseBasicChannelSetExpr, so that parameterised channels become range c (see there)*]
-definition "[%= chansetpara.name.word%] = [%=chansetpara.channelSet.expr.parseExpr()%]"
+definition [%= chansetpara.name.word%] :: "chan_event set" where "[%= chansetpara.name.word%] = [%=chansetpara.channelSet.expr.parseExpr()%]"
 [%}%]
       
 abbreviation "assume b Q P \<equiv> (if b then P else aviol \<rightarrow> Q)"
@@ -203,6 +251,9 @@ where
 [simp del] :\<open>[%= actpara.nameWithSig()%] = 
 	[%=actpara.circusAction.parseAction()%] \<close> 
 [%}%]
+
+[*end of locale actions; the end below closes the theory (issue M: before, only one end was printed)*]
+end
 [%}%]
 end
 
@@ -244,12 +295,17 @@ end
 	return  "(" + self.circusProcess.parseProc() + " \\ " + self.channelSet.parseChannelSet() + ")";
 }%]
 
+[*A renaming without pairs (e.g. no shared variables) is printed as its operand alone; "P \<lbrakk>  \<rbrakk> \<lbrakk>\<rbrakk>"
+  does not parse (issue B). The empty case used to print "(" + operand without the closing parenthesis.*]
+[%operation Z!AssignmentPairs hasRenamePairs(): Boolean{
+	return self.isDefined() and self.lhsElement.isDefined() and self.lhsElement.names.size() > 0;
+}%]
 [%operation Z!RenameProcess parseRenameProcess(): String{
-	if(self.assignmentPairs.size()>0){
-	return  "(" + self.circusProcess.parseProc()  + "\r\n" + "	\\<lbrakk> " + self.assignmentPairs.parseAssignmentPairs() + " \\<rbrakk> \\<lbrakk>\\<rbrakk>)";
+	if(self.assignmentPairs.isDefined() and self.assignmentPairs.hasRenamePairs()){
+	return  "(" + self.circusProcess.parseProc()  + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenaming() + "\\<rbrakk>\\<rbrakk>)";
 	}
 	else {
-	return  "(" + self.circusProcess.parseProc();
+	return  "(" + self.circusProcess.parseProc() + ")";
 	}
 }%]
 
@@ -494,10 +550,10 @@ end
 
 
 [%operation Z!RenameAction parseRenameAction(): String{
-	if(self.assignmentPairs.size()>0){
-	return  "(" + self.circusAction.parseAction() + " \\<lbrakk> " + self.assignmentPairs.parseAssignmentPairs() + " \\<rbrakk> \\<lbrakk>\\<rbrakk>)";}
+	if(self.assignmentPairs.isDefined() and self.assignmentPairs.hasRenamePairs()){
+	return  "(" + self.circusAction.parseAction() + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenaming() + "\\<rbrakk>\\<rbrakk>)";}
 	else {
-	return  "(" + self.circusProcess.parseProc();
+	return  "(" + self.circusAction.parseAction() + ")";
 	}
 }%]
 
@@ -569,10 +625,34 @@ end
 //	if(self.commPattern = Z!CommPattern#Input or self.commPattern =  Z!CommPattern#Output){
 	{
 		commu_str = self.channelExpr.parseExpr();
+		//issue D: a trigger with a parameter is the channel with a value field and an input field, c.a?x
+		//(DotField, InputField); printed as c\<^bold>.a\<^bold>?x it does not parse. The leading value fields are
+		//applied to the channel when an input or output field follows: (c a)\<^bold>?x, a read on the channel c a.
+		//Without a following input/output field, c\<^bold>.a stays (write notation, = write0).
+		var fields = self.fieldList.fields;
+		var k = 0;
+		while(k < fields.size() and fields.at(k).isTypeOf(Z!DotField) and fields.at(k).outputField = false){
+			k++;
+		}
+		var start = 0;
+		if(k > 0 and k < fields.size()){
+			var j = 0;
+			var app = commu_str;
+			while(j < k){
+				app = app + " " + fields.at(j).expr.parseExpr();
+				j++;
+			}
+			commu_str = "(" + app + ")";
+			start = k;
+		}
 //		var field = self.fieldList.fields.at(0);
 //		commu_str = commu_str + field.parseField();
+		var idx = 0;
 		for(field in self.fieldList.fields){
-			commu_str = commu_str + field.parseField();
+			if(idx >= start){
+				commu_str = commu_str + field.parseField();
+			}
+			idx++;
 		}
 		
 //		if(field.outputField = true){
@@ -597,6 +677,61 @@ end
 
 
 
+[*Arguments of a chan_event constructor (issue E). RC2Z.eol declares the node-indexed event channel e__in with
+  the product NIDS x T; it is used curried (e__in NID, e__in NID v), so it is declared with two arguments. Only
+  this product is split: a user product type T (e.g. int*int) stays one tuple argument, so that e__in n v and
+  e_in v take the same value v.*]
+[%operation Z!Expr isNidsProduct(): Boolean{
+	return self.isTypeOf(Z!ProdExpr) and self.exprList.exprs.size() = 2
+		and self.exprList.exprs.at(0).parseExpr().startsWith("NIDS_");
+}%]
+[*returns the arguments without the final closing quote, which is static text in the declaration line (keeps
+  the spacing of the output unchanged)*]
+[%operation Z!Expr chanArgs(): String{
+	if(self.isNidsProduct()){
+		return "\"" + self.exprList.exprs.at(0).parseExpr() + "\" \"" + self.exprList.exprs.at(1).parseExpr();
+	}
+	return "\"" + self.parseExpr();
+}%]
+[*Issue P (known deviation from the CSP-M, 5 Nov 2026): event channels are declared only for the events the state
+  machine uses. RC2Z.eol declares e_in, e_out, e__in for every event of the state machine, including all events
+  of the interfaces it uses; some of these have types (records of other files) that the theory does not declare.
+  An event is used if one of its channels is mentioned anywhere in the Z model outside the channel declarations;
+  all channels of a used event are kept. Unused events cannot occur in any process, so the behaviour is
+  unchanged; the CSP-M declares them all. Other channel paragraphs (flow, variables, ...) are unchanged.
+  To do before the MakePlan regression: generate the record and enumeration types of imported packages, then
+  this filter can be reconsidered.*]
+[%@cached
+operation usedEventBases(): Set{
+	var used = new Set;
+	for(n in Z!ZName.all()){
+		var inDecl = n.eContainer().isDefined() and n.eContainer().eContainer().isDefined()
+			and n.eContainer().eContainer().isTypeOf(Z!ChannelDecl);
+		if(not inDecl and n.word.isDefined()){
+			used.add(n.word.relSplit().first().eventBase());
+		}
+	}
+	return used;
+}%]
+[%operation String eventBase(): String{
+	if(self.endsWith("__in")){
+		return self.substring(0, self.length() - 4);
+	}
+	if(self.endsWith("_out")){
+		return self.substring(0, self.length() - 4);
+	}
+	if(self.endsWith("_in")){
+		return self.substring(0, self.length() - 3);
+	}
+	return self;
+}%]
+[%operation Z!ChannelDecl keptChans(): Sequence{
+	var para = self.eContainer().eContainer();
+	if(para.isDefined() and para.isTypeOf(Z!ChannelPara) and para.name.word.startsWith("event_channel_stmbd_")){
+		return self.channelNameList.names.select(c | usedEventBases().includes(c.word.eventBase())).asSequence();
+	}
+	return self.channelNameList.names.asSequence();
+}%]
 [%operation Z!Field parseField(): String{
 	
 	var field_str : String;
@@ -642,6 +777,159 @@ end
   
   
  
+[*Relational renaming printer (generator issues F and I, 4 Nov 2026). Every non-empty renaming is printed as
+  the relational renaming P \<lbrakk>\<lbrakk>R\<rbrakk>\<rbrakk> of RC_HOL-CSP (Relational_Renaming, imported by
+  RoboChart_Library), with R a lambda term over the source event rn_a and the target event rn_b. One-to-many
+  renamings (several pairs with the same left-hand side) become a disjunction, so all targets are kept; as
+  function updates a := b, a := c only the last pair took effect (issue F). The comprehension variable of the
+  trigger projection of ncBehaviour (RC2Z.eol renameTriggerEventsPairL writes e__in\<^bold>.x, CSP-M
+  e__.x <- e | x <- NIDS) is bound by an existential quantifier (issue I). The relation must be parenthesised
+  inside \<lbrakk>\<lbrakk> \<rbrakk>\<rbrakk>. Functional instances can be turned back into Renaming P f id
+  with Relational_Renaming_functional (RC_HOL-CSP.Relational_Renaming_Laws).
+  Depends on the "\<^bold>." marker written by RC2Z.eol (see holEvent); change both together.*]
+[%operation String relSplit(): Sequence{
+	var marker = "\\<^bold>.";
+	var parts = new Sequence;
+	var rest = self;
+	var i = rest.indexOf(marker);
+	while(i >= 0){
+		parts.add(rest.substring(0, i));
+		rest = rest.substring(i + marker.length());
+		i = rest.indexOf(marker);
+	}
+	parts.add(rest);
+	return parts;
+}%]
+[%operation Z!Expr relRawName(): String{
+	if(self.isTypeOf(Z!RefExpr) and self.name.isDefined()){
+		return self.name.word;
+	}
+	return self.parseExpr();
+}%]
+[*the event term of a split side: channel name applied to the given values (x is the bound rn_x) and to extVars*]
+[%operation Sequence relTerm(extVars: Sequence): String{
+	var args = new Sequence;
+	var k = 1;
+	while(k < self.size()){
+		if(self.at(k) = "x"){
+			args.add("rn_x");
+		} else {
+			args.add(self.at(k));
+		}
+		k++;
+	}
+	args.addAll(extVars);
+	if(args.size() = 0){
+		return self.first();
+	}
+	return "(" + self.first() + " " + args.concat(" ") + ")";
+}%]
+[%operation Sequence relHasX(): Boolean{
+	var k = 1;
+	while(k < self.size()){
+		if(self.at(k) = "x"){
+			return true;
+		}
+		k++;
+	}
+	return false;
+}%]
+[%operation relClause(bound: Sequence, body: String): String{
+	if(bound.size() = 0){
+		return "(" + body + ")";
+	}
+	return "(\\<exists>" + bound.concat(" ") + ". " + body + ")";
+}%]
+[*Number of curried arguments of a chan_event constructor: 0 for SYNCH, 2 for NIDS x T (curried, issue E),
+  1 otherwise (a user product type is one tuple argument). Names that are not channels count as 0.*]
+[%@cached
+operation channelArities(): Map{
+	var m = new Map;
+	for(chanpara in Z!ChannelPara.all()){
+		if(chanpara.declList.isDefined()){
+			for(chandecl in chanpara.declList.decls){
+				var n = 0;
+				if(chandecl.expr.isDefined() and chandecl.expr.parseExpr() <> "SYNCH"){
+					n = 1;
+					if(chandecl.expr.isNidsProduct()){
+						n = 2;
+					}
+				}
+				for(chan in chandecl.channelNameList.names){
+					m.put(chan.word, n);
+				}
+			}
+		}
+	}
+	return m;
+}%]
+[%operation relVars(prefix: String, n: Integer): Sequence{
+	var vs = new Sequence;
+	var k = 1;
+	while(k <= n){
+		vs.add(prefix + k);
+		k++;
+	}
+	return vs;
+}%]
+[*Remaining (not given) arguments of a split side.*]
+[%operation Sequence relRest(): Integer{
+	var n = 0;
+	if(channelArities().containsKey(self.first())){
+		n = channelArities().get(self.first());
+	}
+	var r = n - (self.size() - 1);
+	if(r < 0){
+		return 0;
+	}
+	return r;
+}%]
+[*CSP-M renaming: an event in the domain (some left-hand side) is renamed only to its targets; an event outside
+  the domain is unchanged. The last clause states the latter; without it those events would be blocked.
+  Duplicate pairs (e.g. one trigger on several transitions) give one clause.
+  Parameterised endpoints (issue G): a side whose channel takes more arguments than given stands for all its
+  completions. If both sides have the same number of remaining arguments, the renaming is a prefix renaming
+  (c.v <- d.v for all v, e.g. setL_x <- set_x): the variables rn_v1, ... are shared. If only one side has
+  remaining arguments, all of its completions are related to the other side (e.g. share <- setL_x.v for all v,
+  interrupt_X <- e__in NID v for all v). Otherwise (mismatch, not expected) the two sides get separate variables.*]
+[%operation Z!AssignmentPairs parseRelRenaming(): String{
+	var clauses = new OrderedSet;
+	var domain = new OrderedSet;
+	var i = 0;
+	while(i < self.lhsElement.names.size()){
+		var lp = self.lhsElement.names.at(i).word.relSplit();
+		var rp = self.rhsElement.exprs.at(i).relRawName().relSplit();
+		var rl = lp.relRest();
+		var rr = rp.relRest();
+		var lext = relVars("rn_v", rl);
+		var rext = relVars("rn_v", rr);
+		if(rl <> rr and rl > 0 and rr > 0){
+			rext = relVars("rn_w", rr);
+		}
+		var bound = new Sequence;
+		if(lp.relHasX() or rp.relHasX()){
+			bound.add("rn_x");
+		}
+		for(v in lext){
+			bound.add(v);
+		}
+		for(v in rext){
+			if(not bound.includes(v)){
+				bound.add(v);
+			}
+		}
+		clauses.add(relClause(bound, "rn_a = " + lp.relTerm(lext) + " \\<and> rn_b = " + rp.relTerm(rext)));
+		var lbound = new Sequence;
+		if(lp.relHasX()){
+			lbound.add("rn_x");
+		}
+		lbound.addAll(lext);
+		domain.add(relClause(lbound, "rn_a = " + lp.relTerm(lext)));
+		i++;
+	}
+	clauses.add("(" + domain.collect(d | "\\<not> " + d).concat(" \\<and> ") + " \\<and> rn_b = rn_a)");
+	return "(\\<lambda>rn_a rn_b. " + clauses.concat("\r\n\t  \\<or> ") + ")";
+}%]
 [%operation Z!AssignmentPairs parseAssignmentPairs(): String{
 
 	var pair_str : String;
@@ -1091,14 +1379,26 @@ end
 		if(commu.channelExpr.isDefined() and commu.channelExpr.isTypeOf(Z!RefExpr) and commu.channelExpr.name.isDefined()){
 			w = commu.channelExpr.name.word;
 		}
-		if(paramChans.includes(w)){
-			ranges.add("range " + w);
+		//issue H: a channel applied to fewer values than it takes (e.g. newModel__in NID with newModel__in :: NIDS
+		//=> nat => chan_event, written newModel__in\<^bold>.NID by RC2Z.eol) is a function, not an event: all its
+		//completions are meant, i.e. range (newModel__in NID). Bare channel names are the case of no given value.
+		var parts = w.relSplit();
+		if(w <> "" and parts.relRest() > 0){
+			if(parts.size() = 1){
+				ranges.add("range " + w);
+			} else {
+				ranges.add("range " + w.holEvent());
+			}
 		} else {
 			events.add(commu.parseCommu());
 		}
 	}
+	//empty set: "{  }" does not parse; give the type, since an empty set alone has none (issue A)
+	if(events.size() = 0 and ranges.size() = 0){
+		return "({} :: chan_event set)";
+	}
 	var parts = new Sequence;
-	if(events.size() > 0 or ranges.size() = 0){
+	if(events.size() > 0){
 		parts.add("{ " + events.concat(",") + " }");
 	}
 	parts.addAll(ranges);
