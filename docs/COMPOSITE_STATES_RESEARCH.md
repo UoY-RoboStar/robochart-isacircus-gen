@@ -1,6 +1,7 @@
 # Composite states in the HOL-CSP generator: research notes
 
-14 Nov 2026 (Sections 3.4 and 4.1 added and rewritten the same day, after a check of the naming code). RESEARCH ONLY: no rule and no template was changed. Nothing in
+14 Nov 2026 (Sections 3.4 and 4.1 added and rewritten the same day, after a check of the naming code; then
+Fang's decisions on naming recorded in 3.4 and 4.1). RESEARCH ONLY: no rule and no template was changed. Nothing in
 Sections 4 and 5 has been implemented or run; they are a design draft.
 
 Sources that were read:
@@ -201,7 +202,19 @@ package: for a machine defined directly in a package (ex10, all DTI machines) th
 - a package without a name contributes nothing;
 - `_` is also a legal character of RoboChart names, so the concatenation is not injective
   (`Adaptation_Legitimate_Adaptation_Legitimate` is machine + package). Not a problem met so far;
-- whether a package name can itself be qualified (`a::b`) and what the rules do then was not examined.
+- a package name can be qualified. Checked 14 Nov 2026 on a copy of ex10 with `package top::sub`:
+  the RoboChart parser and validator accept it, and `RC!StateMachineDef FQN()` copies the name as it
+  is (`pkg.name`), so the FQN is `stm3_top::sub` and every generated name contains `::`
+  (`NIDS_stm3_top::sub`, `Trans_stm3_top::sub`, `get_v1_stm3_top::sub`, `a_stm3_top::sub__in`), in the
+  HOL-CSP and in the IsaCircus output alike. All three templates run without an error, but the
+  result is not legal: in Isabelle `::` is not part of an identifier (it is the type-constraint
+  token, so `datatype NIDS_stm3_top::sub = ...` does not parse; not run, evident from the syntax), and
+  in Circus and CSP-M `::` is not an identifier character either (CSP-M uses it for module
+  qualification). So models with a qualified package name are NOT supported today; none of the models
+  used so far has one. A fix would map `::` to a separator when the FQN is built. With `_` as that
+  separator the ambiguity noted above grows: `package top::sub` and `package top_sub` would give the
+  same names (as already `stm a_b` in `package c` and `stm a` in `package b_c`). Not fixed here; to
+  decide when a model needs it.
 
 **Names built from an FQN** (all follow the convention as far as the FQN does):
 
@@ -221,16 +234,17 @@ package: for a machine defined directly in a package (ex10, all DTI machines) th
 
 | Name | Built in | Lines | What it is |
 |---|---|---|---|
-| event channels `<e>_in`, `<e>_out` | `createchanParaNC` Case 1; communications | 3698, 3699; 7097, 7189, 7203; 4762 | event name only. The version with `e.FQN()` is commented out; the comment at line 229 says event channels keep their names because connections match them |
+| event channels `<e>_in`, `<e>_out` | `createchanParaNC` Case 1; communications | 3698, 3699; 7097, 7189, 7203; 4762 | event name only. **Deliberately not qualified (Fang, 14 Nov 2026); reason: connections match these channels by name.** The version with `e.FQN()` is commented out; the comment at line 229 says the same |
 | trigger channels `<e>__in` | `createchanParaNC` Case 2; `renameTriggerEventsPairL`, `tevent_str`, `tevent`, `trigger` | 3717; 4745; 4916; 4936; 5855, 5879 | event name only, although the channel is typed with the NIDS of ONE container |
-| variables of an interface that the machine `uses`; required (shared) variables: `get_`, `set_`, `setL_`, `setR_`, `set_EXT_`, `sharedMemory_` `<v>` | `createchanParaNC` Cases 2 and shared; shared memory | 3607-3610, 3630; 2936-2961 | variable name only: `FQNllLocalVariables` renames only the variables of `variableList` of the machine |
+| variables of an interface that the machine `uses`; required (shared) variables: `get_`, `set_`, `setL_`, `setR_`, `set_EXT_`, `sharedMemory_` `<v>` | `createchanParaNC` Cases 2 and shared; shared memory | 3607-3610, 3630; 2936-2961 | variable name only: `FQNllLocalVariables` renames only the variables of `variableList` of the machine. **Deliberately not qualified for now (Fang, 14 Nov 2026), for the same reason: they are shared across components and matched by name** |
 | variables of an operation definition | - | 231 | `FQNllLocalVariables` runs for `StateMachineDef` only |
 | `terminate`, `share`, `aviol`, `gviol` (and the abbreviation `SSTOP`) | line 211 and templates | | one global event each, by design (as `terminate` and `share__` in the CSP-M) |
 | theory names `HOLCSP_<baseName>_<timestamp>` | `CircusM2T.egx` | | the file name of the model, not an FQN |
 | lemma names `<z.version>_trans_core_ddlf` | `circusM2T_HOLCSP_trans_core.egl` 175, 204 | | not an FQN, one per theory |
 
 One place builds a wrong (not an unqualified) name: Rule 60, line 6067, `"interrupt_" + nc(self).FQN()`
-(Section 3.1, point 5).
+(Section 3.1, point 5). TO FIX in the second step, with the implementation of composite states
+(Fang, 14 Nov 2026): `"interrupt_" + self.FQN()`.
 
 **The templates build no names.** They print the names of the Z model and recognise paragraphs and
 channels by PATTERNS on those names:
@@ -306,7 +320,15 @@ event name and the suffix, as the commented-out `e.FQN() + "__in"` did, so the s
 templates (`endsWith("__in")`) keep working. Rule 40 of the container C renames `<e>_<C>__in.x` to the
 event channel `<e>_in` for every x in `NIDS_<C>`.
 
-**Consequence for flat models, to be accepted knowingly.** With the machine itself named like every
+**Decided (Fang, 14 Nov 2026): all trigger channels are renamed, those of flat machines too.**
+First step, flat models only, IMPLEMENTED on the generator branch `trigger-fqn-naming` (from `main`,
+commit 844768b; this branch keeps only these notes): `triggerChan(e, nc)` in `RC2Z.eol`; in the
+HOL-CSP templates the type of Trans from its declaration, exact node matching instead of
+`contains(nd)`, and the event filter (`eventBase`) through the declaration of the channel. The proof
+theories that import regenerated theories are updated on the branch `trigger-fqn-naming` of
+RoboChart-Deadlock-HOLCSP-AG-dev. The second step (composite states) is not started.
+
+**Consequence for flat models.** With the machine itself named like every
 other container, the trigger channels of a flat machine change too: ex10 `a__in` becomes
 `a_stm3_ex10__in`; Legitimate `newModel__in` becomes
 `newModel_Adaptation_Legitimate_Adaptation_Legitimate__in`. Nothing else in a flat theory changes.
@@ -319,14 +341,13 @@ What depends on the old names:
   updated when they move to a new generated file;
 - the IsaCircus output of flat models changes in the same names (Section 4.4), so Arjun has to be told.
 
-If this is not wanted now, the variant "state containers qualified, the machine keeps `<e>__in`"
-leaves all flat output unchanged, at the price of keeping the machine level outside the convention.
+The variant "state containers qualified, the machine keeps `<e>__in`" was not chosen.
 
-**Not changed by this scheme, still outside the convention** (Section 3.4): the event channels `<e>_in`
-and `<e>_out` (matched by connections; qualifying them is a change of the controller and module rules
-as well), variables from used interfaces and required variables, variables of operations. They are
+**Not changed by this scheme, deliberately not qualified** (Fang, 14 Nov 2026; Section 3.4): the event
+channels `<e>_in` and `<e>_out` and the variables from used interfaces and required variables. Reason:
+connections (and the sharing of variables between components) match them by name. They are
 independent of composite states; a composite state declares no variables and no events, so nothing new
-arises from them. To decide separately.
+arises from them. Variables of operation definitions are also unqualified; not examined further.
 
 **What each place needs:**
 
@@ -372,6 +393,17 @@ every container module, the scheme only those used there (issue P, same behaviou
 one `exit` and one `exited` for all levels and hides them per level, the generator has one pair per
 container, hidden at the same places (same behaviour; with separate names the inner pair cannot be
 confused with the outer one in the proofs); (3) the CSP-M `InOut` argument is the suffix `_in`/`_out`.
+
+**TO VERIFY (not checked):** difference (2) is claimed to make no difference to the external
+behaviour. Reason: the inner `exit` and `exited` are hidden in `ncBehaviour` of the composite state
+(Rule 40, hide set `enterSS ∪ {exit, exited} ∪ internal__`), in the CSP-M and in the generator alike,
+so outside `Behaviour` only the pair of the enclosing level is visible, whichever names the inner pair
+has; and inside one level the nodes and Trans of that level use one pair in both. What has to hold in
+addition for the CSP-M is that an inner `exit`/`exited` can never synchronise with an outer one before
+it is hidden; this follows from the hiding being applied inside `Behaviour`, before the composition
+with the outer nodes. To be checked with FDR when the CSP-M of c1 to c6 exists: build a variant of the
+generated CSP-M in which each composite-state module declares its own `exit`/`exited`, and assert
+refinement in both directions (FD) against the generated one, for c1, c2 and c6 (nesting).
 
 ### 4.2 Model-to-model (`RC2Z.eol`)
 
