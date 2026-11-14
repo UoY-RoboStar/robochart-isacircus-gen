@@ -213,8 +213,10 @@ package: for a machine defined directly in a package (ex10, all DTI machines) th
   qualification). So models with a qualified package name are NOT supported today; none of the models
   used so far has one. A fix would map `::` to a separator when the FQN is built. With `_` as that
   separator the ambiguity noted above grows: `package top::sub` and `package top_sub` would give the
-  same names (as already `stm a_b` in `package c` and `stm a` in `package b_c`). Not fixed here; to
-  decide when a model needs it.
+  same names (as already `stm a_b` in `package c` and `stm a` in `package b_c`). DECIDED (Fang, 14 Nov 2026): qualified
+  package names are NOT SUPPORTED for now; the mapping rule is to be fixed later. Two constraints for
+  it: `_` collides with package names such as `top_sub`, and `__` collides with suffixes such as
+  `__in`.
 
 **Names built from an FQN** (all follow the convention as far as the FQN does):
 
