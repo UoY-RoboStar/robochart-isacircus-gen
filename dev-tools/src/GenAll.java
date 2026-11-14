@@ -103,5 +103,21 @@ public class GenAll {
     Path thy = new File(out, "HOLCSP_" + base + "_" + a[5] + ".thy").toPath();
     Files.writeString(thy, mod.execute().toString());
     System.out.println("wrote " + zPath + "\nwrote " + thy);
+    if (opts.contains("alltemplates")) {
+      // the two other templates of CircusM2T.egx, on the same Z model
+      String[][] more = { { "circusM2T.egl", "IsaCircus_enriched_" }, { "circusM2T_HOLCSP_trans_core.egl", "HOLCSP_trans_core_" } };
+      for (String[] t : more) {
+        EglTemplateFactoryModuleAdapter m2 = new EglTemplateFactoryModuleAdapter(new EglTemplateFactory());
+        if (!m2.parse(new File(a[2], t[0]))) { System.out.println(m2.getParseProblems()); System.exit(1); }
+        m2.getContext().getModelRepository().addModel(zr);
+        m2.getContext().getFrameStack().put(Variable.createReadOnlyVariable("z", zr.getAllOfType("Spec").iterator().next()));
+        m2.getContext().getFrameStack().put(Variable.createReadOnlyVariable("baseName", base));
+        m2.getContext().getFrameStack().put(Variable.createReadOnlyVariable("ts", a[5]));
+        m2.getContext().setOutputStream(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
+        Path f = new File(out, t[1] + base + "_" + a[5] + ".thy").toPath();
+        try { Files.writeString(f, m2.execute().toString()); System.out.println("wrote " + f); }
+        catch (Exception e) { System.out.println("FAILED " + t[0] + ": " + e); }
+      }
+    }
   }
 }

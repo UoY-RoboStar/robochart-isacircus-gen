@@ -3714,7 +3714,7 @@ operation RC!NodeContainer createchanParaNC()  {
 //							 //e.FQN() + "__out" , this is removed because the out channel is not necessary, as e.NIDS channel is only used for transition triggers, and a trigger can only be an input.
 //							   };	
 
-		var evt_seq = Sequence{e.name + "__in"//,
+		var evt_seq = Sequence{triggerChan(e, self)//,
 							 //e.name + "__out" , this is removed because the out channel is not necessary, as e.NIDS channel is only used for transition triggers, and a trigger can only be an input.
 							   };	
 							   							   	
@@ -4724,6 +4724,17 @@ operation setRC(nameset: Set<String>):Set<String>{
 }
 
 
+//Name of the trigger channel of event e in the node container nc: <e>_<FQN of nc>__in.
+//The channel is typed with the node identifiers of ONE container (NIDS_<FQN of nc>), so its name carries the
+//full path of that container, innermost first, as every other name built from an FQN. Before 14 Nov 2026 it
+//was e.name + "__in" (event name only). The suffix "__in" stays at the end: the HOL-CSP templates recognise
+//the channel by it (eventBase). The external event channels <e>_in / <e>_out are deliberately NOT qualified:
+//connections match them by name.
+//Every place that names a trigger channel must use this operation.
+operation triggerChan(e: RC!Event, nc: RC!NodeContainer): String{
+	return e.name + "_" + nc.FQN() + "__in";
+}
+
 //CSPM example:
 /****************************
 [[ stop__.x____ 	<- stop,
@@ -4742,7 +4753,7 @@ operation renameTriggerEventsPairL(nc:RC!NodeContainer): Sequence<String>{
 	for(t in nc.transitions.select(l|l.trigger.isDefined())){
 		//NOTE: the HOL-CSP templates (holEvent in circusM2T_HOLCSP*.egl) rely on this exact "\\<^bold>." marker
 		//to print the event as (c v); change both together. See the comment above holEvent for the background.
-		pairL.add(t.trigger.event.name +"__in" +"\\<^bold>.x" ); //syntax for Isacircus
+		pairL.add(triggerChan(t.trigger.event, nc) +"\\<^bold>.x" ); //syntax for Isacircus
 //		pairL.add(t.trigger.event.name +"__in" +"\\<cdot>x" );
 //		pairL.add(t.trigger.event.FQN()+"__in" +"\\<cdot>x" );
 		//in Isabelle, event1\<cdot>x means the set of events that take all values of the first type of event1  when the tirgger's type is a product.
@@ -4913,7 +4924,7 @@ operation tevent_str(t: RC!Transition): String{
 //		tevent_string = t.trigger.event.name + "__in\\<cdot>NID_" + t.source.FQN();
 		//NOTE: the HOL-CSP templates (holEvent in circusM2T_HOLCSP*.egl) rely on this exact "\\<^bold>." marker
 		//to print the event as (c v); change both together. See the comment above holEvent for the background.
-		tevent_string = t.trigger.event.name + "__in\\<^bold>.NID_" + t.source.FQN(); //syntax for isacircus
+		tevent_string = triggerChan(t.trigger.event, nc(t)) + "\\<^bold>.NID_" + t.source.FQN(); //syntax for isacircus
 	}
 	
 	return tevent_string;
@@ -4933,7 +4944,7 @@ operation tevent(t: RC!Transition): Z!Communication{
 	} 
 	
 	else {
-		chan_name = t.trigger.event.name + "__in";
+		chan_name = triggerChan(t.trigger.event, nc(t));
 //		chan_name = t.trigger.event.FQN() + "__in";
 		commu = createOutputCommunicationFromString(chan_name, para_name, "SYNC");
 	}
@@ -5852,7 +5863,7 @@ operation trigger(t: RC!Transition): Z!PrefixingAction{
 		CSPM example: trigger1__!NID_s0.in?a
 		Circus example: trigger1_stm0__in!NID_s0_stm0?a_stm0
 		****************************************/
-		channel_name = t.trigger.event.name + "__in";
+		channel_name = triggerChan(t.trigger.event, nc(t));
 //		channel_name = t.trigger.event.FQN() + "__in";		
 		var dot_para = "NID_" + t.source.FQN();
 
@@ -5876,7 +5887,7 @@ operation trigger(t: RC!Transition): Z!PrefixingAction{
 	} else
 	
 	if(t.trigger._type = CommunicationType#SIMPLE){
-		channel_name = t.trigger.event.name + "__in" ;
+		channel_name = triggerChan(t.trigger.event, nc(t));
 //		channel_name = t.trigger.event.FQN() + "__in" ;
 		var dot_para = "NID_"+ t.source.FQN();
 //		commu = createSynchCommunication(channel_name);

@@ -25,14 +25,11 @@ type_synonym [%=gp.nameList.names.at(0).word%] = nat
 [%
 var freeparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!FreePara));
 
-//var NID_name is to record the name of the node id type of the stm.
-var NID_name = new String;
+//The type of node identifiers of a Trans paragraph is printed from its own parameter declaration (paramType),
+//not from a single variable NID_name: with composite states there is one NIDS type per node container.
 for(freepara in freeparas){
 	var enumType = freepara.freetypeList.freeTypes.at(0);
 //	var chans = chandecl.channelNameList.names;
-	if (enumType.name.word.startsWith("NIDS_")){
-	NID_name = enumType.name.word;
-	}
 	%]
 	
 	
@@ -167,7 +164,7 @@ abbreviation "SSTOP \<equiv> SSTOP_aux share"
 [%for(actpara in procpara.circusProcess.paraList.paras.select(ap|ap.name.word.startsWith("Transc_"))){%]
 locale trans_core_action 
 begin
-fixrec [%= actpara.name.word%] :: "[%=NID_name%] \<rightarrow> chan_event process"
+fixrec [%= actpara.name.word%] :: "[%=actpara.paramType()%] \<rightarrow> chan_event process"
 where
 [simp del] :\<open>[%= actpara.name.word%]\<cdot>n = 
 	[%=actpara.circusAction.parseAction()%] \<close>
@@ -196,7 +193,7 @@ locale trans_core_action
 begin
 [*Trans_core*]
 [%for(actpara in actparas.select(ap|ap.name.word.startsWith("Transc_"))){%]
-fixrec [%= actpara.name.word%] :: "[%=NID_name%] \<rightarrow> chan_event process"
+fixrec [%= actpara.name.word%] :: "[%=actpara.paramType()%] \<rightarrow> chan_event process"
 where
 [simp del] :\<open>[%= actpara.name.word%]\<cdot>n = 
 	[%=actpara.circusAction.parseAction()%] \<close>
@@ -676,7 +673,45 @@ operation usedEventBases(): Set{
 	}
 	return used;
 }%]
+[*Trigger channels are named <e>_<FQN of the node container>__in (RC2Z.eol, triggerChan). The event e of such a
+  channel cannot be found from the name alone (with nested containers both S_M_P and M_P are suffixes), so it is
+  computed from the declaration: the channel is typed with NIDS_<FQN of the container>.*]
+[%operation Z!ChannelDecl nidsContainer(): String{
+	var t = null;
+	if(self.expr.isNidsProduct()){
+		t = self.expr.exprList.exprs.at(0).parseExpr();
+	} else if(self.expr.isTypeOf(Z!RefExpr)){
+		t = self.expr.parseExpr();
+	}
+	if(t.isDefined() and t.startsWith("NIDS_")){
+		return t.substring(5);
+	}
+	return null;
+}%]
+[%@cached
+operation triggerChanBases(): Map{
+	var m = new Map;
+	for(d in Z!ChannelDecl.all()){
+		var fq = d.nidsContainer();
+		if(fq.isDefined()){
+			var suffix = "_" + fq + "__in";
+			for(c in d.channelNameList.names){
+				if(c.word.endsWith(suffix)){
+					m.put(c.word, c.word.substring(0, c.word.length() - suffix.length()));
+				}
+			}
+		}
+	}
+	return m;
+}%]
+[*The type of the parameter n of a Trans / Transc paragraph, from its declaration (n : NIDS_<FQN of the container>).*]
+[%operation Z!ActionPara paramType(): String{
+	return self.circusAction.declList.decls.at(0).expr.parseExpr();
+}%]
 [%operation String eventBase(): String{
+	if(triggerChanBases().containsKey(self)){
+		return triggerChanBases().get(self);
+	}
 	if(self.endsWith("__in")){
 		return self.substring(0, self.length() - 4);
 	}
