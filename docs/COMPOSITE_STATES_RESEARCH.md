@@ -1,6 +1,6 @@
 # Composite states in the HOL-CSP generator: research notes
 
-14 Nov 2026. RESEARCH ONLY: no rule and no template was changed. Nothing in
+14 Nov 2026 (Sections 3.4 and 4.1 added and rewritten the same day, after a check of the naming code). RESEARCH ONLY: no rule and no template was changed. Nothing in
 Sections 4 and 5 has been implemented or run; they are a design draft.
 
 Sources that were read:
@@ -171,33 +171,214 @@ In Rule 52 the branch for a composite state does not add `"Inactive_" + nd.FQN()
 - Templates: printers for hiding, parallel, interleaving and renaming exist in all three templates
   (never exercised on interleaving; see 4.3).
 
+### 3.4 The naming convention today (read from the code, 14 Nov 2026)
+
+Fang's convention: a fully qualified name goes all the way up to the highest level (module or
+package). This section lists where names are built and whether they follow it. Line numbers are
+those of `erules/RC2Z.eol` at `main` 2976313 unless a template is named.
+
+**The FQN operations** (the only places where levels are concatenated):
+
+| Operation | Line | Result | Levels |
+|---|---|---|---|
+| `RC!RCModule FQN()` | 3513 | `<module>_<package>`; `<module>` if the package has no name | module, package |
+| `RC!ControllerDef FQN()` | 3472 | `<ctrl>_<module FQN>` if defined in a module, else `<ctrl>_<package>` | controller, (module,) package |
+| `RC!StateMachineDef FQN()` | 3447 | `<stm>_<controller FQN>` if defined in a controller, else `<stm>_<package>` | machine, (controller, (module,)) package |
+| `RC!OperationDef FQN()` | 3423 | as for a machine | operation, (controller, ...) package |
+| `RC!Node FQN()` | 3367 | `<node>_<FQN of its container>`; the container is a machine, an operation or a composite state (recursive) | node, every enclosing composite state, machine, ..., package |
+| `RC!Interface FQN()` | 3499 | the package name only (the interface's own name is dropped) | package |
+| `RC!Event FQN()` | 3398 | commented out | - |
+| `FQNllLocalVariables(nc)` | 544, called at 231 for every machine | renames a variable or constant declared directly in the machine to `<v>_<machine FQN>` before anything else runs | variable, machine, ..., package |
+
+Order and separator, everywhere: **innermost first, each level followed by `_` and the next outer
+level**; a name of a generated object is `<kind>_<FQN>` (kind first). The path does go up to the
+package: for a machine defined directly in a package (ex10, all DTI machines) the FQN is
+`<stm>_<package>`; for a machine defined in a controller of a module it is
+`<stm>_<ctrl>_<module>_<package>`. So the FQN operations follow the convention, with these remarks:
+
+- the path is the path of the DEFINITION. A machine defined in a package and referenced from a
+  controller by `sref` keeps `<stm>_<package>`; the controller and the module do not appear;
+- a package without a name contributes nothing;
+- `_` is also a legal character of RoboChart names, so the concatenation is not injective
+  (`Adaptation_Legitimate_Adaptation_Legitimate` is machine + package). Not a problem met so far;
+- whether a package name can itself be qualified (`a::b`) and what the rules do then was not examined.
+
+**Names built from an FQN** (all follow the convention as far as the FQN does):
+
+| Name | Built in | Lines | Levels after the kind |
+|---|---|---|---|
+| `NIDS_<nc>` (type), `NID_<node>` (constructors) | `createchanParaNC`; used in Rules 41, 53, 53-1, 54, 55, `tevent` | 3546, 3550; 4311, 4928, 5432, 5513, 5586, 5606, 5626, 5844 | container path; node path |
+| `internal__<nc>` | `createchanParaNC`, Rule 40, `tevent_str`, `tevent`, `trigger` | 3555, 4240, 4907, 4931, 5844 | container path (no separator of its own after `internal__`) |
+| `interrupt_<nc>`, `exit_<nc>`, `exited_<nc>` | `createchanParaNC`, Rule 29-2, Rule 40, Rule 41, `flowevts`, Rule 53, Rules 54, 55, 59, 60, final state | 3566, 2567, 4240, 4283, 4633-4635, 5375-5379, 5615, 5622, 5959, 6008, 6018, 6125, 6135 | container path. In the node rules the container is `nc(self)`, the direct container of the node |
+| `enter_<node>`, `entered_<node>`, `interrupt_<node>`, `enteredL_`, `enteredR_` | `createchanParaNC`; `enterSS`, `enteredSS`; Rule 41; Rules 54, 55; node rules | 3772-3779; 4648, 4656; 4269, 4279, 4308; 5626; 5906, 5914, 5938, 5948, 5953, 5982, 5996, 6001 | node path |
+| node paragraphs `Inactive_`, `InactiveJct_`, `InactiveFn_`, `Activation_`, `Termination_`, `Active_`, `Behaviour_`, `During_`, `Exiting_`, `Entering_`, `Interrupted_` `<node>` | Rule 52; junction, final, Rule 59, Rule 60 | 5076-5089; 5901-5917; 5933-5962; 5978-6021; 6038-6138 | node path |
+| `Trans_<nc>`, `Transc_<nc>`, `composeNodes_<nc>`, `ncCoreBehaviour_<nc>`, `ncBehaviour_<nc>` | Rules 53, 53-1, 52, 41, 40 | 5435, 5588, 5059/5123, 4338, 4253 | container path |
+| `machineBody_`, `stateful_`, `varMemory_`, `sharedVarMemory_`, `stm_` `<stm>` | Rules 29-2, 29, memory rules, top rule | 2571, 2559, 2648, 2733, 2503 | machine path |
+| paragraph and channel-set names `..._stmbd_<nc>`, `enterSS_in_stmbd_<nc>`, `enteredSS_in_stmbd_<nc>`, `sem__events_stm_<nc>` | `createchanParaNC` | 3555-3827 | container path |
+| `get_`, `set_`, `setL_`, `setR_` `<v>`, `Memory_<v>` for a variable declared directly in the machine | `createchanParaNC` 3582-3585, `Memory` 2751, C.2.2 4524-4602 | | `v.name`, which IS `<v>_<machine FQN>` after `FQNllLocalVariables` |
+
+**Names that do NOT follow the convention** (all of these exist for flat models already):
+
+| Name | Built in | Lines | What it is |
+|---|---|---|---|
+| event channels `<e>_in`, `<e>_out` | `createchanParaNC` Case 1; communications | 3698, 3699; 7097, 7189, 7203; 4762 | event name only. The version with `e.FQN()` is commented out; the comment at line 229 says event channels keep their names because connections match them |
+| trigger channels `<e>__in` | `createchanParaNC` Case 2; `renameTriggerEventsPairL`, `tevent_str`, `tevent`, `trigger` | 3717; 4745; 4916; 4936; 5855, 5879 | event name only, although the channel is typed with the NIDS of ONE container |
+| variables of an interface that the machine `uses`; required (shared) variables: `get_`, `set_`, `setL_`, `setR_`, `set_EXT_`, `sharedMemory_` `<v>` | `createchanParaNC` Cases 2 and shared; shared memory | 3607-3610, 3630; 2936-2961 | variable name only: `FQNllLocalVariables` renames only the variables of `variableList` of the machine |
+| variables of an operation definition | - | 231 | `FQNllLocalVariables` runs for `StateMachineDef` only |
+| `terminate`, `share`, `aviol`, `gviol` (and the abbreviation `SSTOP`) | line 211 and templates | | one global event each, by design (as `terminate` and `share__` in the CSP-M) |
+| theory names `HOLCSP_<baseName>_<timestamp>` | `CircusM2T.egx` | | the file name of the model, not an FQN |
+| lemma names `<z.version>_trans_core_ddlf` | `circusM2T_HOLCSP_trans_core.egl` 175, 204 | | not an FQN, one per theory |
+
+One place builds a wrong (not an unqualified) name: Rule 60, line 6067, `"interrupt_" + nc(self).FQN()`
+(Section 3.1, point 5).
+
+**The templates build no names.** They print the names of the Z model and recognise paragraphs and
+channels by PATTERNS on those names:
+
+| Template place | Pattern | Purpose |
+|---|---|---|
+| `circusM2T_HOLCSP.egl` 24-30; `..._trans_core.egl` 29-35 | free type whose name `startsWith("NIDS_")`; the last one becomes `NID_name` | the parameter type of every `Trans_`/`Transc_` |
+| `circusM2T_HOLCSP.egl` 200 | `startsWith("Trans_")` | Trans paragraphs first |
+| same, 207-215 | paragraphs starting with `Inactive_`, `InactiveJct_`, `InactiveFn_`; node = the text after the first `_` (i.e. the node FQN) | the list of nodes |
+| same, 219-229 | `name.contains(nd)` | the paragraphs of one node, as one `fixrec` |
+| same, 234-247 | list of prefixes | "all other paragraphs" |
+| same, 686 | product type whose first component `startsWith("NIDS_")` | a trigger channel is declared curried |
+| same, 716-733 | `endsWith("__in")`, `endsWith("_out")`, `endsWith("_in")`; paragraph `startsWith("event_channel_stmbd_")` | issue P: only the channels of used events are declared |
+
+`contains(nd)` is already unsound for a flat machine: a node whose name ends with the name of another
+node of the same container (`Wait` and `LongWait`) gets the other's paragraphs too
+(`Inactive_LongWait_M_P` contains `Wait_M_P`). No model used so far has such names.
+
+**Check against generated theories** (plugin 1.0.0.202611071400):
+
+- ex10 (`package ex10`, `stm stm3`, defined in the package): `NIDS_stm3_ex10`, `NID_s0_stm3_ex10`,
+  `enter_s0_stm3_ex10`, `entered_s0_stm3_ex10`, `interrupt_s0_stm3_ex10` (node, machine, package);
+  `interrupt_stm3_ex10`, `exit_stm3_ex10`, `exited_stm3_ex10`, `internal__stm3_ex10`,
+  `Trans_stm3_ex10`, `composeNodes_stm3_ex10`, `ncCoreBehaviour_stm3_ex10` (machine, package);
+  `get_v1_stm3_ex10`, `Memory_v1_stm3_ex10` (variable, machine, package). Not qualified: `a_in`,
+  `a_out`, `a__in` (typed `NIDS_stm3_ex10`), `terminate`, `share`.
+- Legitimate (`package Adaptation_Legitimate`, `stm Adaptation_Legitimate`):
+  `NIDS_Adaptation_Legitimate_Adaptation_Legitimate`,
+  `enter_PerformVerification_Adaptation_Legitimate_Adaptation_Legitimate`,
+  `get_candidateModel_Adaptation_Legitimate_Adaptation_Legitimate`; not qualified: `newModel_in`,
+  `newModel__in`, `verifyPlan__in`, `get_newModel_out`, ...
+- Adaptation_Plan (`package Adaptation_Plan`, `stm Adaptation_Plan`, composite `MakePlan`): no theory
+  can be generated; BY READING `RC!Node FQN()` (Case 3) and Rule 60: the composite node is
+  `MakePlan_Adaptation_Plan_Adaptation_Plan` (`enter_...`, `Inactive_...`), and its events as a node
+  of the machine are `exit_Adaptation_Plan_Adaptation_Plan`, `exited_Adaptation_Plan_Adaptation_Plan`.
+  An inner node is `CheckModel_MakePlan_Adaptation_Plan_Adaptation_Plan` (node, composite state,
+  machine, package); the inner level, with the state as the container, would get
+  `NIDS_MakePlan_Adaptation_Plan_Adaptation_Plan`, `internal__MakePlan_Adaptation_Plan_Adaptation_Plan`,
+  `exit_MakePlan_Adaptation_Plan_Adaptation_Plan`, `Trans_MakePlan_Adaptation_Plan_Adaptation_Plan`,
+  and its container interrupt `interrupt_MakePlan_Adaptation_Plan_Adaptation_Plan` is the same name
+  as the node interrupt of `MakePlan` (intended, Section 5.4). Not run: the rules fail before any
+  output (issue S).
+
 ## 4. What has to be added or changed
 
-### 4.1 One decision first: node identifiers and trigger channels per level
+### 4.1 Scheme A: every node container fully qualified
 
-The CSP-M declares, in the module of every container, its own `NIDS`, `internal__ : NIDS` and
-`e__ : NIDS.InOut...` for every event; Rule 40 of each level renames `e__.x` to `e`. Two ways to have
-this in one Isabelle theory:
+As asked by Fang (14 Nov 2026): per container, as the CSP-M, and every name fully qualified from the
+container up to the highest level, in the order and with the separator of the existing convention
+(Section 3.4): innermost first, `_` between levels, kind first. The alternative of the first version of
+these notes (one `NIDS` type for the whole machine) is not pursued.
 
-- **(A) per container**, as the CSP-M: `NIDS_<nc>` and `internal__<nc>` as now; the trigger channels of
-  a state container get the container in their name (`e__in_<S>`), those of the machine keep `e__in`.
-  Each level is then literally an instance of the flat construction, with its own type of node
-  identifiers, which is what the proofs want (one protocol instance and one family per level). Cost:
-  one more set of trigger channels per composite state; `renameTriggerEventsPairL/R` and `tevent_str`
-  take the container into account.
-- **(B) one `NIDS` for the whole machine** (all nodes of all levels) and the trigger channels declared
-  once. Fewer declarations and the templates' single `NID_name` stays, but every `Trans_<nc>` is then
-  defined on node identifiers of other levels too (vacuous cases in every proof by cases on the node),
-  and it departs from the modules of the CSP-M.
+A node container is the machine itself or a composite state. Write `<C>` for `C.FQN()`:
+`<stm>_<...>_<package>` for the machine, `<S>_<C'>` for a composite state S in the container C'
+(so `<S1>_<S>_<stm>_<package>` for a state nested in a state). For every container C:
 
-Recommendation: (A). For a flat machine both give exactly the present output. To be decided by Fang.
+| Object | Name | Status |
+|---|---|---|
+| type of node identifiers | `NIDS_<C>` | as now |
+| its constructors | `NID_<n>_<C>` for every node n directly in C | as now |
+| untriggered-transition channel | `internal__<C> : NIDS_<C>` | as now |
+| flow channels of the container | `interrupt_<C>`, `exit_<C>`, `exited_<C>` | as now |
+| flow channels of a node n of C | `enter_<n>_<C>`, `entered_<n>_<C>`, `interrupt_<n>_<C>` | as now |
+| trigger channel of an event e used as a trigger by a transition of C | `<e>_<C>__in : NIDS_<C>` (`NIDS_<C> × T` for an event of type T) | **changed**: now `<e>__in` |
+| processes | `Trans_<C>`, `Transc_<C>`, `composeNodes_<C>`, `ncCoreBehaviour_<C>`, `ncBehaviour_<C>`; node paragraphs `<Kind>_<n>_<C>` | as now |
+
+The interrupt of a composite state S as a node of C', `interrupt_<S>_<C'>`, and the container
+interrupt of S, `interrupt_<S>` with `<S>` = `<S>_<C'>`, are the same name. This is intended: it is the
+one event `S::interrupt` of the CSP-M (Section 5.4).
+
+The trigger channel is the only name that changes. Its form `<e>_<C>__in` puts the path between the
+event name and the suffix, as the commented-out `e.FQN() + "__in"` did, so the suffix tests of the
+templates (`endsWith("__in")`) keep working. Rule 40 of the container C renames `<e>_<C>__in.x` to the
+event channel `<e>_in` for every x in `NIDS_<C>`.
+
+**Consequence for flat models, to be accepted knowingly.** With the machine itself named like every
+other container, the trigger channels of a flat machine change too: ex10 `a__in` becomes
+`a_stm3_ex10__in`; Legitimate `newModel__in` becomes
+`newModel_Adaptation_Legitimate_Adaptation_Legitimate__in`. Nothing else in a flat theory changes.
+What depends on the old names:
+
+- the generated theories that proofs import unchanged (ex10 `..._07112026_141038.thy`, Legitimate
+  `..._07112026_141128.thy`, MakePlan `..._23092026_194718.thy`) stay valid as files; a NEWLY generated
+  theory has the new names, and the proof theories on top of it (model theories, `Gen_ex10`,
+  `Gen_Legitimate`: `sync_set`, `trigger_read_unfold`, the renaming relations, FDR scripts) have to be
+  updated when they move to a new generated file;
+- the IsaCircus output of flat models changes in the same names (Section 4.4), so Arjun has to be told.
+
+If this is not wanted now, the variant "state containers qualified, the machine keeps `<e>__in`"
+leaves all flat output unchanged, at the price of keeping the machine level outside the convention.
+
+**Not changed by this scheme, still outside the convention** (Section 3.4): the event channels `<e>_in`
+and `<e>_out` (matched by connections; qualifying them is a change of the controller and module rules
+as well), variables from used interfaces and required variables, variables of operations. They are
+independent of composite states; a composite state declares no variables and no events, so nothing new
+arises from them. To decide separately.
+
+**What each place needs:**
+
+| Place | Change |
+|---|---|
+| `createchanParaNC` (3538) | split into (1) the container part, for every container: `NIDS_<C>`, `internal__<C>`, the three flow channels, the node channels, the channel sets `enterSS_in_stmbd_<C>`, `enteredSS_in_stmbd_<C>`, and the trigger channels `<e>_<C>__in` for the events that the transitions of C use as triggers; (2) the machine part, once per machine: variable channels, shared-variable channels, event channels `<e>_in`/`<e>_out`, operation channels, `sem__events_stm_`. For a state as container only (1) is called; the events are found from the transitions, not from `self.events` (a State has none). For the machine, declaring the trigger channel only for events used as triggers of ITS transitions agrees with issue P (the template already drops unused ones) |
+| trigger channel, model-to-model | one helper, e.g. `triggerChan(e, nc) = e.name + "_" + nc.FQN() + "__in"`, used in `createchanParaNC` 3717, `renameTriggerEventsPairL` 4745 (with its container), `tevent_str` 4916, `tevent` 4936, `trigger` (Rule 55) 5855 and 5879 (`nc(t)`). `renameTriggerEventsPairR` (`<e>_in`) unchanged |
+| trigger channel, templates | `eventBase()` (716): the base of `<e>_<C>__in` is now `<e>_<C>`, not `<e>`, so issue P's filter must be told the relation (strip the known container FQNs, or let RC2Z record the event of each trigger channel in the paragraph name); `isNidsProduct` (686) unchanged (`startsWith("NIDS_")`) |
+| `NID_name` (templates, HOL-CSP 24-30, trans core 29-35) | remove. The type of `Trans_<C>`/`Transc_<C>` is printed from the parameter declaration of its `ParamAction`, which RC2Z already builds as `n : NIDS_<C>` (5432, 5586). All `NIDS_` free types are already printed as datatypes with their `discrete_cpo` instance (the loop is over all free types) |
+| `contains(nd)` (HOL-CSP 219-229) | select the paragraphs of a node by equality: name = one of the known kind prefixes + the node FQN. This also removes the flat unsoundness of Section 3.4. With composite states `contains` would in addition pull `Trans_<S>`, `composeNodes_<S>`, `ncCoreBehaviour_<S>`, `ncBehaviour_<S>` and every paragraph of every inner node into the group of S, since all of them contain `<S>` |
+| node list (HOL-CSP 207-215) and "other paragraphs" (234-247) | per container, innermost first (Section 4.3); `Trans_` no longer all at the top |
+| `machineBody` (2563) | unchanged (`interrupt_<stm>`, `enteredSS_in_stmbd_<stm>`) |
+| Rule 60 line 6067 | `"interrupt_" + self.FQN()` |
+| `RC!Node FQN()`, `RC!StateMachineDef FQN()` and the other FQN operations | unchanged; they already give the full path |
+| `nc(nd)` (4963, `eContainer()`), `nc(t)` (4948) | unchanged; they return the direct container, a state for an inner node or transition |
+| `FQNllLocalVariables` | unchanged (variables belong to the machine) |
+
+**Correspondence with the CSP-M of Adaptation_Plan.** The CSP-M nests modules: the module of a
+machine generated on its own is named `<package>_<stm>`, outermost first (here
+`module Adaptation_Plan_Adaptation_Plan`; for a machine `stm0` of a controller `contrl` in
+`Abstract_examples` the standalone file has `module contrl_stm0`, and the controller's file has
+`module stm0` inside `module contrl`), each node is a module inside the module of its container, and a name is referred to from outside as `Outer::Inner::name`. The Isabelle name is
+the same path read from the inside out, with `_`, the kind first:
+
+| CSP-M (module path :: name) | HOL-CSP name under scheme A |
+|---|---|
+| `Adaptation_Plan_Adaptation_Plan::NIDS`, constructor `NID_MakePlan` | `NIDS_Adaptation_Plan_Adaptation_Plan`, `NID_MakePlan_Adaptation_Plan_Adaptation_Plan` |
+| `...::MakePlan::NIDS`, constructor `NID_CheckModel` | `NIDS_MakePlan_Adaptation_Plan_Adaptation_Plan`, `NID_CheckModel_MakePlan_Adaptation_Plan_Adaptation_Plan` |
+| `...::internal__`, `...::MakePlan::internal__` | `internal__Adaptation_Plan_Adaptation_Plan`, `internal__MakePlan_Adaptation_Plan_Adaptation_Plan` |
+| `...::MakePlan::enter`, `::entered` | `enter_MakePlan_Adaptation_Plan_Adaptation_Plan`, `entered_...` |
+| `...::MakePlan::CheckModel::enter`, `::entered`, `::interrupt` | `enter_CheckModel_MakePlan_Adaptation_Plan_Adaptation_Plan`, `entered_...`, `interrupt_...` |
+| `...::MakePlan::interrupt` (interrupt of the node MakePlan and of the inner level) | `interrupt_MakePlan_Adaptation_Plan_Adaptation_Plan` |
+| `...::interrupt` (machine level) | `interrupt_Adaptation_Plan_Adaptation_Plan` |
+| `...::requestPlan__ : NIDS.InOut` (machine module) | `requestPlan_Adaptation_Plan_Adaptation_Plan__in` |
+| `...::MakePlan::requestPlan__ : NIDS.InOut` (redeclared in the module of MakePlan with its NIDS) | `requestPlan_MakePlan_Adaptation_Plan_Adaptation_Plan__in`, declared only if a transition inside MakePlan has this trigger (it has none: the inner transitions have no trigger) |
+| `...::requestPlan : InOut` | `requestPlan_in`, `requestPlan_out` (unchanged, see above) |
+| `exit`, `exited` (ONE channel each, declared in the machine module, used at every level) | `exit_Adaptation_Plan_Adaptation_Plan`, `exited_...` at the machine level; `exit_MakePlan_Adaptation_Plan_Adaptation_Plan`, `exited_...` inside MakePlan |
+| `terminate`, `share__` | `terminate`, `share` |
+| `set_x`, `setL_x`, `setR_x`, `get_x` (machine module) | `set_x_Adaptation_Plan_Adaptation_Plan`, ... for variables declared in the machine; bare `set_x` for variables of used interfaces (outside the convention, Section 3.4) |
+
+Differences that are not only spelling: (1) the CSP-M declares the trigger channels of ALL events in
+every container module, the scheme only those used there (issue P, same behaviour); (2) the CSP-M has
+one `exit` and one `exited` for all levels and hides them per level, the generator has one pair per
+container, hidden at the same places (same behaviour; with separate names the inner pair cannot be
+confused with the outer one in the proofs); (3) the CSP-M `InOut` argument is the suffix `_in`/`_out`.
 
 ### 4.2 Model-to-model (`RC2Z.eol`)
 
 | Rule | Change |
 |---|---|
-| `createchanParaNC` | split: the part for a container (NIDS, `internal__`, flow channels, and with (A) the trigger channels of the events used by the container's transitions) and the part for the machine (variables, events, operations), called once. For a state the variables and events are those of the enclosing machine (walk up `eContainer()`) |
-| Rule 40 `ncBehaviour(nc)` | works for a state once `createchanParaNC` is split; hide set and trigger renaming unchanged (with (A): the channels of this container) |
+| `createchanParaNC` | split: the part for a container (NIDS, `internal__`, flow channels, node channels, and the trigger channels of the events used by the container's transitions; details in 4.1) and the part for the machine (variables, events, operations), called once. For a state the variables and events are those of the enclosing machine (walk up `eContainer()`) |
+| Rule 40 `ncBehaviour(nc)` | works for a state once `createchanParaNC` is split; hide set unchanged; the trigger renaming uses the trigger channels of this container (4.1) |
 | Rule 52 `composeNodes` | add `"Inactive_" + nd.FQN()` for a composite state |
 | Rule 60 | rewrite `Behaviour` and `During` (Section 5); fix the nine points of 3.1 |
 | new `createRunAction(Set<String>)` | `CallAction` `RUN` with the set of events |
@@ -206,7 +387,8 @@ Recommendation: (A). For a flat machine both give exactly the present output. To
 | `RC!Node FQN()` | unchanged (it finds the parent of an inner node by a search over all nodes) |
 
 Requirement on the change: for a model without composite states the Z model, and so all three generated
-theories, must be unchanged (regression on ex10, ex12, MakePlan, Legitimate with `dev-tools`).
+theories, must be unchanged EXCEPT for the trigger channel names of Section 4.1 (regression on ex10, ex12,
+MakePlan, Legitimate with `dev-tools`: compare after renaming the trigger channels).
 
 ### 4.3 Model-to-text (HOL-CSP templates)
 
@@ -229,11 +411,12 @@ the outer one.
 `circusM2T.egl` (IsaCircus / CyPhyCircus, used by Arjun for test generation) runs on the SAME Z model
 and prints every action paragraph in order, without selection by name.
 
-- Flat models: no change, provided the Z model of a flat machine is unchanged (the requirement of 4.2).
+- Flat models: with scheme A the trigger channel names change (`a__in` to `a_stm3_ex10__in`,
+  Section 4.1) and nothing else; with the variant that leaves the machine level as it is, no change.
   The split of `createchanParaNC` must keep the order of the channel paragraphs for this reason.
 - Models with composite states: today RC2Z fails, so there is no IsaCircus output at all. After the
   change the output would contain the new paragraphs, with a hiding (`\<Zhide>`), an interleaving, a
-  call `RUN(...)` and, with (A), the additional trigger channels. Whether IsaCircus accepts these
+  call `RUN(...)` and the trigger channels of the inner containers. Whether IsaCircus accepts these
   (in particular a `RUN` action and the hiding inside a basic process) is NOT known and was not
   tested; the HOL-CSP-specific choices of 4.3 (definitions before `fixrec`, `|||`) are in the HOL-CSP
   templates only and do not touch it.
@@ -361,10 +544,12 @@ refused. The new paragraphs keep this: both waiting points of `During_S` are und
 
 1. Fang generates the CSP-M of c1 to c6 in RoboTool; compare with Section 5 (and with the generator
    source when available).
-2. Decide 4.1.
+2. Scheme A (4.1); to confirm: whether the machine level is renamed now (flat output changes)
+   or only the state containers.
 3. M2M: split `createchanParaNC`, fix Rule 52, rewrite Rule 60, `createRunAction`; regression: the Z
    model of the flat models unchanged.
 4. M2T: grouping and order per container, parameter type of Trans, definitions for `Behaviour` and
    `During`, `|||`, `RUN`; first target: the generated theory of c1 loads in Isabelle.
 5. c2 to c6 one at a time; then Adaptation_Plan.
-6. Before a merge into `main`: IsaCircus output of the flat models unchanged; tell Arjun.
+6. Before a merge into `main`: IsaCircus output of the flat models compared (unchanged except the names
+   of 4.1); tell Arjun.
