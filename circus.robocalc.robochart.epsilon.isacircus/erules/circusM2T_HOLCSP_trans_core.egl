@@ -8,6 +8,12 @@ Generator conventions for printing the HOL-CSP theory, not rules of the manual:
 (2) the event of a trigger channel <e>_<FQN of the container>__in (RC2Z.eol, triggerChan) is found from the
     declaration of the channel (triggerChanBases, eventBase), for the filter of issue P.
 *]
+[*15 Nov 2026, branch composite-states (Fang)
+Composite states: Rule 53-1 gives one Transc paragraph per node container. Generator convention, not a rule
+of the manual: with several containers the names of the two lemmas of a Transc paragraph carry the FQN of
+its container (lemmaSuffix); for a machine without composite states the names are unchanged.
+Interleaving is printed as |||.
+*]
 [*This template generates the "Trans core" theory: only Transc_<nc> and the lemma
   deadlock_free (\<sqinter> n \<in> UNIV. Transc_<nc>\<cdot>n).
   Transc is Trans without the always-enabled branches (share, interrupt, terminate), so this lemma
@@ -512,6 +518,7 @@ end
 [*suppose there is only one parameter for iteration*]
 
 [%operation Z!InterleaveAction parseInterleaveAction(): String{
+	//15 Nov 2026 (kept the same as in circusM2T_HOLCSP.egl; Transc contains no interleaving):
 	//HOL-CSP writes interleaving P ||| Q (Inter_syntax in Synchronization_Product.thy); \<interleave> is not its notation
 	return  "(" + self.leftAction.parseAction() + " ||| " +	self.rightAction.parseAction() + ")";
 }%]
@@ -719,7 +726,8 @@ operation triggerChanBases(): Map{
 [%operation Z!ActionPara paramType(): String{
 	return self.circusAction.declList.decls.at(0).expr.parseExpr();
 }%]
-[*With composite states there is one Transc paragraph per node container, each with its two lemmas. The lemma
+[*Generator convention, not a rule of the manual (15 Nov 2026).
+  With composite states there is one Transc paragraph per node container, each with its two lemmas. The lemma
   names of a machine without composite states are unchanged (<version>_trans_core_ddlf); with several
   containers the FQN of the container is added.*]
 [%operation Z!ActionPara lemmaSuffix(): String{

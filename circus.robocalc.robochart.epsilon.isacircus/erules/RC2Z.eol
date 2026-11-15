@@ -92,6 +92,21 @@ Rule 55 (trigger).
 Templates (circusM2T_HOLCSP.egl, circusM2T_HOLCSP_trans_core.egl): the paragraphs of a node are selected by
 exact match instead of contains(nd); eventBase() finds the event of a trigger channel from the declaration
 of the channel; NID_name removed, the type of Trans is printed from its parameter declaration.
+
+15 Nov 2026, branch composite-states (Fang)
+Composite states. Implemented as RoboTool's CSP-M writes them (CSP generator 3.1.0.202608041330; read from
+the CSP-M of the test models c1 to c6 and of Adaptation_Plan), where this differs from the manual it is
+said at the rule.
+Rule 52 (composeNodes): the composite node is added to the composition.
+Rule 60 (createCompositeStateAsActionParas): Behaviour (Rule 40 with the state as node container, During,
+the two-sided write synchronisation over all variables of the machine, hiding of enteredSS and terminate),
+During, RunEntered; the interrupt of the state instead of the interrupt of its container.
+Channel declarations (createchanParaNC, not covered by the manual): split into the part of a node container
+and the part of the machine. Generator convention.
+Rules 47, 49, 50 (vars; called through Rule 48 for a composite state, never reached before): three
+corrections (result set not instantiated; guard of a transition; left-hand side of an indexed assignment).
+Templates: paragraphs printed container by container, innermost first; interleaving as |||; Trans core:
+lemma names with the container when there are several.
 ******************************/
 
 
@@ -3555,6 +3570,8 @@ operation RC!RCModule FQN(): String{
 //channel decleration and channelset declaration for node container (NC)
 operation RC!NodeContainer createchanParaNC()  {
 
+	//Generator convention, not a rule of the manual (15 Nov 2026): the manual does not cover channel
+	//declarations; RoboTool's CSP-M declares the channels of a node container in the module of that container.
 	//A node container is the state machine (or operation) itself or a composite state. The container part
 	//(NIDS, internal__, flow channels, trigger channels, node channels, the enter/entered channel sets) is
 	//declared for every container; the machine part (variables, shared variables, event channels, operation
@@ -3588,6 +3605,8 @@ operation RC!NodeContainer createchanParaNC()  {
 
 	
 	//2. Flow channel: interrupt, exited, exit, terminate
+	//As RoboTool's CSP-M (S::interrupt is the interrupt of the node S and of the level inside S; Rule 41 with
+	//nc = S renames the inner node interrupts to it, Rule 53 uses it in the interrupt branch of Trans).
 	//For a composite state the container interrupt interrupt_<state> is the same event as the interrupt of the
 	//state as a node of its own container, which the parent container declares with the node channels
 	//(enter_, entered_, interrupt_); it is not declared a second time here.
@@ -3725,7 +3744,9 @@ operation RC!NodeContainer createchanParaNC()  {
 			stm_events = stm_events.includingAll(defined_interface.events);
 		}
 	} else {
-		//composite state: only trigger channels, for the events that its own transitions use as triggers
+		//composite state: only trigger channels, for the events that its own transitions use as triggers.
+		//Generator convention: the CSP-M redeclares e__ for ALL events in the module of every container;
+		//channels that no transition of the container uses cannot occur (as issue P for the machine)
 		stm_events = new Sequence;
 		for(t in self.transitions.select(l|l.trigger.isDefined())){
 			if(not stm_events.includes(t.trigger.event)){
@@ -4374,6 +4395,11 @@ operation ncCoreBehaviour(nc: RC!NodeContainer): Z!ActionPara{
 	
 	/***************begin of C.2.2 metanotatin************************/
 	
+	//Rule 41 with Definition C.2.2. KNOWN DIFFERENCE from RoboTool's CSP-M (D2), kept, also when nc is a
+	//composite state: here setL_v is used for the variables of vars(nc.nodes) that the guards read
+	//(pw /\ qr) and there is no setR (qw = {}); the CSP-M uses setL_v for EVERY variable read by a guard of
+	//the container's transitions (also one that no node writes, e.g. v1 of ex10) and setR_v for a variable
+	//bound by a trigger parameter. Checked with FDR on Legitimate (flat): no effect on the behaviour.
 	var ncCoreBehaviour = createMetaParallelAction(nc, 
 												  composedNodeActionTidsRenamed, 
 												  vars(nc.nodes), 
@@ -4416,6 +4442,7 @@ operation vars(nodeset:Set<RC!Node>): Set<String>{
 //CSP Rule 47
 operation vars(ts: Set<RC!Transition>):Set<String>{
 	"Rule 47 is called".println();
+	//Rule 47, corrected 15 Nov 2026 (correction 1 of 3 in Rules 47, 49, 50; no change for flat machines).
 	//an instance, not the type: with the type, a container whose transitions use no variable returned a
 	//collection type instead of a set (met with composite states, where Rule 48 calls this rule)
 	var varset = new Set<String>;
@@ -4449,6 +4476,7 @@ operation vars(t: RC!Transition):Set<String>{
 	"Rule 49 is called".println();
 	var varset = new Set<String>;
 	if(t.condition.isDefined()){
+		//Rule 49, corrected 15 Nov 2026 (correction 2 of 3).
 		//the condition is an expression: there is no vars rule for expressions (Rule 50 is for statements);
 		//its variables are those of Rule 45. Reached only through a composite state (Rule 48).
 		varset = varset.includingAll(usedVariablesInExpr(t.condition, nc(t)));
@@ -4472,6 +4500,7 @@ operation vars(stmt: RC!Statement):Set<String>{
 //		varset = usedVariables(stmt.left).includingAll(usedVariables(stmt.right));
 //		THIS line above nc(stmt.left.name) is commented out, because usedVariables (Rule 45) does not cover VarRef, a subclass of Assignable
 		
+		//Rule 50, corrected 15 Nov 2026 (correction 3 of 3).
 		//rootVarName: the variable of the left-hand side, also for an indexed one (x[i] = e), where
 		//stmt.left.name does not exist (met on Adaptation_Plan through a composite state)
 		varset = Set{stmt.left.rootVarName() }.includingAll(usedVariablesInExpr(stmt.right, nc(stmt)));
@@ -5167,6 +5196,9 @@ operation composeNodes(nodes: Set<Node>, nc: RC!NodeContainer): Z!ActionPara{
 //					ndProcSet.add(nd.createSimpleStateAsBasicProcess());
 				} else{
 					nd.createCompositeStateAsActionParas();
+					//Rule 52: composeNodes composes ALL nodes of the container on {share, terminate}; the
+					//node of a composite state is its paragraph Inactive_<state> (Rule 60). Before 15 Nov 2026
+					//the name was not added, so the composite node was missing from the composition.
 					//the composite node takes part in the composition as every other node
 					ndActionNameSet.add("Inactive_"+nd.FQN());
 				}
@@ -6106,7 +6138,13 @@ operation RC!State createSimpleStateAsActionParas() {
 }
 
 
-//Rule 60
+//Rule 60, implemented as RoboTool's CSP-M writes a composite state (15 Nov 2026; before, a draft that did
+//not run). Inactive, Activation, Termination, Active and Exiting are those of a simple state (Rule 59).
+//Differences from the manual, as for Rule 59: exit and exited are offered under SStop
+//((SSTOP /\ (exited -> Skip)) ; Inactive; the manual has exited -> Inactive), see the comment at Exiting.
+//Behaviour: the write synchronisation uses all variables of the machine on both sides, as the CSP-M, not
+//the sets of Definition C.2.2 (see createTwoSidedWriteSync). RunEntered is RUN(enteredSS) of the manual and
+//of the CSP-M, written as a recursive paragraph (generator convention).
 operation RC!State createCompositeStateAsActionParas(){
 	
 	
@@ -6243,6 +6281,7 @@ operation RC!State createCompositeStateAsActionParas(){
 }
 
 
+//Auxiliary of Rule 60 (generator convention, not a rule of the manual).
 //The machine (state machine or operation) that a node container belongs to: the container itself, or the
 //enclosing machine of a composite state.
 operation machineOf(nc: RC!NodeContainer): RC!NodeContainer{
@@ -6253,6 +6292,7 @@ operation machineOf(nc: RC!NodeContainer): RC!NodeContainer{
 	return c;
 }
 
+//Auxiliary of Rule 60 (Behaviour).
 //The names of the variables declared in the machine of nc: those for which createchanParaNC declares the
 //channels get_, set_, setL_, setR_ (variables of the machine itself and of the interfaces it uses). After
 //the FQN pre-processing v.name is already the qualified name.
@@ -6274,6 +6314,11 @@ operation machineVarNames(nc: RC!NodeContainer): Sequence<String>{
 	return names;
 }
 
+//Rule 60 (Behaviour), Definition C.2.2 in its two-sided form. DIFFERENT FROM Definition C.2.2: the sets are
+//not the intersections of the variables read and written by the two sides; as in RoboTool's CSP-M, ALL
+//variables of the machine are used on both sides (c5: also for a composite state that uses no variable).
+//Reason for following the CSP-M: During is not under SStop at its prefix entered_<state>; with smaller
+//sets a write of the inner machine at that moment would not be synchronised with During.
 //The two-sided write synchronisation of Behaviour of a composite state (Rule 60), as RoboTool's CSP-M
 //writes it:
 //  ( P [share -> share, setR_v...] [set_v -> setL_v...]  [| cs, share, setL_v..., setR_v... |]

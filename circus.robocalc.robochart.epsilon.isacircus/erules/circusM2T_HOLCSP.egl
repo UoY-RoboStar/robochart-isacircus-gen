@@ -10,6 +10,14 @@ Generator conventions for printing the HOL-CSP theory, not rules of the manual:
 (3) the event of a trigger channel <e>_<FQN of the container>__in (RC2Z.eol, triggerChan) is found from the
     declaration of the channel (triggerChanBases, eventBase), for the filter of issue P.
 *]
+[*15 Nov 2026, branch composite-states (Fang)
+Composite states (RC2Z.eol, Rules 52 and 60). Generator conventions for printing, not rules of the manual:
+(1) the action paragraphs are printed container by container, innermost first (containerDepth), because the
+    node of a composite state refers to ncBehaviour of its inner level (Rule 40 with the state as container);
+(2) RunEntered, During and Behaviour of a composite state are printed as separate fixrecs before the fixrec
+    of the node (isCompositePart), so that fixrec has no continuity obligation for Behaviour;
+(3) interleaving is printed as ||| (the notation of HOL-CSP).
+*]
 theory HOLCSP_[%=baseName%]_[%=ts%]
 	imports "RC_HOL-CSP.RoboChart_Library" HOL.Real
 begin
@@ -210,7 +218,9 @@ where
 	[%=actpara.circusAction.parseAction()%] \<close>
 [%}%]
 
-[%//Node containers and their nodes, from the NIDS free types: NIDS_<container FQN> has one constructor
+[%//Generator convention, not a rule of the manual (15 Nov 2026): the order in which the paragraphs of
+//Rules 40, 41, 52 and 56 to 60 are printed. Isabelle needs a constant to be defined before it is used.
+//Node containers and their nodes, from the NIDS free types: NIDS_<container FQN> has one constructor
 //NID_<node FQN> per node of the container. A composite state is a node of its container and a container
 //itself. The paragraphs are printed container by container, innermost first, because the node of a
 //composite state refers to the behaviour of its inner level (ncBehaviour_<state>).
@@ -595,6 +605,7 @@ end
 [*suppose there is only one parameter for iteration*]
 
 [%operation Z!InterleaveAction parseInterleaveAction(): String{
+	//Rule 60 (During) is the first rule that produces an interleaving of actions. 15 Nov 2026:
 	//HOL-CSP writes interleaving P ||| Q (Inter_syntax in Synchronization_Product.thy); \<interleave> is not its notation
 	return  "(" + self.leftAction.parseAction() + " ||| " +	self.rightAction.parseAction() + ")";
 }%]
@@ -808,7 +819,8 @@ operation triggerChanBases(): Map{
   14 Nov 2026 the test was name.contains(nd), which also selected the paragraphs of a node whose name ends with
   the name of another node (Inactive_LongWait_M_P contains Wait_M_P), and would select everything inside a
   composite state.*]
-[*Depth of a node container: 0 for the machine, 1 for a composite state of the machine, ... A container is a
+[*Generator convention, not a rule of the manual (15 Nov 2026).
+  Depth of a node container: 0 for the machine, 1 for a composite state of the machine, ... A container is a
   node of its parent container (its FQN is a constructor of the parent's NIDS type).*]
 [%operation String containerDepth(nidsMap: Map): Integer{
 	for(p in nidsMap.keySet()){
@@ -818,7 +830,9 @@ operation triggerChanBases(): Map{
 	}
 	return 0;
 }%]
-[*Behaviour_<nd> and During_<nd> of a composite state nd are printed apart from the fixrec group of the node.*]
+[*Generator convention, not a rule of the manual (15 Nov 2026): Rule 60 gives Behaviour and During as
+  paragraphs of the node; they are not recursive with its frame.
+  Behaviour_<nd> and During_<nd> of a composite state nd are printed apart from the fixrec group of the node.*]
 [%operation String isCompositePart(nd: String, nidsMap: Map): Boolean{
 	return nidsMap.containsKey(nd) and (self = "Behaviour_" + nd or self = "During_" + nd);
 }%]
