@@ -116,6 +116,13 @@ Rule 45 (usedVariables of an expression; usedVariablesInExpr, usedVariablesInExp
 treated explicitly, the variables of the values of its declarations and of its body (generator issue X).
 Before, a variable occurring only in the value of a let was not read before the action (Rule 62, readState)
 and was free in the generated equation. Changes the output of models with let (flat MakePlan).
+
+15 Nov 2026, branch composite-states (Fang)
+User-defined types of imported packages (generator issue W; completes issue C, 25e7662): createTypeDeclPara
+translates the types of the selected file's package and the types of other non-toolkit packages reachable
+from the selected file (typeDeclsToTranslate), dependencies first. Names are not qualified; a clash of two
+type names stops the generation with an error. Changes the output of models that use types of an imported
+package (dti/enriched: Legitimate, Adaptation_Plan).
 ******************************/
 
 
@@ -405,9 +412,14 @@ datatype GasSensor {
 }
 enumeration Angle { Left Right Back Front }
 */
+//Translation of the user-defined types (records, enumerations, primitive types).
+//15 Nov 2026 (generator issue W): not only pkg.types (the package of the selected file) but also the types
+//of imported packages that the selected file reaches (typeDeclsToTranslate). This completes issue C
+//(25e7662, RctLoader): since then the files of the imported packages are loaded and their references
+//resolve, but RC!X.all() still sees only the selected file, so these types were never translated.
 operation createTypeDeclPara(pkg:RC!RCPackage){
 
-	for(tp in pkg.types){
+	for(tp in typeDeclsToTranslate(pkg)){
 	
 		if(tp.instanceOf(RC!PrimitiveType)){
 			var givenPara = new Z!GivenPara;
@@ -440,6 +452,97 @@ operation createTypeDeclPara(pkg:RC!RCPackage){
 	}
 }
 
+
+//Generator convention, not a rule of the manual (15 Nov 2026, generator issue W). The type declarations to
+//translate: the types of pkg and the types of other packages (not the toolkits) that are reachable from the
+//selected file, i.e. reached by following the references of its objects and of the objects reached
+//(an interface it uses, the events of that interface, the record types of their types, the field types of
+//those records, ...). Order: dependencies first (Isabelle needs a record declared before a record that uses
+//it); otherwise the order of pkg.types, then the order in which the imported types were reached. With no
+//imported type the result is pkg.types in its own order, so models without imported types are unchanged.
+//The names of imported types are NOT qualified (to keep the existing output); two translated types with
+//the same name stop the generation with an error naming both packages.
+operation typeDeclsToTranslate(pkg: RC!RCPackage): Sequence{
+	var toolkits = Set{"relation_toolkit", "function_toolkit", "sequence_toolkit", "set_toolkit", "core"};
+	var imported = new Sequence;
+	var visited = new Set;
+	var queue = new Sequence;
+	for(o in RC.allContents()){ visited.add(o); queue.add(o); }
+	var i = 0;
+	while(i < queue.size()){
+		var o = queue.at(i);
+		i = i + 1;
+		var op = packageOf(o);
+		if(op.isDefined() and toolkits.includes(op.name)){
+			continue;
+		}
+		if(o.isKindOf(RC!TypeDecl) and op.isDefined() and op <> pkg and not imported.includes(o)){
+			imported.add(o);
+		}
+		var next = new Sequence;
+		next.addAll(o.eContents());
+		for(ref in o.eClass().getEAllReferences()){
+			if(not ref.isContainment() and not ref.isContainer() and not ref.isDerived() and not ref.isTransient()){
+				var v = o.eGet(ref);
+				if(ref.isMany()){
+					next.addAll(v);
+				} else if(v.isDefined()){
+					next.add(v);
+				}
+			}
+		}
+		for(t in next){
+			if(not visited.includes(t)){
+				visited.add(t);
+				queue.add(t);
+			}
+		}
+	}
+	var candidates = new Sequence;
+	candidates.addAll(pkg.types);
+	candidates.addAll(imported);
+	//name clash: imported type names are not qualified
+	var byName = new Map;
+	for(t in candidates){
+		if(byName.containsKey(t.name) and byName.get(t.name) <> t){
+			throw "Type name clash (generator issue W): type " + t.name + " is declared in package "
+				+ packageOf(byName.get(t.name)).name + " and in package " + packageOf(t).name
+				+ "; types of imported packages are not qualified, so the theory would declare it twice. "
+				+ "No theory is generated.";
+		}
+		byName.put(t.name, t);
+	}
+	//dependencies first, otherwise the order of candidates
+	var ordered = new Sequence;
+	var started = new Set;
+	for(t in candidates){
+		addTypeDeclWithDependencies(t, candidates, ordered, started);
+	}
+	return ordered;
+}
+
+//auxiliary of typeDeclsToTranslate: t after the types of candidates that its contents refer to
+operation addTypeDeclWithDependencies(t: Any, candidates: Sequence, ordered: Sequence, started: Set){
+	if(started.includes(t)){
+		return;
+	}
+	started.add(t);
+	for(c in t.eAllContents()){
+		if(c.isKindOf(RC!TypeRef) and candidates.includes(c.ref)){
+			addTypeDeclWithDependencies(c.ref, candidates, ordered, started);
+		}
+	}
+	ordered.add(t);
+}
+
+//auxiliary of typeDeclsToTranslate: the package that contains o (null if none)
+operation packageOf(o: Any): Any{
+	var c = o;
+	while(c.isDefined() and not c.isKindOf(RC!RCPackage)){
+		c = c.eContainer();
+	}
+	return c;
+}
 
 operation RC!RecordType createConstDecl(): Z!ConstDecl{
 	var constDecl = new Z!ConstDecl;

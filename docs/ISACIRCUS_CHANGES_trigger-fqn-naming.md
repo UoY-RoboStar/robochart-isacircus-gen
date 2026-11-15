@@ -48,3 +48,33 @@ strings are involved. No line-by-line identical pair could therefore be produced
 
 Not checked: whether the new IsaCircus theories are accepted by IsaCircus (the old ones were not
 checked here either); models other than these two; models with controllers or modules.
+
+## Branch composite-states: types of imported packages (generator issue W, 15 Nov 2026)
+
+`RC2Z.eol` now also translates the record, enumeration and primitive types of imported packages (not
+the toolkits) that the selected file reaches, dependencies first; before, only the types of the
+selected file's package were translated, although the imported files were loaded (issue C). The
+names are not qualified; two types of the same name stop the generation with an error.
+
+Effect on the IsaCircus output: lines are ADDED, none removed or changed. Checked on ex10,
+Legitimate, c1 to c6 and the flat MakePlan (dev-tools, before and after): only Legitimate
+(`dti/enriched/Adaptation_Legitimate.rct`, which imports `Types`) changes, by 13 lines, the
+declarations of the three records it reaches:
+
+    record EstimatedPosition =
+    	topLeft :: "(nat\<times>nat)"
+    	bottomRight :: "(nat\<times>nat)"
+    	confidence :: "real"
+    record ImageData =
+    	pixels :: "(((nat\<times>nat\<times>nat) list) list)"
+    	height :: "nat"
+    	width :: "nat"
+    record ScrewImageData =
+    	position :: "(real\<times>real\<times>real)"
+    	orientation :: "(real\<times>real\<times>real)"
+    	image :: "ImageData"
+    	screwsDetected :: "(EstimatedPosition list)"
+
+Before, the IsaCircus theory of Legitimate used `ScrewImageData` in its event channel declarations
+without declaring it. Any model whose state machine uses types declared in another file changes in
+the same way. Not checked: whether IsaCircus accepts the new theory.
