@@ -83,8 +83,10 @@ Change record (most recent last). Each entry: date, branch, summary, rules conce
 14-15 Nov 2026, branch trigger-fqn-naming (Fang)
 Trigger channels are named with the fully qualified name of their node container:
 <e>_<FQN of the container>__in instead of <e>__in (operation triggerChan).
-Generator convention, not a rule of the manual: the manual and the CSP-M declare the channel e__ in the
-module of each container; in one Isabelle theory the path of the container has to be part of the name.
+Generator convention, not a rule of the manual: the manual (Rules 42, 43, 55) writes the event
+eventId(e).id(source) and does not say how the channel is declared; RoboTool's CSP-M names the channel e__
+and declares it in the module of each container. In one Isabelle theory the path of the container has to
+be part of the name.
 The event channels <e>_in / <e>_out are deliberately not qualified (connections match them by name).
 Rules concerned: channel declarations (createchanParaNC, not covered by the manual), Rule 41 (tidsR and
 transSync, through tevent_str), Rule 42 (renameTriggerEventsPairL), Rule 43 (tevent_str, tevent),
@@ -4744,9 +4746,10 @@ operation setRC(nameset: Set<String>):Set<String>{
 
 
 //Generator convention, not a rule of the manual (14 Nov 2026).
-//The manual (Rules 42, 43, 55) and RoboTool's CSP-M write the trigger channel e__ and declare it in the
-//module of each node container; here all channels are constructors of one Isabelle datatype, so the path
-//of the container is part of the name.
+//The manual (Rules 42, 43, 55) writes the trigger event eventId(e).id(source)[.in]; it does not name or
+//declare the channel. RoboTool's CSP-M names the channel e__ and declares it in the module of each node
+//container. Here all channels are constructors of one Isabelle datatype, so the path of the container is
+//part of the name.
 //Name of the trigger channel of event e in the node container nc: <e>_<FQN of nc>__in.
 //The channel is typed with the node identifiers of ONE container (NIDS_<FQN of nc>), so its name carries the
 //full path of that container, innermost first, as every other name built from an FQN. Before 14 Nov 2026 it
