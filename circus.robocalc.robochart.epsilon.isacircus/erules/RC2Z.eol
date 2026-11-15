@@ -102,7 +102,8 @@ said at the rule.
 Rule 52 (composeNodes): the composite node is added to the composition.
 Rule 60 (createCompositeStateAsActionParas): Behaviour (Rule 40 with the state as node container, During,
 the two-sided write synchronisation over all variables of the machine, hiding of enteredSS and terminate),
-During, RunEntered; the interrupt of the state instead of the interrupt of its container.
+During, RunEntered; the interrupt of the state instead of the interrupt of its container. Checked against
+Rule 60 of the manual: four differences, all following the CSP-M, listed at the rule.
 Channel declarations (createchanParaNC, not covered by the manual): split into the part of a node container
 and the part of the machine. Generator convention.
 Rules 47, 49, 50 (vars; called through Rule 48 for a composite state, never reached before): three
@@ -4397,9 +4398,11 @@ operation ncCoreBehaviour(nc: RC!NodeContainer): Z!ActionPara{
 	
 	/***************begin of C.2.2 metanotatin************************/
 	
-	//Rule 41 with Definition C.2.2. KNOWN DIFFERENCE from RoboTool's CSP-M (D2), kept, also when nc is a
-	//composite state: here setL_v is used for the variables of vars(nc.nodes) that the guards read
-	//(pw /\ qr) and there is no setR (qw = {}); the CSP-M uses setL_v for EVERY variable read by a guard of
+	//Rule 41 with Definition C.2.2, AS THE MANUAL: |[vars(nc.nodes) | flowevts, transSync(nc), end |
+	//vtguards(nc) : {}]|, i.e. pr = pw = vars(nc.nodes), qr = vtguards(nc), qw = {} (the manual explains
+	//why the transitions are taken to write nothing in parallel). So setL_v is used for the variables of
+	//vars(nc.nodes) that the guards read (pw /\ qr), and there is no setR. KNOWN DIFFERENCE from RoboTool's
+	//CSP-M (D2), kept, also when nc is a composite state: the CSP-M uses setL_v for EVERY variable read by a guard of
 	//the container's transitions (also one that no node writes, e.g. v1 of ex10) and setR_v for a variable
 	//bound by a trigger parameter. Checked with FDR on Legitimate (flat): no effect on the behaviour.
 	var ncCoreBehaviour = createMetaParallelAction(nc, 
@@ -4479,6 +4482,9 @@ operation vars(t: RC!Transition):Set<String>{
 	var varset = new Set<String>;
 	if(t.condition.isDefined()){
 		//Rule 49, corrected 15 Nov 2026 (correction 2 of 3).
+		//The manual writes vars(t.condition) u vars(t.action) u vars(t.deadline), but gives vars only for
+		//nodes, transitions and statements (Rules 46 to 51); for the condition, an expression, the function
+		//is usedVariables (Rule 45), as vtguards of Rule 41 uses it.
 		//the condition is an expression: there is no vars rule for expressions (Rule 50 is for statements);
 		//its variables are those of Rule 45. Reached only through a composite state (Rule 48).
 		varset = varset.includingAll(usedVariablesInExpr(t.condition, nc(t)));
@@ -4502,7 +4508,8 @@ operation vars(stmt: RC!Statement):Set<String>{
 //		varset = usedVariables(stmt.left).includingAll(usedVariables(stmt.right));
 //		THIS line above nc(stmt.left.name) is commented out, because usedVariables (Rule 45) does not cover VarRef, a subclass of Assignable
 		
-		//Rule 50, corrected 15 Nov 2026 (correction 3 of 3).
+		//Rule 50, corrected 15 Nov 2026 (correction 3 of 3). The manual has usedVariables(s.left) u
+		//usedVariables(s.right) for an assignment.
 		//rootVarName: the variable of the left-hand side, also for an indexed one (x[i] = e), where
 		//stmt.left.name does not exist (met on Adaptation_Plan through a composite state)
 		varset = Set{stmt.left.rootVarName() }.includingAll(usedVariablesInExpr(stmt.right, nc(stmt)));
@@ -6143,11 +6150,23 @@ operation RC!State createSimpleStateAsActionParas() {
 
 //Rule 60, implemented as RoboTool's CSP-M writes a composite state (15 Nov 2026; before, a draft that did
 //not run). Inactive, Activation, Termination, Active and Exiting are those of a simple state (Rule 59).
-//Differences from the manual, as for Rule 59: exit and exited are offered under SStop
-//((SSTOP /\ (exited -> Skip)) ; Inactive; the manual has exited -> Inactive), see the comment at Exiting.
-//Behaviour: the write synchronisation uses all variables of the machine on both sides, as the CSP-M, not
-//the sets of Definition C.2.2 (see createTwoSidedWriteSync). RunEntered is RUN(enteredSS) of the manual and
-//of the CSP-M, written as a recursive paragraph (generator convention).
+//Checked against the manual (RoboChart Reference Manual, Rule 60) on 15 Nov 2026. As the manual: the
+//frame; During = (SStop /\ ([] e : enteredSS(s) . e -> Skip)) ; entered.id(s) -> ((RUN(enteredSS(s)) |||
+//[[s.during]] ; SStop) /\ interrupt.id(s) -> (SStop /\ end -> Skip)); Behaviour = ([[s]]NC in the meta
+//parallel with During) \ (enteredSS(s), end).
+//Differences from the manual, all following RoboTool's CSP-M:
+//(1) Exiting, as for Rule 59: the manual has (SStop /\ exit -> Skip) ; [[s.exit]] ; exited -> Inactive,
+//    exited NOT under SStop; here (SSTOP /\ (exited -> Skip)) ; Inactive (comment at Exiting). (The final
+//    state, Rule 58, is generated as the manual writes it: SStop /\ exit -> exited -> Inactive.)
+//(2) Behaviour: the manual writes |[vars(s.nodes) | enteredSS(s), end, interrupt | vars(s.during)]|, i.e.
+//    Definition C.2.2 with the variables of the inner nodes on one side and those of the during action on
+//    the other; here all variables of the machine on both sides (see createTwoSidedWriteSync).
+//(3) the synchronisation set of Behaviour: the manual has the whole channel interrupt; here the one event
+//    interrupt_<state>, the only interrupt event of the inner level that is left after the renaming tidsR
+//    of Rule 41.
+//(4) enteredSS(s): the manual takes entered.id(x) for all x in s.nodes; here, and in the CSP-M, for the
+//    states (and final states) only: a junction has no entered event (Rule 57).
+//RunEntered is RUN(enteredSS(s)) of the manual, written as a recursive paragraph (generator convention).
 operation RC!State createCompositeStateAsActionParas(){
 	
 	
@@ -6317,8 +6336,9 @@ operation machineVarNames(nc: RC!NodeContainer): Sequence<String>{
 	return names;
 }
 
-//Rule 60 (Behaviour), Definition C.2.2 in its two-sided form. DIFFERENT FROM Definition C.2.2: the sets are
-//not the intersections of the variables read and written by the two sides; as in RoboTool's CSP-M, ALL
+//Rule 60 (Behaviour), Definition C.2.2 in its two-sided form. DIFFERENT FROM THE MANUAL: Rule 60 has
+//|[vars(s.nodes) | cs | vars(s.during)]|, for which Definition C.2.2 uses setL for the variables in
+//vars(s.nodes) /\ vars(s.during) and setR likewise; here, as in RoboTool's CSP-M, ALL
 //variables of the machine are used on both sides (c5: also for a composite state that uses no variable).
 //Reason for following the CSP-M: During is not under SStop at its prefix entered_<state>; with smaller
 //sets a write of the inner machine at that moment would not be synchronised with During.
