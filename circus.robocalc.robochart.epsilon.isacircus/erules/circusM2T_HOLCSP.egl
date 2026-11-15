@@ -1,6 +1,15 @@
 [*14052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
+[*14-15 Nov 2026, branch trigger-fqn-naming (Fang)
+Generator conventions for printing the HOL-CSP theory, not rules of the manual:
+(1) the type of the parameter n of a Trans / Transc paragraph is printed from its declaration (paramType);
+    the single variable NID_name is removed (one NIDS type per node container);
+(2) the paragraphs of a node are selected by exact match <kind>_<node FQN> (isParaOfNode) instead of
+    name.contains(nd);
+(3) the event of a trigger channel <e>_<FQN of the container>__in (RC2Z.eol, triggerChan) is found from the
+    declaration of the channel (triggerChanBases, eventBase), for the filter of issue P.
+*]
 theory HOLCSP_[%=baseName%]_[%=ts%]
 	imports "RC_HOL-CSP.RoboChart_Library" HOL.Real
 begin
@@ -755,7 +764,8 @@ operation usedEventBases(): Set{
 	}
 	return used;
 }%]
-[*Trigger channels are named <e>_<FQN of the node container>__in (RC2Z.eol, triggerChan). The event e of such a
+[*Generator convention, not a rule of the manual (14 Nov 2026).
+  Trigger channels are named <e>_<FQN of the node container>__in (RC2Z.eol, triggerChan). The event e of such a
   channel cannot be found from the name alone (with nested containers both S_M_P and M_P are suffixes), so it is
   computed from the declaration: the channel is typed with NIDS_<FQN of the container>.*]
 [%operation Z!ChannelDecl nidsContainer(): String{
@@ -786,11 +796,15 @@ operation triggerChanBases(): Map{
 	}
 	return m;
 }%]
-[*The type of the parameter n of a Trans / Transc paragraph, from its declaration (n : NIDS_<FQN of the container>).*]
+[*Generator convention, not a rule of the manual (14 Nov 2026): Trans is parameterised by the current node
+  (Rule 53, modified), and its fixrec needs the type of that parameter.
+  The type of the parameter n of a Trans / Transc paragraph, from its declaration (n : NIDS_<FQN of the container>).*]
 [%operation Z!ActionPara paramType(): String{
 	return self.circusAction.declList.decls.at(0).expr.parseExpr();
 }%]
-[*The paragraphs of the node with FQN nd: exactly <kind>_<nd> for the kinds of node paragraphs. Before
+[*Generator convention, not a rule of the manual (14 Nov 2026): the paragraphs of one node (Rules 56 to 60)
+  are mutually recursive and are printed as one fixrec.
+  The paragraphs of the node with FQN nd: exactly <kind>_<nd> for the kinds of node paragraphs. Before
   14 Nov 2026 the test was name.contains(nd), which also selected the paragraphs of a node whose name ends with
   the name of another node (Inactive_LongWait_M_P contains Wait_M_P), and would select everything inside a
   composite state.*]

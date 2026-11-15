@@ -1,6 +1,13 @@
 [*14052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
+[*14-15 Nov 2026, branch trigger-fqn-naming (Fang)
+Generator conventions for printing the HOL-CSP theory, not rules of the manual:
+(1) the type of the parameter n of a Trans / Transc paragraph is printed from its declaration (paramType);
+    the single variable NID_name is removed (one NIDS type per node container);
+(2) the event of a trigger channel <e>_<FQN of the container>__in (RC2Z.eol, triggerChan) is found from the
+    declaration of the channel (triggerChanBases, eventBase), for the filter of issue P.
+*]
 [*This template generates the "Trans core" theory: only Transc_<nc> and the lemma
   deadlock_free (\<sqinter> n \<in> UNIV. Transc_<nc>\<cdot>n).
   Transc is Trans without the always-enabled branches (share, interrupt, terminate), so this lemma
@@ -674,7 +681,8 @@ operation usedEventBases(): Set{
 	}
 	return used;
 }%]
-[*Trigger channels are named <e>_<FQN of the node container>__in (RC2Z.eol, triggerChan). The event e of such a
+[*Generator convention, not a rule of the manual (14 Nov 2026).
+  Trigger channels are named <e>_<FQN of the node container>__in (RC2Z.eol, triggerChan). The event e of such a
   channel cannot be found from the name alone (with nested containers both S_M_P and M_P are suffixes), so it is
   computed from the declaration: the channel is typed with NIDS_<FQN of the container>.*]
 [%operation Z!ChannelDecl nidsContainer(): String{
@@ -705,7 +713,9 @@ operation triggerChanBases(): Map{
 	}
 	return m;
 }%]
-[*The type of the parameter n of a Trans / Transc paragraph, from its declaration (n : NIDS_<FQN of the container>).*]
+[*Generator convention, not a rule of the manual (14 Nov 2026): Trans is parameterised by the current node
+  (Rule 53, modified), and its fixrec needs the type of that parameter.
+  The type of the parameter n of a Trans / Transc paragraph, from its declaration (n : NIDS_<FQN of the container>).*]
 [%operation Z!ActionPara paramType(): String{
 	return self.circusAction.declList.decls.at(0).expr.parseExpr();
 }%]
