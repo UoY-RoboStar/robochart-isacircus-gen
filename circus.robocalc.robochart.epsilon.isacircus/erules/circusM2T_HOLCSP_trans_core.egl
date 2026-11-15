@@ -169,12 +169,12 @@ where
 [simp del] :\<open>[%= actpara.name.word%]\<cdot>n = 
 	[%=actpara.circusAction.parseAction()%] \<close>
 	
-lemma [%=z.version%]_trans_core_ddlf:
+lemma [%=z.version%][%=actpara.lemmaSuffix()%]_trans_core_ddlf:
   "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%=actpara.name.word%]\<cdot>n)  "
   apply (deadlock_free' P_def: [%=actpara.name.word%].simps)
   done
   
-lemma [%=z.version%]_trans_core_findcounterexample:
+lemma [%=z.version%][%=actpara.lemmaSuffix()%]_trans_core_findcounterexample:
   "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%= actpara.name.word%]\<cdot>n)"
   apply (find_counterexample P_def: [%= actpara.name.word%].simps)
   nitpick
@@ -198,12 +198,12 @@ where
 [simp del] :\<open>[%= actpara.name.word%]\<cdot>n = 
 	[%=actpara.circusAction.parseAction()%] \<close>
 	
-lemma [%=z.version%]_trans_core_ddlf:
+lemma [%=z.version%][%=actpara.lemmaSuffix()%]_trans_core_ddlf:
   "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%=actpara.name.word%]\<cdot>n)  "
   apply (deadlock_free' P_def: [%=actpara.name.word%].simps)
   done
   
-lemma [%=z.version%]_trans_core_findcounterexample:
+lemma [%=z.version%][%=actpara.lemmaSuffix()%]_trans_core_findcounterexample:
   "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%= actpara.name.word%]\<cdot>n)"
   apply (find_counterexample P_def: [%= actpara.name.word%].simps)
   nitpick
@@ -505,7 +505,8 @@ end
 [*suppose there is only one parameter for iteration*]
 
 [%operation Z!InterleaveAction parseInterleaveAction(): String{
-	return  "(" + self.leftAction.parseAction() + " \\<interleave> " +	self.rightAction.parseAction() + ")";
+	//HOL-CSP writes interleaving P ||| Q (Inter_syntax in Synchronization_Product.thy); \<interleave> is not its notation
+	return  "(" + self.leftAction.parseAction() + " ||| " +	self.rightAction.parseAction() + ")";
 }%]
 
 
@@ -707,6 +708,15 @@ operation triggerChanBases(): Map{
 [*The type of the parameter n of a Trans / Transc paragraph, from its declaration (n : NIDS_<FQN of the container>).*]
 [%operation Z!ActionPara paramType(): String{
 	return self.circusAction.declList.decls.at(0).expr.parseExpr();
+}%]
+[*With composite states there is one Transc paragraph per node container, each with its two lemmas. The lemma
+  names of a machine without composite states are unchanged (<version>_trans_core_ddlf); with several
+  containers the FQN of the container is added.*]
+[%operation Z!ActionPara lemmaSuffix(): String{
+	if(Z!ActionPara.all().select(ap|ap.name.word.startsWith("Transc_")).size() > 1){
+		return "_" + self.name.word.substring(7);
+	}
+	return "";
 }%]
 [%operation String eventBase(): String{
 	if(triggerChanBases().containsKey(self)){

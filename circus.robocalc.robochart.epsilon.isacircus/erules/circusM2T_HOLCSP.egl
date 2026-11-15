@@ -201,29 +201,71 @@ where
 	[%=actpara.circusAction.parseAction()%] \<close>
 [%}%]
 
-[%//to collect the nodes into nodeSet
-var nodeSet = new Set<String>;
-for(actpara in actparas.select(ap|ap.name.word.startsWith("Inactive_") 
-or ap.name.word.startsWith("InactiveJct_")
-or ap.name.word.startsWith("InactiveFn_"))){
-	var namestring = actpara.name.word;
-	var node = namestring.substring(namestring.indexOf("_") + 1);
-    nodeSet.add(node);
+[%//Node containers and their nodes, from the NIDS free types: NIDS_<container FQN> has one constructor
+//NID_<node FQN> per node of the container. A composite state is a node of its container and a container
+//itself. The paragraphs are printed container by container, innermost first, because the node of a
+//composite state refers to the behaviour of its inner level (ncBehaviour_<state>).
+var nidsMap = new Map;
+var containerOrder = new Sequence;
+for(freepara in freeparas){
+	var ft = freepara.freetypeList.freeTypes.at(0);
+	if(ft.name.word.startsWith("NIDS_")){
+		var nodes = new Sequence;
+		for(bran in ft.branchList.branches){
+			nodes.add(bran.name.word.substring(4));
+		}
+		nidsMap.put(ft.name.word.substring(5), nodes);
+		containerOrder.add(ft.name.word.substring(5));
+	}
 }
-("line 175: nodeSet = " + nodeSet).println();%]
+var containersInnermostFirst = containerOrder.sortBy(c | 0 - c.containerDepth(nidsMap));
+//the paragraphs of the inner levels, printed after the nodes of their container
+var innerParaNames = new Set;
+for(c in containerOrder.select(c | c.containerDepth(nidsMap) > 0)){
+	innerParaNames.add("composeNodes_" + c);
+	innerParaNames.add("ncCoreBehaviour_" + c);
+	innerParaNames.add("ncBehaviour_" + c);
+}%]
 
 [*nodes*]
-[%for(nd in nodeSet){%]
+[%for(cont in containersInnermostFirst){%]
+[%for(nd in nidsMap.get(cont)){%]
+[%if(nidsMap.containsKey(nd)){
+	//composite state: RunEntered, During and Behaviour are not recursive with the frame of the node; they are
+	//printed before it, each on its own, so that fixrec has no continuity obligation for the hiding, the
+	//renamings and the parallel composition of Behaviour
+	for(kind in Sequence{"RunEntered_", "During_", "Behaviour_"}){
+		for(actpara in actparas.select(ap|ap.name.word = kind + nd)){%]
+
+fixrec [%= actpara.name.word%] :: "chan_event process"
+where 
+[simp del] :\<open>[%= actpara.name.word%] = 
+	[%=actpara.circusAction.parseAction()%] \<close> 
+[%		}
+	}
+}%]
 fixrec
-	[%for(actpara_nd in actparas.select(ap|ap.name.word.isParaOfNode(nd))){%]
+	[%for(actpara_nd in actparas.select(ap|ap.name.word.isParaOfNode(nd) and not ap.name.word.isCompositePart(nd, nidsMap))){%]
 [%= actpara_nd.name.word%] :: "chan_event process"[%if(hasMore){%] and [%}%]	
 	[%}%]
 where
-	[%for(actpara_nd in actparas.select(ap|ap.name.word.isParaOfNode(nd))){%]
+	[%for(actpara_nd in actparas.select(ap|ap.name.word.isParaOfNode(nd) and not ap.name.word.isCompositePart(nd, nidsMap))){%]
 [simp del] :\<open>[%= actpara_nd.name.word%] = 
 	[%=actpara_nd.circusAction.parseAction()%] \<close> [%if(hasMore){%] | [%}%]
 	
 	[%}%]	
+[%}%]
+[%if(cont.containerDepth(nidsMap) > 0){
+	for(kind in Sequence{"composeNodes_", "ncCoreBehaviour_", "ncBehaviour_"}){
+		for(actpara in actparas.select(ap|ap.name.word = kind + cont)){%]
+
+fixrec [%= actpara.name.word%] :: "chan_event process"
+where 
+[simp del] :\<open>[%= actpara.name.word%] = 
+	[%=actpara.circusAction.parseAction()%] \<close> 
+[%		}
+	}
+}%]
 [%}%]
 
 
@@ -241,6 +283,8 @@ or ap.name.word.startsWith("Entering_")
 or ap.name.word.startsWith("Interrupted_")
 or ap.name.word.startsWith("Trans_") 
 or ap.name.word.startsWith("Transc_") 
+or ap.name.word.startsWith("RunEntered_")
+or innerParaNames.includes(ap.name.word)
 ))){%]
 
 fixrec [%= actpara.name.word%] :: "[%= actpara.actionWithSig()%]chan_event process"
@@ -542,7 +586,8 @@ end
 [*suppose there is only one parameter for iteration*]
 
 [%operation Z!InterleaveAction parseInterleaveAction(): String{
-	return  "(" + self.leftAction.parseAction() + " \\<interleave> " +	self.rightAction.parseAction() + ")";
+	//HOL-CSP writes interleaving P ||| Q (Inter_syntax in Synchronization_Product.thy); \<interleave> is not its notation
+	return  "(" + self.leftAction.parseAction() + " ||| " +	self.rightAction.parseAction() + ")";
 }%]
 
 
@@ -749,6 +794,20 @@ operation triggerChanBases(): Map{
   14 Nov 2026 the test was name.contains(nd), which also selected the paragraphs of a node whose name ends with
   the name of another node (Inactive_LongWait_M_P contains Wait_M_P), and would select everything inside a
   composite state.*]
+[*Depth of a node container: 0 for the machine, 1 for a composite state of the machine, ... A container is a
+  node of its parent container (its FQN is a constructor of the parent's NIDS type).*]
+[%operation String containerDepth(nidsMap: Map): Integer{
+	for(p in nidsMap.keySet()){
+		if(nidsMap.get(p).includes(self)){
+			return 1 + p.containerDepth(nidsMap);
+		}
+	}
+	return 0;
+}%]
+[*Behaviour_<nd> and During_<nd> of a composite state nd are printed apart from the fixrec group of the node.*]
+[%operation String isCompositePart(nd: String, nidsMap: Map): Boolean{
+	return nidsMap.containsKey(nd) and (self = "Behaviour_" + nd or self = "During_" + nd);
+}%]
 [%operation String isParaOfNode(nd: String): Boolean{
 	for(k in Sequence{"Inactive_", "InactiveJct_", "InactiveFn_", "Activation_", "Termination_", "Active_",
 			"Behaviour_", "During_", "Exiting_", "Entering_", "Interrupted_"}){

@@ -3536,6 +3536,13 @@ operation RC!RCModule FQN(): String{
 
 //channel decleration and channelset declaration for node container (NC)
 operation RC!NodeContainer createchanParaNC()  {
+
+	//A node container is the state machine (or operation) itself or a composite state. The container part
+	//(NIDS, internal__, flow channels, trigger channels, node channels, the enter/entered channel sets) is
+	//declared for every container; the machine part (variables, shared variables, event channels, operation
+	//channels, the semantic event set, aviol/gviol) only for the machine: a composite state declares no
+	//variables and no events.
+	var isMachine = not self.instanceOf(RC!State);
 	
 	//1. channel internal__: NIDS
 	
@@ -3563,13 +3570,20 @@ operation RC!NodeContainer createchanParaNC()  {
 
 	
 	//2. Flow channel: interrupt, exited, exit, terminate
-	var flow_chanpara = Sequence{"interrupt_"+self.FQN(), "exited_"+self.FQN(), "exit_"+self.FQN()//, "terminate"
-	}.createChannelPara("flowchannel_stmbd_" + self.FQN());
+	//For a composite state the container interrupt interrupt_<state> is the same event as the interrupt of the
+	//state as a node of its own container, which the parent container declares with the node channels
+	//(enter_, entered_, interrupt_); it is not declared a second time here.
+	var flow_names = Sequence{"interrupt_"+self.FQN(), "exited_"+self.FQN(), "exit_"+self.FQN()};//, "terminate"
+	if(not isMachine){
+		flow_names = Sequence{"exited_"+self.FQN(), "exit_"+self.FQN()};
+	}
+	var flow_chanpara = flow_names.createChannelPara("flowchannel_stmbd_" + self.FQN());
 
 
 
 	//3. variable channels, each var has a channel declaration, as vars can have different types, while the channels in the chandecl.list should have the same type.
 	
+	if(isMachine){
 	var var_chanpara = createChannelPara("var_channel_stmbd_" + self.FQN());
 	//Case 1: vars declared in the stm directly
 	for(vl in self.variableList){
@@ -3675,6 +3689,8 @@ operation RC!NodeContainer createchanParaNC()  {
 	}
 	*/
 	
+	}//end of isMachine (variables)
+
 	//6. Declaring state machine events as channels
 
 	var evt_chanpara = createChannelPara("event_channel_stmbd_" + self.FQN());
@@ -3683,13 +3699,25 @@ operation RC!NodeContainer createchanParaNC()  {
 	//e.g., CSPM: trigger1:InOut.core_int;   the state nodes id NIDS is not involved.
 	//Circus: trigger1_in ::int, trigger1_out ::int
 	
-	var stm_events = self.events;
-	//to collect all the events that are defined in the defined interfaces
-	for(defined_interface in self.interfaces){
-		stm_events = stm_events.includingAll(defined_interface.events);
+	var stm_events;
+	if(isMachine){
+		stm_events = self.events;
+		//to collect all the events that are defined in the defined interfaces
+		for(defined_interface in self.interfaces){
+			stm_events = stm_events.includingAll(defined_interface.events);
+		}
+	} else {
+		//composite state: only trigger channels, for the events that its own transitions use as triggers
+		stm_events = new Sequence;
+		for(t in self.transitions.select(l|l.trigger.isDefined())){
+			if(not stm_events.includes(t.trigger.event)){
+				stm_events.add(t.trigger.event);
+			}
+		}
 	}
 	
 	
+	if(isMachine){
 	for(e in stm_events){
 				
 //		var evt_seq = Sequence{e.FQN() + "_in", //CSPM InOut enumtype is removed for Circus, so becomes 2 channels
@@ -3706,6 +3734,8 @@ operation RC!NodeContainer createchanParaNC()  {
 		}
 	}
 	
+	}//end of isMachine (event channels)
+
 	//Case 2: to generate channels for the events to be used as transition triggers
 	//e.g., CSPM: trigger1__:NIDS.InOut.core_int
 	//Circus: trigger1_stm0_pkg0__in :: NIDS x int
@@ -3732,7 +3762,7 @@ operation RC!NodeContainer createchanParaNC()  {
 	
 	//7. Declaring call and ret events for undefined operations as channels
 	
-	if(self.hasRequiredOps()){//TBC with Pedro: is hasRequiredOps enough?
+	if(isMachine and self.hasRequiredOps()){//TBC with Pedro: is hasRequiredOps enough?
 		var undefined_ops_chanpara = createChannelPara("undefined_op_channel_stmbd_" + self.FQN());
 		for(ri in self.rInterfaces){
 			for(op in ri.operations){
@@ -3798,6 +3828,7 @@ operation RC!NodeContainer createchanParaNC()  {
 	var internal_events_channelsetPara = internal_events_channelset.createChanSetPara("internal_events_in_stmbd_"+self.FQN());
 	
 	
+	if(isMachine){
 	//shared_variable_events
 	var shared_var_events_channelset = createChannelSet(createBasicChannelSetExpr(sharedVarSet(self)));
 	var shared_variable_events_channelsetPara = shared_var_events_channelset.createChanSetPara("shared_variable_events_in_stmbd_"+self.FQN());
@@ -3833,6 +3864,7 @@ operation RC!NodeContainer createchanParaNC()  {
 	
 	//11. assumption-guarantee violation channel: aviol for assumption violation, gviol for guarantee violation
 	var ag_chanpara = Sequence{"aviol", "gviol"	}.createChannelPara("assumption-guarantee_viol_" + self.FQN());
+	}//end of isMachine (shared variable events, semantic events, aviol/gviol)
 	
 }
 
@@ -4352,7 +4384,7 @@ operation vtguards(nc: RC!NodeContainer):  Set<String>{
 //CSP Rule 46
 operation vars(nodeset:Set<RC!Node>): Set<String>{
 	"Rule 46 is called".println();
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	varset = Set{};
 
 	for(n in nodeset){
@@ -4365,7 +4397,9 @@ operation vars(nodeset:Set<RC!Node>): Set<String>{
 //CSP Rule 47
 operation vars(ts: Set<RC!Transition>):Set<String>{
 	"Rule 47 is called".println();
-	var varset = Set<String>;
+	//an instance, not the type: with the type, a container whose transitions use no variable returned a
+	//collection type instead of a set (met with composite states, where Rule 48 calls this rule)
+	var varset = new Set<String>;
 	for(t in ts){
 		varset = varset.includingAll(vars(t));//Rule 49
 	}
@@ -4376,7 +4410,7 @@ operation vars(ts: Set<RC!Transition>):Set<String>{
 //CSP Rule 48
 operation vars(node: RC!Node):Set<String>{
 	"Rule 48 is called".println();
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	varset = Set{};
 	if(node.instanceOf(RC!State)){
 		for(a in node.actions){
@@ -4394,15 +4428,17 @@ operation vars(node: RC!Node):Set<String>{
 //CSP Rule 49
 operation vars(t: RC!Transition):Set<String>{
 	"Rule 49 is called".println();
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	if(t.condition.isDefined()){
-		varset = varset.includingAll(vars(t.condition));//Rule 50
+		//the condition is an expression: there is no vars rule for expressions (Rule 50 is for statements);
+		//its variables are those of Rule 45. Reached only through a composite state (Rule 48).
+		varset = varset.includingAll(usedVariablesInExpr(t.condition, nc(t)));
 	}
 	if(t.action.isDefined()){
 		varset = varset.includingAll(vars(t.action));//Rule 50
 	}
 	if(t.deadline.isDefined()){
-		varset = varset.includingAll(vars(t.deadline));
+		varset = varset.includingAll(usedVariablesInExpr(t.deadline, nc(t)));
 	}
 	
 	return varset;
@@ -4410,14 +4446,16 @@ operation vars(t: RC!Transition):Set<String>{
 
 //CSP Rule 50
 operation vars(stmt: RC!Statement):Set<String>{
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	varset = Set{};
 	
 	if(stmt.instanceOf(RC!Assignment)){
 //		varset = usedVariables(stmt.left).includingAll(usedVariables(stmt.right));
 //		THIS line above nc(stmt.left.name) is commented out, because usedVariables (Rule 45) does not cover VarRef, a subclass of Assignable
 		
-		varset = Set{stmt.left.name.name }.includingAll(usedVariablesInExpr(stmt.right, nc(stmt)));
+		//rootVarName: the variable of the left-hand side, also for an indexed one (x[i] = e), where
+		//stmt.left.name does not exist (met on Adaptation_Plan through a composite state)
+		varset = Set{stmt.left.rootVarName() }.includingAll(usedVariablesInExpr(stmt.right, nc(stmt)));
 		//stmt.left is an Assignable, stmt.left.name is a Variable
 		//nc(stmt.left.name) returns the basiccontext that defines this variable
 		// we use the nc(stmt) as scope or nc(stmt.left.name) as scope? e.g., in module stm0, var is a local and to be renamed using EXT
@@ -4484,7 +4522,7 @@ operation requiredVariables(op: RC!OperationSig): Set<String>{
 //CSP Rule 51
 operation vars(seq: Sequence<RC!Statement>):Set<String>{
 
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	for(stmt in seq){
 		varset = varset.includingAll(vars(stmt));
 	}
@@ -5103,7 +5141,8 @@ operation composeNodes(nodes: Set<Node>, nc: RC!NodeContainer): Z!ActionPara{
 //					ndProcSet.add(nd.createSimpleStateAsBasicProcess());
 				} else{
 					nd.createCompositeStateAsActionParas();
-					//ndProcSet.add(nd.createCompositeStateAsBasicProcess()); 
+					//the composite node takes part in the composition as every other node
+					ndActionNameSet.add("Inactive_"+nd.FQN());
 				}
 				
 			}
@@ -6073,58 +6112,83 @@ operation RC!State createCompositeStateAsActionParas(){
 	
 	
 	/*******************************
-	Behaviour
+	Behaviour (15 Nov 2026; checked against RoboTool's CSP-M of the test models c1 to c6 and of
+	Adaptation_Plan, CSP generator 3.1.0.202608041330)
+
+	Behaviour_S = ( ncBehaviour_S [share -> share and every setR_v] [set_v -> setL_v]
+	                  [| enteredSS(S), interrupt_S, terminate, share, setL_v, setR_v |]
+	                During_S      [share -> share and every setL_v] [set_v -> setR_v]
+	              ) [setL_v -> set_v] [setR_v -> set_v]  \ (enteredSS(S), terminate)
+
+	ncBehaviour_S is Rule 40 with the state as node container: the inner nodes with the inner Trans (Rule 41),
+	the inner flow events hidden, the inner trigger channels renamed. v ranges over ALL variables declared in
+	the machine, on both sides, as in the CSP-M (not reduced by Definition C.2.2).
+	interrupt_S, the interrupt of this node, is also the container interrupt of the inner level.
 	*******************************/
-	var cs = enteredSS(self).asSet().includingAll(Set{"terminate", "interrupt_" + nc(self).FQN()});//TBC
-	var ns1 = vars(self.nodes);
-	var ns2 = vars(self.actions.selectOne(a|a.instanceOf(RC!DuringAction)).action); //Manual: vars(s.during) TBC: s.during.type = statement? 
-	var Beh_act1 = ncbehaviour(self);
-	var Behaviour = createParallelAction(cs,ns1,ns2,Beh_act1.name.word.createCallAction(),"During_"+self.FQN().createCallAction());
+	var inner = ncBehaviour(self);
+	var cs = enteredSS(self).asSet().includingAll(Set{"terminate", "interrupt_" + self.FQN()});
+	var Behaviour = createTwoSidedWriteSync(inner.name.word.createCallAction(),
+											("During_"+self.FQN()).createCallAction(),
+											cs,
+											machineVarNames(self));
+	Behaviour = Behaviour.createHideAction(enteredSS(self).includingAll(Sequence{"terminate"}));
 	Behaviour.createActionPara("Behaviour_" + self.FQN());
 	
 	
 	/*******************************
-	During
+	RunEntered_S = [] e : enteredSS(S) . e -> RunEntered_S       (RUN(enteredSS(S)) of the CSP-M, as a
+	recursive paragraph: no RUN action is needed in the metamodel or in the templates)
+	*******************************/
+	var runSeq = new Sequence<Z!CircusAction>;
+	for(e in enteredSS(self)){
+		runSeq.add(createPrefixingAction(createSynchCommunication(e), ("RunEntered_"+self.FQN()).createCallAction()));
+	}
+	var runAction;
+	if(runSeq.size()>1){
+		runAction = runSeq.createSequenceAsExtchoiceAction();
+	} else {
+		runAction = runSeq.at(0);
+	}
+	runAction.createActionPara("RunEntered_" + self.FQN());
+	
+	
+	/*******************************
+	During_S = (SStop /\ ([] e : enteredSS(S) . e -> Skip)) ;
+	           entered_S -> ( (RunEntered_S ||| (during action ; SStop))
+	                          /\ (interrupt_S -> (SStop /\ (terminate -> Skip))) )
 	*******************************/
 	//step 1: [] e: enteredSS(s) . e -> Skip
 	var extchoiceSeq = new Sequence<Z!CircusAction>;
 	for(e in enteredSS(self)){
-		extchoiceSeq.add(createPrefixingAction(createSynchCommunication(e.name), createSkipAction()));
+		extchoiceSeq.add(createPrefixingAction(createSynchCommunication(e), createSkipAction()));
 	}
 	var ext_choice;
 	if(extchoiceSeq.size()>1){
 		ext_choice = extchoiceSeq.createSequenceAsExtchoiceAction();
-	} else if(extchoiceSeq.size()=1) {//lvars.size()=1
+	} else {
 		ext_choice = extchoiceSeq.at(0);
 	}
 	
 	//step 2: SStop /\ (step 1)
 	var During_act1 = createAction2("InterruptAction", "SSTOP".createCallAction(), ext_choice);
 	
-	
-	//step 3: RUN(enteredSS(s))
-	var run = createRunAction(enteredSS(self)); 
-	
-	//step 4 [s.during]action ; SStop
+	//step 3: [s.during]action ; SStop
 	var During_act2 = createAction2("SeqAction", self.createStateActionAsCircusAction("DuringAction"), "SSTOP".createCallAction());
 	
-	//step 5: RUN ||| (during;SStop)
-	var During_act3  = createAction2("InterleaveAction", run, During_act2);
+	//step 4: RunEntered ||| (during ; SStop)
+	var During_act3  = createAction2("InterleaveAction", ("RunEntered_"+self.FQN()).createCallAction(), During_act2);
 	
-	
-	//step 6: interrupt.id(s) -> (SStop /\ end -> Skip)
+	//step 5: interrupt.id(s) -> (SStop /\ end -> Skip)
 	var stopInterruptByEnd = createAction2("InterruptAction", "SSTOP".createCallAction(), createPrefixingAction(createSynchCommunication("terminate"), createSkipAction()));
 	var During_act4 = createPrefixingAction(createSynchCommunication("interrupt_" + self.FQN()), stopInterruptByEnd);
 	
-	
-	//step 7: interruption 
+	//step 6: interruption 
 	var During_act5 = createAction2("InterruptAction", During_act3, During_act4);
 	
+	//step 7: entered.id(s) -> ()
+	During_act5 = createPrefixingAction(createSynchCommunication("entered_"+self.FQN()), During_act5);
 	
-	//step 8: entered.id(s) -> ()
-	During_act5 = createPrefixingAction(createSynchCommunication("enter_"+self.FQN()), During_act5);
-	
-	//step 9: sequential
+	//step 8: sequential
 	var During = createAction2("SeqAction", During_act1, During_act5);
 	
 	During.createActionPara("During_" + self.FQN());
@@ -6150,6 +6214,64 @@ operation RC!State createCompositeStateAsActionParas(){
 
 }
 
+
+//The machine (state machine or operation) that a node container belongs to: the container itself, or the
+//enclosing machine of a composite state.
+operation machineOf(nc: RC!NodeContainer): RC!NodeContainer{
+	var c = nc;
+	while(c.instanceOf(RC!State)){
+		c = c.eContainer();
+	}
+	return c;
+}
+
+//The names of the variables declared in the machine of nc: those for which createchanParaNC declares the
+//channels get_, set_, setL_, setR_ (variables of the machine itself and of the interfaces it uses). After
+//the FQN pre-processing v.name is already the qualified name.
+operation machineVarNames(nc: RC!NodeContainer): Sequence<String>{
+	var m = machineOf(nc);
+	var names = new Sequence<String>;
+	for(vl in m.variableList){
+		if(vl.modifier = RC!VariableModifier#VAR){
+			for(v in vl.vars){ names.add(v.name); }
+		}
+	}
+	for(defined_interface in m.interfaces){
+		for(vl in defined_interface.variableList){
+			if(vl.modifier = RC!VariableModifier#VAR){
+				for(v in vl.vars){ names.add(v.name); }
+			}
+		}
+	}
+	return names;
+}
+
+//The two-sided write synchronisation of Behaviour of a composite state (Rule 60), as RoboTool's CSP-M
+//writes it:
+//  ( P [share -> share, setR_v...] [set_v -> setL_v...]  [| cs, share, setL_v..., setR_v... |]
+//    Q [share -> share, setL_v...] [set_v -> setR_v...] ) [setL_v -> set_v...] [setR_v -> set_v...]
+//for all v in vs. createMetaParallelAction (Rule 41) is not used: its part for the right-hand writes adds
+//the pairs to the renaming of P after P has been renamed.
+operation createTwoSidedWriteSync(P: Z!CircusAction, Q: Z!CircusAction, cs: Set<String>, vs: Sequence<String>): Z!CircusAction{
+	var PpairR = Sequence{"share"}; var PpairL = Sequence{"share"};
+	var QpairR = Sequence{"share"}; var QpairL = Sequence{"share"};
+	for(v in vs){ PpairR.add("share"); PpairL.add("setR_"+v); }
+	for(v in vs){ PpairR.add("set_"+v); PpairL.add("setL_"+v); }
+	for(v in vs){ QpairR.add("share"); QpairL.add("setL_"+v); }
+	for(v in vs){ QpairR.add("set_"+v); QpairL.add("setR_"+v); }
+	var channel_names = new Set<String>;
+	channel_names.addAll(cs);
+	channel_names.add("share");
+	for(v in vs){ channel_names.add("setL_"+v); channel_names.add("setR_"+v); }
+	var par = createParallelAction(channel_names, P.createRenameAction(PpairR, PpairL), Q.createRenameAction(QpairR, QpairL));
+	if(vs.size() = 0){
+		return par;
+	}
+	var outR = new Sequence<String>; var outL = new Sequence<String>;
+	for(v in vs){ outR.add("setL_"+v); outL.add("set_"+v); }
+	for(v in vs){ outR.add("setR_"+v); outL.add("set_"+v); }
+	return par.createRenameAction(outR, outL);
+}
 
 operation createParallelAction(cs: Set<String>,
 							   ns1: Set<String>,
