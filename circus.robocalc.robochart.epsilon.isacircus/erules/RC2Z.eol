@@ -78,6 +78,24 @@ option 2: to remove Exception by pushing end event into the process
 
 
 /****************************
+Change record (most recent last). Each entry: date, branch, summary, rules concerned.
+
+14-15 Nov 2026, branch trigger-fqn-naming (Fang)
+Trigger channels are named with the fully qualified name of their node container:
+<e>_<FQN of the container>__in instead of <e>__in (operation triggerChan).
+Generator convention, not a rule of the manual: the manual and the CSP-M declare the channel e__ in the
+module of each container; in one Isabelle theory the path of the container has to be part of the name.
+The event channels <e>_in / <e>_out are deliberately not qualified (connections match them by name).
+Rules concerned: channel declarations (createchanParaNC, not covered by the manual), Rule 41 (tidsR and
+transSync, through tevent_str), Rule 42 (renameTriggerEventsPairL), Rule 43 (tevent_str, tevent),
+Rule 55 (trigger).
+Templates (circusM2T_HOLCSP.egl, circusM2T_HOLCSP_trans_core.egl): the paragraphs of a node are selected by
+exact match instead of contains(nd); eventBase() finds the event of a trigger channel from the declaration
+of the channel; NID_name removed, the type of Trans is printed from its parameter declaration.
+******************************/
+
+
+/****************************
 rct Vs EMF (1)
 when using rct as source model, if the source is set as both read on load and store on disposal, the model is deleted every time the program run
 this issue is avoided when use exported EMF models
@@ -3714,6 +3732,7 @@ operation RC!NodeContainer createchanParaNC()  {
 //							 //e.FQN() + "__out" , this is removed because the out channel is not necessary, as e.NIDS channel is only used for transition triggers, and a trigger can only be an input.
 //							   };	
 
+		//name by triggerChan: <e>_<FQN of this container>__in (generator convention, not a rule of the manual)
 		var evt_seq = Sequence{triggerChan(e, self)//,
 							 //e.name + "__out" , this is removed because the out channel is not necessary, as e.NIDS channel is only used for transition triggers, and a trigger can only be an input.
 							   };	
@@ -4724,6 +4743,10 @@ operation setRC(nameset: Set<String>):Set<String>{
 }
 
 
+//Generator convention, not a rule of the manual (14 Nov 2026).
+//The manual (Rules 42, 43, 55) and RoboTool's CSP-M write the trigger channel e__ and declare it in the
+//module of each node container; here all channels are constructors of one Isabelle datatype, so the path
+//of the container is part of the name.
 //Name of the trigger channel of event e in the node container nc: <e>_<FQN of nc>__in.
 //The channel is typed with the node identifiers of ONE container (NIDS_<FQN of nc>), so its name carries the
 //full path of that container, innermost first, as every other name built from an FQN. Before 14 Nov 2026 it
@@ -4753,6 +4776,7 @@ operation renameTriggerEventsPairL(nc:RC!NodeContainer): Sequence<String>{
 	for(t in nc.transitions.select(l|l.trigger.isDefined())){
 		//NOTE: the HOL-CSP templates (holEvent in circusM2T_HOLCSP*.egl) rely on this exact "\\<^bold>." marker
 		//to print the event as (c v); change both together. See the comment above holEvent for the background.
+		//Rule 42: the left-hand side is the trigger channel of THIS container (triggerChan), renamed to <e>_in
 		pairL.add(triggerChan(t.trigger.event, nc) +"\\<^bold>.x" ); //syntax for Isacircus
 //		pairL.add(t.trigger.event.name +"__in" +"\\<cdot>x" );
 //		pairL.add(t.trigger.event.FQN()+"__in" +"\\<cdot>x" );
@@ -4924,6 +4948,7 @@ operation tevent_str(t: RC!Transition): String{
 //		tevent_string = t.trigger.event.name + "__in\\<cdot>NID_" + t.source.FQN();
 		//NOTE: the HOL-CSP templates (holEvent in circusM2T_HOLCSP*.egl) rely on this exact "\\<^bold>." marker
 		//to print the event as (c v); change both together. See the comment above holEvent for the background.
+		//Rule 43: the trigger channel of the container of t (triggerChan), at the source node of t
 		tevent_string = triggerChan(t.trigger.event, nc(t)) + "\\<^bold>.NID_" + t.source.FQN(); //syntax for isacircus
 	}
 	
@@ -4944,6 +4969,7 @@ operation tevent(t: RC!Transition): Z!Communication{
 	} 
 	
 	else {
+		//Rule 43: the trigger channel of the container of t (triggerChan)
 		chan_name = triggerChan(t.trigger.event, nc(t));
 //		chan_name = t.trigger.event.FQN() + "__in";
 		commu = createOutputCommunicationFromString(chan_name, para_name, "SYNC");
@@ -5863,6 +5889,7 @@ operation trigger(t: RC!Transition): Z!PrefixingAction{
 		CSPM example: trigger1__!NID_s0.in?a
 		Circus example: trigger1_stm0__in!NID_s0_stm0?a_stm0
 		****************************************/
+		//Rule 55: the trigger channel of the container of t (triggerChan); before 14 Nov 2026 e.name + "__in"
 		channel_name = triggerChan(t.trigger.event, nc(t));
 //		channel_name = t.trigger.event.FQN() + "__in";		
 		var dot_para = "NID_" + t.source.FQN();
@@ -5887,6 +5914,7 @@ operation trigger(t: RC!Transition): Z!PrefixingAction{
 	} else
 	
 	if(t.trigger._type = CommunicationType#SIMPLE){
+		//Rule 55: the trigger channel of the container of t (triggerChan); before 14 Nov 2026 e.name + "__in"
 		channel_name = triggerChan(t.trigger.event, nc(t));
 //		channel_name = t.trigger.event.FQN() + "__in" ;
 		var dot_para = "NID_"+ t.source.FQN();
