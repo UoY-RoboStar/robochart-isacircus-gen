@@ -1,6 +1,15 @@
 [*14052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
+[*15 Nov 2026, branch datatype-plugins-threshold (Fang). EXPERIMENT, not decided.
+Generator convention, not a rule of the manual: CHAN_EVENT_PLUGIN_THRESHOLD (at the theory line) is the
+largest number of constructors of chan_event for which the datatype is printed with all plugins. Above it
+the plugins code, transfer and the five quickcheck plugins are switched off for chan_event only, and a
+comment saying so is printed before the datatype. Measured on the 117 constructors of the full
+Adaptation_Plan: with all plugins the definition did not finish (more than 10 GB); without these 1:04.
+All models up to now have at most 72 constructors and are printed as before. The proofs use only
+chan_event.distinct and chan_event.inject, which remain.
+*]
 [*14-15 Nov 2026, branch trigger-fqn-naming (Fang)
 Generator conventions for printing the HOL-CSP theory, not rules of the manual:
 (1) the type of the parameter n of a Trans / Transc paragraph is printed from its declaration (paramType);
@@ -18,7 +27,7 @@ Composite states (RC2Z.eol, Rules 52 and 60). Generator conventions for printing
     of the node (isCompositePart), so that fixrec has no continuity obligation for Behaviour;
 (3) interleaving is printed as ||| (the notation of HOL-CSP).
 *]
-theory HOLCSP_[%=baseName%]_[%=ts%]
+[%var CHAN_EVENT_PLUGIN_THRESHOLD = 80;%]theory HOLCSP_[%=baseName%]_[%=ts%]
 	imports "RC_HOL-CSP.RoboChart_Library" HOL.Real
 begin
 
@@ -146,10 +155,13 @@ consts [%=ap.zSchText.declList.decls.at(0).nameList.names.at(0).word%] :: "[%=ap
 [%}%]
 
 \<comment> \<open>Channel Declaration\<close>
-datatype chan_event  = 
+[%var channelparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara));
+var nChanEventCons = 1;
+for(cp in channelparas){ for(d in cp.declList.decls){ nChanEventCons = nChanEventCons + d.keptChans().size(); } }
+var chanEventPluginsOff = nChanEventCons > CHAN_EVENT_PLUGIN_THRESHOLD;%][%if(chanEventPluginsOff){%]\<comment> \<open>chan_event has [%=nChanEventCons%] constructors, more than the threshold [%=CHAN_EVENT_PLUGIN_THRESHOLD%] of the generator: the datatype plugins code, transfer and quickcheck (quickcheck_random, quickcheck_exhaustive, quickcheck_bounded_forall, quickcheck_full_exhaustive, quickcheck_narrowing) are switched off, because with them the definition of the datatype exhausts the memory. Therefore quickcheck on goals over values of chan_event and code generation for chan_event are not available.\<close>
+[%}%]datatype [%if(chanEventPluginsOff){%](plugins del: code transfer quickcheck_random quickcheck_exhaustive quickcheck_bounded_forall quickcheck_full_exhaustive quickcheck_narrowing) [%}%]chan_event  = 
 "share"|
 [%z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara)).println();
-var channelparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara));
 
 for(chanpara in channelparas.select(cp|cp.declList.decls.exists(d|d.keptChans().size()>0))){%]
 \<comment> \<open>[%=chanpara.name.word%]\<close>
