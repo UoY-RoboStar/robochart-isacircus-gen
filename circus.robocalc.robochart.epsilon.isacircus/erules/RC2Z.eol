@@ -110,6 +110,12 @@ Rules 47, 49, 50 (vars; called through Rule 48 for a composite state, never reac
 corrections (result set not instantiated; guard of a transition; left-hand side of an indexed assignment).
 Templates: paragraphs printed container by container, innermost first; interleaving as |||; Trans core:
 lemma names with the container when there are several.
+
+15 Nov 2026, branch composite-states (Fang)
+Rule 45 (usedVariables of an expression; usedVariablesInExpr, usedVariablesInExprModel): a LetExpression is
+treated explicitly, the variables of the values of its declarations and of its body (generator issue X).
+Before, a variable occurring only in the value of a let was not read before the action (Rule 62, readState)
+and was free in the generated equation. Changes the output of models with let (flat MakePlan).
 ******************************/
 
 
@@ -3232,6 +3238,19 @@ operation usedVariablesInExprModel(expr:RC!Expression, container: Any): Set<Vari
 		}
 
 	} else
+	//LetExpression (15 Nov 2026, branch composite-states; generator issue X). Rule 45 (usedVariables of an
+	//expression) is "standard and omitted" in the manual; the variables read by let x == e1, ... @ e are those
+	//of the values e1, ... and of the body e. The values are held in declarations : Declaration, and a
+	//Declaration is not an Expression, so the generic case below never reached them: a variable that occurs
+	//only in the value of a let was not read (no get_v?v before the action, Rule 62 readState), and it was
+	//free in the generated equation. A reference to the bound name x is a RefExp to the Declaration, not to
+	//a Variable, so it is not collected.
+	if(expr.instanceOf(RC!LetExpression)){
+		for(d in expr.declarations){
+			set = set.includingAll(usedVariablesInExprModel(d.value,container));
+		}
+		set = set.includingAll(usedVariablesInExprModel(expr.expression,container));
+	} else
 	{
 		"line814".println();
 		 expr.eContents.println();
@@ -5144,6 +5163,19 @@ operation usedVariablesInExpr(expr:RC!Expression, container: Any): Set<String>{
 //			set.add(value.name + "_" + container.FQN());
 		}
 
+	} else
+	//LetExpression (15 Nov 2026, branch composite-states; generator issue X). Rule 45 (usedVariables of an
+	//expression) is "standard and omitted" in the manual; the variables read by let x == e1, ... @ e are those
+	//of the values e1, ... and of the body e. The values are held in declarations : Declaration, and a
+	//Declaration is not an Expression, so the generic case below never reached them: a variable that occurs
+	//only in the value of a let was not read (no get_v?v before the action, Rule 62 readState), and it was
+	//free in the generated equation. A reference to the bound name x is a RefExp to the Declaration, not to
+	//a Variable, so it is not collected.
+	if(expr.instanceOf(RC!LetExpression)){
+		for(d in expr.declarations){
+			set = set.includingAll(usedVariablesInExpr(d.value,container));
+		}
+		set = set.includingAll(usedVariablesInExpr(expr.expression,container));
 	} else
 	{
 		"line814".println();
