@@ -1,0 +1,57 @@
+/****************************
+Shared by the three templates circusM2T.egl, circusM2T_HOLCSP.egl and circusM2T_HOLCSP_trans_core.egl
+(imported by each, 15 Nov 2026, generator issue Y, Fang).
+Generator convention, not a rule of the manual: printing of a tuple selection t.k (CZT TupleSelExpr) as
+Isabelle projections. Isabelle tuples are right-nested pairs, (a, b, c) = (a, (b, c)), so component k of an
+n-tuple is fst (snd^(k-1) t) for k < n and snd^(n-1) t for k = n.
+n is the attribute arity of TupleSelExpr (circus_metamodel.ecore; set by RC2Z, createTupleSelExprGeneral).
+n = 0 means unknown (an older Z model, or a selection created elsewhere): then the result is exactly the
+printing used before 15 Nov 2026 (exact for pairs only; for k > 2 the component is assumed NOT to be the
+last one).
+t is the printed tuple expression, already in parentheses. The result is not parenthesised.
+******************************/
+operation tupleSelString(t: String, k: Integer, n: Integer): String{
+	var str : String;
+	if(n.isUndefined() or n = 0){
+		if(k = 1){
+			str = "fst " + t;
+		}
+		if(k = 2){
+			str = "snd " + t;
+		}
+		if(k > 2){
+			("parseTupleSelExpr: component " + k + " of a tuple with more than 2 members, check by hand").println();
+			str = t;
+			var i = 1;
+			while(i < k){
+				str = "snd (" + str + ")";
+				i++;
+			}
+			str = "fst (" + str + ")";
+		}
+		return str;
+	}
+	//number of snd: k - 1 below the last component, n - 1 for the last one
+	var m = k - 1;
+	if(k = n){
+		m = n - 1;
+	}
+	str = t;
+	var j = 0;
+	while(j < m){
+		if(j = 0){
+			str = "snd " + str;
+		} else {
+			str = "snd (" + str + ")";
+		}
+		j++;
+	}
+	if(k < n){
+		if(m = 0){
+			str = "fst " + str;
+		} else {
+			str = "fst (" + str + ")";
+		}
+	}
+	return str;
+}

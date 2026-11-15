@@ -78,3 +78,24 @@ declarations of the three records it reaches:
 Before, the IsaCircus theory of Legitimate used `ScrewImageData` in its event channel declarations
 without declaring it. Any model whose state machine uses types declared in another file changes in
 the same way. Not checked: whether IsaCircus accepts the new theory.
+
+## Branch composite-states: projection of n-tuples (generator issue Y, 15 Nov 2026)
+
+`TupleSelExpr` has a new optional attribute `arity` (circus_metamodel.ecore; default 0 = unknown;
+marked as a deviation from CZT by an annotation). RC2Z sets it to the number of components of the
+RoboChart product type; `circusM2T.egl` prints the selection through the shared operation
+`tupleSelString` (`erules/tupleSelection.eol`, imported at the first line of the template), as the two
+HOL-CSP templates do. Component k of an n-tuple is printed `fst (snd^(k-1) t)` for k < n and
+`snd^(n-1) t` for k = n; for arity 0 the printing is the one used before.
+
+Effect on the IsaCircus output: only selections from tuples with three or more components change, and
+only when the component is not the first one. Pairs are printed exactly as before. Checked: ex10,
+Legitimate, c1 to c6 and the flat MakePlan unchanged; the full `dti/enriched/Adaptation_Plan.rct`
+(`imagesWithLight_var : Seq(ScrewImageData * real * nat)`, component 2) changes in 2 places (Trans and
+Transc):
+
+    before:  snd ((imagesWithLight_var ! ...))
+    after:   fst (snd ((imagesWithLight_var ! ...)))
+
+Before, the IsaCircus theory selected the pair `(real, nat)` where the real number is meant. Not
+checked: whether IsaCircus accepts the new theory.

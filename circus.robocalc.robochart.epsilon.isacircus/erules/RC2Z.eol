@@ -123,6 +123,12 @@ translates the types of the selected file's package and the types of other non-t
 from the selected file (typeDeclsToTranslate), dependencies first. Names are not qualified; a clash of two
 type names stops the generation with an error. Changes the output of models that use types of an imported
 package (dti/enriched: Legitimate, Adaptation_Plan).
+
+15 Nov 2026, branch composite-states (Fang)
+Tuple selection (generator issue Y): createTupleSelExprGeneral sets the new optional attribute arity of
+TupleSelExpr (circus_metamodel.ecore; a deviation from CZT, marked there by an annotation) to the number of
+components of the RoboChart product type. The templates print the projection of an n-tuple from it
+(tupleSelection.eol); before, component 2 was always printed as snd, which is wrong for n > 2.
 ******************************/
 
 
@@ -8520,6 +8526,15 @@ operation RC!ArrayExp createTupleSelExprGeneral(): Z!TupleSelExpr{
 		("createTupleSelExprGeneral: tuple index must be a number literal in " + self).println();
 	}
 	tupleSelExpr.numeral.value = self.parameters.first().value;
+	//arity of the tuple (15 Nov 2026, generator issue Y): the number of components of the RoboChart product
+	//type of the selected value, which createExpr has checked to be a ProductType before calling this
+	//operation. The attribute is a deviation from CZT (see the annotation in circus_metamodel.ecore); the
+	//templates need it to print the projection of an n-tuple (tupleSelection.eol). Left at 0 (unknown) if the
+	//type cannot be determined.
+	var base_type = self.value.rcType();
+	if(base_type.isDefined() and base_type.isKindOf(RC!ProductType)){
+		tupleSelExpr.arity = base_type.types.size();
+	}
 	return tupleSelExpr;
 }
 

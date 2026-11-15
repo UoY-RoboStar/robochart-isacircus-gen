@@ -1,6 +1,12 @@
-[*19052025
+[%import "tupleSelection.eol";%][*19052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 ????????????????*]
+[*15 Nov 2026, branch composite-states (Fang). Generator issue Y: tuple selections are printed by the
+shared operation tupleSelString of tupleSelection.eol (imported at the first line; an EGL import must come
+before any text), from the numeral and
+the new attribute arity of TupleSelExpr; with arity 0 (unknown) as before. Shared by circusM2T.egl,
+circusM2T_HOLCSP.egl and circusM2T_HOLCSP_trans_core.egl.
+*]
 
 theory IsaCircus_enriched_[%=baseName%]_[%=ts%] 
 	imports "Test_Generation.Ax_CyPhyCircus" Action_Command_Compat
@@ -997,31 +1003,16 @@ end
 *]
 [*self.expr may be any expression, e.g. (IDEAL_LIGHTING(model))[1] -> (fst (IDEAL_LIGHTING((model)))).
   Isabelle tuples are right-nested pairs, (a, b, c) = (a, (b, c)), so component k of an n-tuple is
-  fst (snd^(k-1) t) for k < n and snd^(n-1) t for k = n. The Z model does not carry n, so only
-  pairs are handled exactly; for k > 2 the component is assumed NOT to be the last one.*]
+  fst (snd^(k-1) t) for k < n and snd^(n-1) t for k = n. Since 15 Nov 2026 n is carried by the attribute
+  arity of TupleSelExpr (set by RC2Z); the printing is in tupleSelection.eol, shared by the three templates
+  circusM2T.egl, circusM2T_HOLCSP.egl, circusM2T_HOLCSP_trans_core.egl.*]
 [%operation Z!TupleSelExpr parseTupleSelExpr(): String{
-	var  str : String;
+	//15 Nov 2026 (generator issue Y): printed by the shared operation tupleSelString (tupleSelection.eol,
+	//imported at the top of this template) from the numeral and the arity of the selection; with arity 0
+	//(unknown) as before.
 	//parenthesise: "fst f(x)" would parse as "(fst f) x"
 	var t = "(" + self.expr.parseExpr() + ")";
-
-	if(self.numeral.value = 1){
-		str = "fst " + t;
-	}
-	if(self.numeral.value = 2){
-		str = "snd " + t;
-	}
-	if(self.numeral.value > 2){
-		("parseTupleSelExpr: component " + self.numeral.value + " of a tuple with more than 2 members, check by hand").println();
-		str = t;
-		var i = 1;
-		while(i < self.numeral.value){
-			str = "snd (" + str + ")";
-			i++;
-		}
-		str = "fst (" + str + ")";
-	}
-
-	return "(" + str + ")";
+	return "(" + tupleSelString(t, self.numeral.value, self.arity) + ")";
 }%]
 
 [%operation Z!ApplExpr parseLessThan(): String{
