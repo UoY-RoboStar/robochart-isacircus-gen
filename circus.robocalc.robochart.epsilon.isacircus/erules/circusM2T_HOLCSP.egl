@@ -1,7 +1,8 @@
 [*14052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
-[*15 Nov 2026, branch datatype-plugins-threshold (Fang). EXPERIMENT, not decided.
+[*15 Nov 2026, branch datatype-plugins-threshold, merged into composite-states (Fang). Threshold 80 decided by
+Fang on 15 Nov 2026 (first written as an experiment).
 Generator convention, not a rule of the manual: CHAN_EVENT_PLUGIN_THRESHOLD (at the theory line) is the
 largest number of constructors of chan_event for which the datatype is printed with all plugins. Above it
 the plugins code, transfer and the five quickcheck plugins are switched off for chan_event only, and a
