@@ -209,9 +209,13 @@ the generator).
 - Kind: semantic (fixed default against nondeterministic choice).
 - Background: the comment in RC2Z says the CSP-M default is an FDR workaround. For the deadlock-freedom
   proofs at the ncCore level there is no memory and every value read is arbitrary, so the proofs cover the
-  manual's choice as well. Relevant to MakePlan: `modelScore` is never initialised; with the CSP-M default
-  `<>` the index guard blocks (FDR prediction D.2a, `stm_nodes_and_parallel/dti-plan-deadlock-fdr/`, NOT
-  RUN).
+  manual's choice as well. Relevant to the inner MakePlan of the FULL Adaptation_Plan: `modelScore` has no
+  initial value and no action extends it; with the CSP-M default `<>` the index guard of imageToCheck blocks
+  (FDR prediction D.2a, `stm_nodes_and_parallel/dti-plan-deadlock-fdr/`, NOT RUN). CORRECTED 16 Nov 2026:
+  this is not so for the flat MakePlan of D1.3, whose modelToCheck appends `<0>` to modelScore (see the proof
+  repository, `stm_nodes_and_parallel/DEFINEDNESS_NOTES.md`). In the flat model an arbitrary initial value
+  (Rule 35) of modelRanking would make the unguarded indices in the conditions undefined; the default `<>`
+  does not.
 - Status: as the CSP-M; to decide whether to follow the manual (choice over the type) in the memory.
 
 ## 11. Guards for division and sequence indexing
@@ -223,8 +227,13 @@ the generator).
   `index-division-guards` (e3f812b, NOT merged): 8 conditions in 3 transition actions of MakePlan, no
   change for ex10, Legitimate, c1-c6.
 - Kind: manual incomplete (definedness, entry 16); semantic between `composite-states` and the CSP-M.
-- Background: the D1.3 MakePlan result relies on the HOL-CSP having no index guards (generator CLAUDE.md,
-  "Guards for division and indexing, experiment").
+- Background (CORRECTED 16 Nov 2026): with the default initial values the index guards of the flat MakePlan
+  of D1.3 always hold (predicted, FDR scripts `stm_nodes_and_parallel/definedness-fdr/` of the proof
+  repository, NOT RUN), so the MODEL does not need their absence; the PROOF METHOD does: at the ncCore level
+  the values read are arbitrary, so a guarded branch would be blocked for some values and the existing
+  method would fail without invariants on the memory. The earlier statement "modelScore is never initialised,
+  so MakePlan would deadlock" holds for the full Adaptation_Plan only. FDR scripts and the analysis of guards
+  against definedness obligations: proof repository `stm_nodes_and_parallel/DEFINEDNESS_NOTES.md`.
 - Status: PENDING (Fang, 16 Nov 2026): the branch stays unmerged until entry 16 is decided with Ana.
 
 ## 12. Rules 45 to 50: vars and usedVariables
