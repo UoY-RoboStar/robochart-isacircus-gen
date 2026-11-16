@@ -263,6 +263,14 @@
         containment="true"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
         containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="generatorNote" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="A warning of the generator about this paragraph, or unset. Added on 16 Nov 2026 by Fang (exit actions of the inner states of a composite state that read or write the variable of an input trigger of a transition leaving the state, docs/SEMANTICS_DIFFERENCES.md). RC2Z sets it on the paragraph Behaviour_&lt;state&gt;; the HOL-CSP and IsaCircus templates print it as a comment at the composite state, and the plugin and dev-tools report it after the model-to-model step. It does not change the meaning of the paragraph."/>
+      </eAnnotations>
+      <eAnnotations source="http://www.robocalc.circus/Circus/deviation">
+        <details key="czt" value="Deviation from CZT: CZT has no generator annotations on paragraphs. This metamodel carries one optional string on an action paragraph, so that a warning found in the model-to-model step can be printed next to the paragraph it concerns and read by the caller from the Z model; it has no meaning in Circus."/>
+      </eAnnotations>
+    </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="ChannelPara" eSuperTypes="#//Para">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">

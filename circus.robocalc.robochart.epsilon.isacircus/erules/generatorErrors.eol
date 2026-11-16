@@ -57,3 +57,14 @@ operation missingActionMarker(owner: Any): String{
 	}
 	return generatorErrorMarker("missing_action", name);
 }
+
+//16 Nov 2026: the warning of RC2Z on paragraph p (attribute generatorNote of ActionPara, set by
+//exitTriggerConflicts on Behaviour_<state>) as an Isabelle comment line, or "" if there is none. Printed by
+//circusM2T_HOLCSP.egl at the composite state and by circusM2T.egl before the paragraph.
+operation generatorNoteComment(p: Any): String{
+	if(p.isDefined() and p.isKindOf(Z!ActionPara) and p.generatorNote.isDefined() and p.generatorNote <> ""){
+		var note = p.generatorNote.replace("\\*\\)", "* )").replace("\\(\\*", "( *");
+		return "(* GENERATOR WARNING: " + note + " *)\r\n";
+	}
+	return "";
+}

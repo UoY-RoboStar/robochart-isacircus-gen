@@ -305,6 +305,27 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
     return; // stop here, do not proceed to Step 2
 }
 
+        // Warnings of RC2Z (16 Nov 2026, GeneratorNotes; e.g. an exit action of an inner state of a composite
+        // state that reads or writes the variable of an input trigger leaving it): reported, the generation
+        // goes on; the theories carry them as comments
+        final java.util.List<String> notes = circus.robocalc.robochart.epsilon.isacircus.m2t.GeneratorNotes.collect(circusModel);
+        if (!notes.isEmpty()) {
+            StringBuilder nb = new StringBuilder();
+            for (String n : notes) {
+                CompileLog.warning("RC2Z.eol: " + n);
+                nb.append(n).append("\n\n");
+            }
+            final String noteText = nb.toString();
+            org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+                org.eclipse.jface.dialogs.MessageDialog.openWarning(
+                    org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                    "IsaCircus: generator warning",
+                    "The theories are generated; the generator found the following, also written as comments "
+                    + "(GENERATOR WARNING) in the theories:\n\n" + noteText
+                    + "Log: " + CompileLog.LOG_FILE.getPath());
+            });
+        }
+
         // Disposing circusModel triggers storeOnDisposal, writing _circus.model to temp dir
         circusModel.dispose();
         // rcModel is disposed after Step 2, which uses the same resolved resource

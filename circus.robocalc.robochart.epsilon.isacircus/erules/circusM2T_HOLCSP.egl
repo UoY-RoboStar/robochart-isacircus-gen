@@ -1,6 +1,12 @@
 [*14052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
+[*16 Nov 2026, branch composite-states (Fang). A warning of RC2Z about a paragraph (attribute generatorNote
+of ActionPara, set on Behaviour_<state> when an exit action of an inner state reads or writes the variable of
+an input trigger leaving the composite state) is printed as the comment (* GENERATOR WARNING: ... *) by
+generatorNoteComment of generatorErrors.eol: in circusM2T_HOLCSP.egl before the paragraphs of the composite
+state, in circusM2T.egl before the paragraph. circusM2T_HOLCSP_trans_core.egl prints no node paragraphs.
+*]
 [*16 Nov 2026, branch m2t-partial-output (Fang). Generator convention, not a rule of the manual: an action
 that is missing in the Z model is printed as the marker GENERATOR_ERROR_missing_action_<paragraph>
 (parseActionOrMarker, missingActionMarker of generatorErrors.eol, imported with the other shared modules)
@@ -283,6 +289,11 @@ for(c in containerOrder.select(c | c.containerDepth(nidsMap) > 0)){
 [%for(cont in containersInnermostFirst){%]
 [%for(nd in nidsMap.get(cont)){%]
 [%if(nidsMap.containsKey(nd)){
+	//16 Nov 2026: a warning of RC2Z about this composite state (generatorNote of Behaviour_<state>,
+	//generatorErrors.eol), printed as a comment before its paragraphs
+	for(np in actparas.select(ap|ap.name.word = "Behaviour_" + nd)){
+		out.print(generatorNoteComment(np));
+	}
 	//composite state: RunEntered, During and Behaviour are not recursive with the frame of the node; they are
 	//printed before it, each on its own, so that fixrec has no continuity obligation for the hiding, the
 	//renamings and the parallel composition of Behaviour

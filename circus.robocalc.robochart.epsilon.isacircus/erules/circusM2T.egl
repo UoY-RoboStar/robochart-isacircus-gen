@@ -1,6 +1,12 @@
 [%import "toolkitFunctions.eol";%][%import "generatorErrors.eol";%][%import "tupleSelection.eol";%][*19052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 ????????????????*]
+[*16 Nov 2026, branch composite-states (Fang). A warning of RC2Z about a paragraph (attribute generatorNote
+of ActionPara, set on Behaviour_<state> when an exit action of an inner state reads or writes the variable of
+an input trigger leaving the composite state) is printed as the comment (* GENERATOR WARNING: ... *) by
+generatorNoteComment of generatorErrors.eol: in circusM2T_HOLCSP.egl before the paragraphs of the composite
+state, in circusM2T.egl before the paragraph. circusM2T_HOLCSP_trans_core.egl prints no node paragraphs.
+*]
 [*16 Nov 2026, branch m2t-partial-output (Fang). Generator convention, not a rule of the manual: an action
 that is missing in the Z model is printed as the marker GENERATOR_ERROR_missing_action_<paragraph>
 (parseActionOrMarker, missingActionMarker of generatorErrors.eol, imported with the other shared modules)
@@ -167,6 +173,8 @@ abbreviation "guar b P \<equiv> (if b then P else gviol \<rightarrow> Stop)"
 actions  is "(mychan, unit) cyphyaction" where 
 "SSTOP = share  \<rightarrow>  SSTOP" |
 [%for(actpara in actparas){
+	//16 Nov 2026: a warning of RC2Z about the paragraph (generatorNote, generatorErrors.eol) as a comment
+	out.print(generatorNoteComment(actpara));
 	if(actpara.circusAction.instanceOf(Z!ParamAction)){%]
 " [%= actpara.name.word%]([%=actpara.circusAction.declList.parseZDeclList()%]) = [%} else {%]
 " [%= actpara.name.word%] = [%}%]

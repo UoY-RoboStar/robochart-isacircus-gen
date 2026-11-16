@@ -158,6 +158,13 @@ command containing the marker. The type name clash of issue W still stops the ge
 declaration under a marker name would be a valid declaration, and every reference to the type is printed by
 its unqualified name, so no marker can make Isabelle stop at the right place (generator CLAUDE.md, "M2T
 errors and output").
+
+16 Nov 2026, branch composite-states (Fang)
+Exit actions of inner states and input triggers (exitTriggerConflicts, at Rule 60): for a composite state with
+a transition leaving it whose trigger binds a variable x, an exit action of an inner state (any depth) that
+reads or writes x gives a warning (generatorNote on Behaviour_<state>, printed as a comment by the templates,
+reported by the plugin and dev-tools); the generation goes on. Comments at Rules 41 and 60: Pedro's
+explanations of 16 Nov 2026 (docs/SEMANTICS_DIFFERENCES.md).
 ******************************/
 
 
@@ -4555,13 +4562,29 @@ operation ncCoreBehaviour(nc: RC!NodeContainer): Z!ActionPara{
 	
 	/***************begin of C.2.2 metanotatin************************/
 	
-	//Rule 41 with Definition C.2.2, AS THE MANUAL: |[vars(nc.nodes) | flowevts, transSync(nc), end |
+	//Rule 41 with Definition C.2.2, AS THE MANUAL (p. 47): |[vars(nc.nodes) | flowevts, transSync(nc), end |
 	//vtguards(nc) : {}]|, i.e. pr = pw = vars(nc.nodes), qr = vtguards(nc), qw = {} (the manual explains
 	//why the transitions are taken to write nothing in parallel). So setL_v is used for the variables of
-	//vars(nc.nodes) that the guards read (pw /\ qr), and there is no setR. KNOWN DIFFERENCE from RoboTool's
-	//CSP-M (D2), kept, also when nc is a composite state: the CSP-M uses setL_v for EVERY variable read by a guard of
-	//the container's transitions (also one that no node writes, e.g. v1 of ex10) and setR_v for a variable
-	//bound by a trigger parameter. Checked with FDR on Legitimate (flat): no effect on the behaviour.
+	//vars(nc.nodes) that the guards read (pw /\ qr), and there is no setR.
+	//DIFFERENT FROM RoboTool's CSP-M (difference D2, docs/SEMANTICS_DIFFERENCES.md), kept, also when nc is a
+	//composite state: the CSP-M (CStateGenerator.xtend NCCoreBehaviour_rule 80-108, nodeVars 446-451,
+	//CTransitionGenerator.xtend 281-305, robochart-csp-gen a6412b40c8) uses on the node side every variable
+	//of the machine (allVariables), on the Trans side the variables read by the guards (qr) and the variables
+	//bound by trigger parameters (qw); hence setL_v for every variable read by a guard (also one that no node
+	//writes, e.g. v1 of ex10) and setR_v for a variable bound by a trigger. Checked with FDR on Legitimate
+	//(flat): no effect on the behaviour.
+	//Reason (Pedro, 16 Nov 2026): the empty write set of the Trans side is right: the behaviour of a state
+	//machine is sequential; while a transition action runs no state is active, and when a transition is
+	//triggered no action of any state (inner states included) is running. The extra variables of the CSP-M
+	//on the Trans side are not needed but harmless. D2 closed: the manual is followed.
+	//HAZARD (not handled, Fang's decision of 16 Nov 2026: keep the manual for now): vars(nc.nodes) (Rules 46,
+	//48, 50) contains for an operation call only the call's arguments and requiredVariables (the parameters
+	//of the operation), not the variables that the called operation's definition reads or writes. If an
+	//action of a node calls an operation that writes a variable occurring nowhere in the nodes, that write is
+	//not synchronised here (Pedro, 16 Nov 2026: vars(s.nodes) should include the variables of the called
+	//operations; the manual is incomplete there). No effect now: operation calls are not supported (generator
+	//issue R). When R is implemented, this side must include the variables of the called operations, or use
+	//all variables of the machine as the CSP-M does.
 	var ncCoreBehaviour = createMetaParallelAction(nc, 
 												  composedNodeActionTidsRenamed, 
 												  vars(nc.nodes), 
@@ -6390,7 +6413,16 @@ operation RC!State createCompositeStateAsActionParas(){
 											cs,
 											machineVarNames(self));
 	Behaviour = Behaviour.createHideAction(enteredSS(self).includingAll(Sequence{"terminate"}));
-	Behaviour.createActionPara("Behaviour_" + self.FQN());
+	var BehaviourPara = Behaviour.createActionPara("Behaviour_" + self.FQN());
+	//Exit actions of the inner states and input triggers (16 Nov 2026, exitTriggerConflicts): a warning, the
+	//generation goes on. It is put on the paragraph Behaviour_<state> (attribute generatorNote, a deviation
+	//from CZT marked in circus_metamodel.ecore); the templates print it at the composite state, the plugin
+	//and dev-tools report it.
+	var exitNotes = self.exitTriggerConflicts();
+	if(exitNotes.size() > 0){
+		BehaviourPara.generatorNote = exitNotes.concat(" ");
+		for(n in exitNotes){ ("GENERATOR WARNING: " + n).println(); }
+	}
 	
 	
 	/*******************************
@@ -6473,6 +6505,57 @@ operation RC!State createCompositeStateAsActionParas(){
 }
 
 
+//Precondition check for a composite state (16 Nov 2026, Fang; docs/SEMANTICS_DIFFERENCES.md, item
+//"Exit actions of inner states and the assignment of an input trigger"). Not a rule of the manual; a
+//warning only, the translation is unchanged.
+//The problem (known, Pedro, 16 Nov 2026): a transition t from the composite state S with an input trigger
+//e?x does, in Trans of S's container (Rule 54 with Rule 55, p. 50-51), e?x and then set_x!x before exit.
+//The same event e, renamed to interrupt_S (Rule 40), interrupts S, and the inner states of S, at any
+//depth, run their exit actions inside Behaviour_S (Rules 59, 60) while Trans of the container goes on to
+//set_x!x; the write of x and these exit actions are not ordered (both are under SStop and synchronise only
+//on share). An exit action of an inner state that reads x may see the old or the new value, one that
+//writes x may be overwritten or not. The exit action of S itself comes after exit, i.e. after set_x!x, and
+//is ordered. Here: for every transition from S whose trigger has a parameter x, every state inside S (all
+//levels) whose exit action reads or writes x (vars of Rule 50) gives one message. Not covered: x read or
+//written in an operation called by the exit action (vars of a call contains only its arguments and the
+//parameters of the operation, see the hazard at Rule 41).
+operation RC!State exitTriggerConflicts(): Sequence<String>{
+	var msgs = new Sequence<String>;
+	var container = self.eContainer();
+	var outgoing = container.transitions.select(t | t.source = self and t.trigger.isDefined()
+		and t.trigger.parameter.isDefined());
+	if(outgoing.isEmpty()){
+		return msgs;
+	}
+	for(s in self.innerStatesAllLevels()){
+		for(a in s.actions.select(a | a.type().name = "ExitAction")){
+			var vs = vars(a.action);
+			for(t in outgoing){
+				var x = t.trigger.parameter.name;
+				if(vs.includes(x)){
+					msgs.add("Composite state " + self.name + ": the exit action of its inner state " + s.name
+						+ " reads or writes " + x + ", the variable bound by the input trigger of transition "
+						+ t.name + " leaving " + self.name + ". The assignment of the trigger value to " + x
+						+ " and the exit actions of the inner states are not ordered (Rules 55, 59, 60), so the value"
+						+ " of " + x + " seen or left by that exit action depends on the interleaving (known"
+						+ " problem, Pedro, 16 Nov 2026). The theory is generated unchanged.");
+				}
+			}
+		}
+	}
+	return msgs;
+}
+
+//the states inside a composite state, at every depth (final states included; junctions have no actions)
+operation RC!State innerStatesAllLevels(): Sequence{
+	var result = new Sequence;
+	for(n in self.nodes.select(n | n.isKindOf(RC!State))){
+		result.add(n);
+		result.addAll(n.innerStatesAllLevels());
+	}
+	return result;
+}
+
 //Auxiliary of Rule 60 (generator convention, not a rule of the manual).
 //The machine (state machine or operation) that a node container belongs to: the container itself, or the
 //enclosing machine of a composite state.
@@ -6493,6 +6576,10 @@ operation machineOf(nc: RC!NodeContainer): RC!NodeContainer{
 //operation definitions to provide interfaces ("... cannot provide interface"), so for every model accepted
 //by RoboTool the provided part is empty; it is kept to follow the source. After the FQN pre-processing
 //v.name is the qualified name of a variable of a state machine.
+//DIFFERENT FROM allVariables (found 16 Nov 2026, not changed; docs/SEMANTICS_DIFFERENCES.md entry 2, generator
+//issue EE): allVariables also adds the variables of the REQUIRED interfaces (stm.RInterfaces, its last loop);
+//they are missing here. No generated model is affected (Adaptation_Plan has only defined interfaces; c7, the
+//only test model with requires, cannot be generated yet).
 operation machineVarNames(nc: RC!NodeContainer): Sequence<String>{
 	var m = machineOf(nc);
 	var names = new Sequence<String>;
@@ -6521,12 +6608,20 @@ operation machineVarNames(nc: RC!NodeContainer): Sequence<String>{
 	return names;
 }
 
-//Rule 60 (Behaviour), Definition C.2.2 in its two-sided form. DIFFERENT FROM THE MANUAL: Rule 60 has
-//|[vars(s.nodes) | cs | vars(s.during)]|, for which Definition C.2.2 uses setL for the variables in
-//vars(s.nodes) /\ vars(s.during) and setR likewise; here, as in RoboTool's CSP-M, ALL
-//variables of the machine are used on both sides (c5: also for a composite state that uses no variable).
-//Reason for following the CSP-M: During is not under SStop at its prefix entered_<state>; with smaller
-//sets a write of the inner machine at that moment would not be synchronised with During.
+//Rule 60 (Behaviour), Definition C.2.2 in its two-sided form. DIFFERENT FROM THE MANUAL (p. 53, difference
+//R60-vars of docs/SEMANTICS_DIFFERENCES.md): Rule 60 has |[vars(s.nodes) | cs | vars(s.during)]|, for which
+//Definition C.2.2 uses setL for the variables in vars(s.nodes) /\ vars(s.during) and setR likewise; here,
+//as in RoboTool's CSP-M (CStateGenerator.xtend compileCompositeStateBehaviour 340-356, stmVars 453-458,
+//GeneratorUtils.xtend allVariables 483-511, robochart-csp-gen a6412b40c8), ALL variables of the machine
+//are used on both sides (c5: also for a composite state that uses no variable).
+//Reasons: (1) ours: During is not under SStop at its prefix entered_<state>; with smaller sets a write of
+//the inner machine at that moment would not be synchronised with During. (2) Pedro, 16 Nov 2026: the
+//formula of the manual is right in intent but incomplete: vars(s.nodes) should also contain the variables
+//read and written by the definitions of the software operations called inside the composite state
+//(including the variables the machine provides and those required by the called operations); the CSP
+//semantics of the nodes alone, or of the operations alone, is not enough; the CSP-M uses all variables of
+//the machine for convenience, a superset, which guarantees the right behaviour. Decision (Fang, 16 Nov
+//2026): keep allVariables as the CSP-M.
 //The two-sided write synchronisation of Behaviour of a composite state (Rule 60), as RoboTool's CSP-M
 //writes it:
 //  ( P [share -> share, setR_v...] [set_v -> setL_v...]  [| cs, share, setL_v..., setR_v... |]

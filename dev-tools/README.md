@@ -39,3 +39,6 @@ Each template is caught on its own, as in the plugin (`PartialOutput.java` in th
 `INCOMPLETE` at the beginning and `GENERATOR ERROR` and an `ML` error command at the end, GenAll prints
 `INCOMPLETE <file>: <reason>` and ends with exit code 2 after all templates; the other templates still run.
 A failure of `RC2Z.eol` stops GenAll as before (no theory).
+Warnings of `RC2Z.eol` (attribute `generatorNote` of the Z model, read by `GeneratorNotes.java`; at present the
+exit-action check of composite states) are printed as lines `GENERATOR WARNING: ...` after the model-to-model step;
+they do not stop GenAll.

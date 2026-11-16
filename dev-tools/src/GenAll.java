@@ -12,6 +12,7 @@ import org.eclipse.epsilon.eol.execute.context.Variable;
 import org.eclipse.xtext.resource.XtextResourceSet;
 import circus.robocalc.robochart.textual.RoboChartStandaloneSetup;
 import circus.robocalc.robochart.epsilon.isacircus.loader.RctLoader;
+import circus.robocalc.robochart.epsilon.isacircus.m2t.GeneratorNotes;
 import circus.robocalc.robochart.epsilon.isacircus.m2t.PartialOutput;
 
 /**
@@ -92,6 +93,8 @@ public class GenAll {
     eol.getContext().getModelRepository().addModel(z);
     eol.getContext().setOutputStream(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
     eol.execute();
+    // warnings of RC2Z (GeneratorNotes, 16 Nov 2026): printed, the generation goes on
+    for (String n : GeneratorNotes.collect(z)) System.out.println("GENERATOR WARNING: " + n);
     z.dispose();
 
     EmfModel zr = new EmfModel();

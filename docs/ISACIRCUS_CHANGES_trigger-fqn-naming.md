@@ -157,3 +157,15 @@ runs).
 
 Not checked: how IsaCircus reports the markers (no IsaCircus session on the workstation); for the HOL-CSP
 output Isabelle reports them as "Extra variables on rhs".
+
+## Branch composite-states: warning comment at a composite state (16 Nov 2026)
+
+When an exit action of an inner state of a composite state S (any depth) reads or writes the variable bound
+by the input trigger of a transition leaving S, RC2Z stores a warning on the paragraph `Behaviour_<S>`
+(new optional attribute `generatorNote` of `ActionPara`, a deviation from CZT marked in the metamodel), and
+`circusM2T.egl` prints it as a comment line `(* GENERATOR WARNING: ... *)` before that paragraph in the
+`actions` list. Nothing else changes; the generation is not stopped (the plugin also shows a dialog).
+Effect on the IsaCircus output: none for every model generated so far (ex10, Legitimate, c1 to c6, the
+flat MakePlan and the full Adaptation_Plan: the same tokens; none has such an exit action); test model
+c8 (`composite-tests/c8_exit_input.rct`) gets one comment. Background: `docs/SEMANTICS_DIFFERENCES.md`,
+entry 6.
