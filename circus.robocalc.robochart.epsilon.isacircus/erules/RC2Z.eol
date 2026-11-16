@@ -1,3 +1,4 @@
+import "toolkitFunctions.eol";
 /****************************
 Due to Rule 60 Semantics of composite states,
 we have to transform most of the RoboChart components into actions instead of processes
@@ -129,6 +130,18 @@ Tuple selection (generator issue Y): createTupleSelExprGeneral sets the new opti
 TupleSelExpr (circus_metamodel.ecore; a deviation from CZT, marked there by an annotation) to the number of
 components of the RoboChart product type. The templates print the projection of an n-tuple from it
 (tupleSelection.eol); before, component 2 was always printed as snd, which is wrong for n > 2.
+
+16 Nov 2026, branch composite-states (Fang)
+Toolkit functions (generator issue AA). The manual has no rule for them (Rule 45 omits usedVariables of
+expressions, Appendix D lists the toolkits but not the sequence toolkit). createCallExpr writes a call of a
+function of a toolkit with its qualified name <package>_<function> (toolkitCallName), as RoboTool's CSP-M
+generator; the templates print it by toolkitFunctions.eol (imported here as well). Supported: the sequence and
+set toolkits except range, iter, squash, extract; size for sequences only. Any other toolkit function stops
+the generation with an error naming it. Preconditions: an assignment, a call, a communication and an if
+statement are guarded by the preconditions of the toolkit functions they call (toolkitGuards,
+withToolkitGuards in createStmtAsAction), placed and collected as in the CSP-M generator
+(CStatementGenerator.xtend, robochart-csp-gen a6412b40c8); the guards for division and indexing of the
+CSP-M generator are not generated.
 ******************************/
 
 
@@ -7179,23 +7192,25 @@ operation RC!Statement createStmtInContextAsAction(): Z!CircusAction{
 
 //CSP Rule 65_aux
 operation RC!Statement createStmtAsAction(): Z!CircusAction{
+	//withToolkitGuards (16 Nov 2026, generator issue AA): the preconditions of toolkit functions, for the four
+	//kinds of statements that the CSP-M generator guards (assignment, call, communication, if)
 	if(self.instanceOf(RC!Assignment)){
-		return self.createAssignmentStmtAsAction();
+		return self.withToolkitGuards(self.createAssignmentStmtAsAction());
 	} else
 	if(self.instanceOf(RC!Call)){
-		return self.createCallStmtAsAction();
+		return self.withToolkitGuards(self.createCallStmtAsAction());
 	} else
 	if(self.instanceOf(RC!Skip)){
 		return self.createSkipStmtAsAction();
 	} else
 	if(self.instanceOf(RC!CommunicationStmt)){
-		return self.createCommuStmtAsAction();
+		return self.withToolkitGuards(self.createCommuStmtAsAction());
 	} else
 	if(self.instanceOf(RC!ParStmt)){
 		return self.createParStmtAsAction();
 	} else
 	if(self.instanceOf(RC!IfStmt)){
-		return self.createIfStmtAsAction();
+		return self.withToolkitGuards(self.createIfStmtAsAction());
 	} else
 	if(self.instanceOf(RC!SeqStatement)){
 		return self.createSeqStmtAsAction();
@@ -8064,6 +8079,15 @@ operation RC!CallExp createCallExpr(): Z!ApplExpr{
 	("line 6843, self.`function`.ref.name = " + self.`function`.ref.name).println();
 	
 	expr.leftExpr = self.`function`.createExpr();
+	//A function of a toolkit (16 Nov 2026, generator issue AA): written with the qualified name
+	//<package>_<function>, as RoboTool's CSP-M generator does (ExpressionGenerator.xtend, compileCallExpression,
+	//https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/ExpressionGenerator.xtend#L190-L237);
+	//the templates print it by toolkitFunctionTable (toolkitFunctions.eol). A toolkit function that is not
+	//in the table, and size of a set, stop the generation.
+	var tkName = toolkitCallName(self);
+	if(tkName.isDefined()){
+		expr.leftExpr = tkName.createRefExpr(false,false);
+	}
 	
 	("self.function = " + self.`function`).println();
 	("self.function.type = " + self.`function`.type()).println();
@@ -8084,6 +8108,110 @@ operation RC!CallExp createCallExpr(): Z!ApplExpr{
 	return 	expr;
 }
 
+
+//Generator convention, not a rule of the manual (16 Nov 2026, generator issue AA). The qualified name
+//<package>_<function> of a call of a toolkit function, or null for another call. Stops the generation for a
+//toolkit function that is not supported (not in toolkitFunctionTable) and for size of a set.
+operation toolkitCallName(c: RC!CallExp): Any{
+	var f = c.`function`;
+	if(not (f.isTypeOf(RC!RefExp) and f.ref.isKindOf(RC!Function))){
+		return null;
+	}
+	var pkg = packageOf(f.ref);
+	if(pkg.isUndefined() or not toolkitPackages().includes(pkg.name)){
+		return null;
+	}
+	var name = pkg.name + "_" + f.ref.name;
+	if(not toolkitFunctionTable().containsKey(name)){
+		throw "Toolkit function " + f.ref.name + " (package " + pkg.name + ") is not supported by the HOL-CSP "
+			+ "generator yet (generator issue AA; see toolkitFunctions.eol). No theory is generated.";
+	}
+	if(name = "sequence_toolkit_size"){
+		var t = c.args.first().rcType();
+		if(t.isDefined() and t.isKindOf(RC!SetType) and not t.isKindOf(RC!SeqType)){
+			throw "Toolkit function size applied to a set is not supported by the HOL-CSP generator yet "
+				+ "(generator issue AA: the Isabelle term would be card). No theory is generated.";
+		}
+	}
+	return name;
+}
+
+//Preconditions of toolkit functions as guards (16 Nov 2026, generator issue AA). As RoboTool's CSP-M
+//generator (CStatementGenerator.xtend, guards(Statement), guards(Expression) and guard, lines 447-562 of
+//https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CStatementGenerator.xtend#L447-L562):
+//an assignment, a communication statement, an operation call and an if statement are guarded by
+//pre_<function>(args) for every call of a function with a precondition that the guards of the CSP-M
+//generator reach: the expressions of the statement (for a communication its value, for an if its condition,
+//for an assignment also the index of an indexed left-hand side), descending only through divisions, sequence
+//indexing and the arguments of calls, as there. The guard is placed after the reads of the statement and
+//before it, as there (readState(vars, guard & stmt)); several guards are nested in the reverse order, as the
+//CSP-M writes g1 & g2 & ... & stmt. Only toolkit functions; DIFFERENT FROM CSP-M: the guards of the CSP-M
+//for division by zero and for an index outside the sequence, and the preconditions of user-defined
+//functions, are not generated here. Transition conditions are not guarded, in the CSP-M neither.
+operation RC!Statement toolkitGuards(): Sequence{
+	var conds = new Sequence;
+	if(self.isKindOf(RC!CommunicationStmt)){
+		if(self.communication.value.isDefined()){
+			conds.addAll(toolkitGuardsOf(self.communication.value));
+		}
+	} else if(self.isKindOf(RC!IfStmt)){
+		conds.addAll(toolkitGuardsOf(self.expression));
+	} else {
+		for(e in self.eContents().select(x|x.isKindOf(RC!Expression))){
+			conds.addAll(toolkitGuardsOf(e));
+		}
+		if(self.isKindOf(RC!Assignment) and self.left.isKindOf(RC!ArrayAssignable)
+			and self.left.parameters.size() = 1){
+			conds.addAll(toolkitGuardsOf(self.left.parameters.first()));
+		}
+	}
+	return conds;
+}
+
+//guards(Expression) of the CSP-M generator, keeping only the preconditions of toolkit functions
+operation toolkitGuardsOf(o: Any): Sequence{
+	var conds = new Sequence;
+	if(o.isKindOf(RC!Div)){
+		conds.addAll(toolkitGuardsOf(o.left));
+		conds.addAll(toolkitGuardsOf(o.right));
+	} else if(o.isKindOf(RC!ArrayExp)){
+		var t = o.value.rcType();
+		if(t.isDefined() and t.isKindOf(RC!SeqType) and o.parameters.size() = 1){
+			conds.addAll(toolkitGuardsOf(o.value));
+			conds.addAll(toolkitGuardsOf(o.parameters.first()));
+		}
+	} else if(o.isKindOf(RC!CallExp)){
+		var name = toolkitCallName(o);
+		if(name.isDefined() and o.`function`.ref.preconditions.size() > 0){
+			var pre = "pre_" + name;
+			if(not toolkitFunctionTable().containsKey(pre)){
+				throw "No guard for the precondition of toolkit function " + name + " (generator issue AA).";
+			}
+			if(toolkitFunctionTable().get(pre) <> ""){
+				var g = new Z!ApplExpr;
+				g.mixFix = false;
+				g.leftExpr = pre.createRefExpr(false,false);
+				var args = new Sequence<Z!Expr>;
+				for(a in o.args){ args.add(a.createExpr()); }
+				g.rightExpr = args.createTupleExpr();
+				conds.add(g);
+			}
+		}
+		for(e in o.args){
+			conds.addAll(toolkitGuardsOf(e));
+		}
+	}
+	return conds;
+}
+
+//the action of a statement under its guards (toolkitGuards), nested in the reverse order
+operation RC!Statement withToolkitGuards(action: Z!CircusAction): Z!CircusAction{
+	var a = action;
+	for(g in self.toolkitGuards()){
+		a = createGuardedAction(g.createMemPredEquality(), a);
+	}
+	return a;
+}
 
 //covers Neg, Not
 //TO DO: is there other unaryApplExpr?

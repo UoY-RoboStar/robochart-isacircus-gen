@@ -99,3 +99,26 @@ Transc):
 
 Before, the IsaCircus theory selected the pair `(real, nat)` where the real number is meant. Not
 checked: whether IsaCircus accepts the new theory.
+
+## Branch composite-states: toolkit functions and their preconditions (generator issue AA, 16 Nov 2026)
+
+RC2Z writes a call of a function of `sequence_toolkit` or `set_toolkit` with the qualified name
+`<package>_<function>` (as RoboTool's CSP-M generator does) and guards an assignment, a communication, a
+call and an if statement by the preconditions of the toolkit functions they call, placed as in the CSP-M
+generator (after the reads, before the statement). The three templates print both by the shared table
+`erules/toolkitFunctions.eol` (`hd`, `tl`, `butlast`, `rev`, `@`, `distinct`, set operators, ...). A
+toolkit function that is not in the table (all of `relation_toolkit` and `function_toolkit`, and
+`range`, `iter`, `squash`, `extract`) and `size` of a set now STOP the generation with an error naming
+the function; before, the name was printed unchanged.
+
+Effect on the IsaCircus output, checked with dev-tools: ex10, Legitimate, c1 to c6 and the flat MakePlan
+unchanged (`size` of a sequence is printed exactly as before, `size((s))`). The full
+`dti/enriched/Adaptation_Plan.rct` changes in two places:
+
+    entry of PlanMade, before:  set_newModel_out!head((modelRanking)) -> Skip
+                       after:   ((modelRanking) \<noteq> []) \<^bold>& (... set_newModel_out!(hd (modelRanking)) -> Skip ...)
+    entry of Replan (then branch of the if), before:  set_modelRanking!tail((modelRanking)) -> Skip
+                                             after:   set_modelRanking!(tl (modelRanking)) -> Skip
+
+Before, `head` and `tail` were names that IsaCircus/Isabelle does not define. Not checked: whether
+IsaCircus accepts the new theory.

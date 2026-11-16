@@ -1,6 +1,11 @@
-[%import "tupleSelection.eol";%][*19052025
+[%import "toolkitFunctions.eol";%][%import "tupleSelection.eol";%][*19052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 ????????????????*]
+[*16 Nov 2026, branch composite-states (Fang). Generator issue AA: calls of toolkit functions (qualified
+names <package>_<function> from RC2Z) and the guards for their preconditions (pre_<package>_<function>) are
+printed by toolkitFunctionTable of toolkitFunctions.eol (imported at the first line), shared by
+circusM2T.egl, circusM2T_HOLCSP.egl and circusM2T_HOLCSP_trans_core.egl.
+*]
 [*15 Nov 2026, branch composite-states (Fang). Generator issue Y: tuple selections are printed by the
 shared operation tupleSelString of tupleSelection.eol (imported at the first line; an EGL import must come
 before any text), from the numeral and
@@ -912,6 +917,14 @@ end
 
 
 [%operation Z!ApplExpr parseApplExprAsCallExpr(): String{
+	//A call of a toolkit function (16 Nov 2026, generator issue AA): RC2Z writes it with the qualified name
+	//<package>_<function>, and also the guards pre_<package>_<function>; printed by toolkitFunctionTable
+	//(toolkitFunctions.eol, shared by circusM2T.egl, circusM2T_HOLCSP.egl, circusM2T_HOLCSP_trans_core.egl).
+	if(self.leftExpr.isTypeOf(Z!RefExpr) and toolkitFunctionTable().containsKey(self.leftExpr.parseExpr())){
+		var tkArgs = new Sequence;
+		for(a in self.rightExpr.exprList.exprs){ tkArgs.add(a.parseExpr()); }
+		return toolkitCallString(self.leftExpr.parseExpr(), tkArgs);
+	}
 	var call_str : String;
 
 	call_str = self.leftExpr.parseExpr() + "(";
