@@ -34,3 +34,8 @@ The generated theory can then be checked with `isabelle process_theories -l RC_H
 By default only the HOL-CSP template is run; with `alltemplates` also `circusM2T.egl`
 (`IsaCircus_enriched_<base>_<tag>.thy`) and `circusM2T_HOLCSP_trans_core.egl` (`HOLCSP_trans_core_<base>_<tag>.thy`),
 on the same Z model, as `CircusM2T.egx` does.
+Each template is caught on its own, as in the plugin (`PartialOutput.java` in the plugin's package
+`...isacircus.m2t`, compiled by `build.sh`): a template that throws writes the text generated so far, with
+`INCOMPLETE` at the beginning and `GENERATOR ERROR` and an `ML` error command at the end, GenAll prints
+`INCOMPLETE <file>: <reason>` and ends with exit code 2 after all templates; the other templates still run.
+A failure of `RC2Z.eol` stops GenAll as before (no theory).

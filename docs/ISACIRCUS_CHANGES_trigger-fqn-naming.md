@@ -122,3 +122,38 @@ unchanged (`size` of a sequence is printed exactly as before, `size((s))`). The 
 
 Before, `head` and `tail` were names that IsaCircus/Isabelle does not define. Not checked: whether
 IsaCircus accepts the new theory.
+
+## Branch m2t-partial-output: partial output and error markers (16 Nov 2026)
+
+How the IsaCircus output (`circus_gen/IsaCircus_enriched_*.thy`, `circusM2T.egl`) behaves when the
+generation goes wrong. The output of a model that generates without error is unchanged (checked with
+dev-tools: ex10, Legitimate, c1 to c6, the flat MakePlan and the full `dti/enriched/Adaptation_Plan.rct`;
+the same tokens as before, only the order of the elements of generated sets differs, as between any two
+runs).
+
+1. Each template is run on its own. Before, the plugin ran the three templates of `CircusM2T.egx` in one
+   EGX, and the first that threw stopped it: no file for that template and none for the templates after
+   it (the IsaCircus template runs first, so an error in it also removed the two HOL-CSP theories, and an
+   error in a HOL-CSP template left only the IsaCircus theory). Now a template that throws still writes its
+   file, under the usual name and time stamp, and the other templates run as before.
+2. A file of a template that threw: a comment
+   `(* INCOMPLETE: generation failed in template circusM2T.egl at line <n>: <message>. See the end of this file. *)`
+   at the beginning; the text generated up to the last top-level command that was started; that last,
+   incomplete command inside a comment; at the end
+   `(* GENERATOR ERROR: <message>, template line <n> *)` and
+   `ML \<open>error "GENERATOR ERROR: <message> (template circusM2T.egl, line <n>)"\<close>`, at which
+   Isabelle stops and shows the message. The plugin also shows a dialog and writes the error to the log.
+3. Markers for known cases. Instead of stopping the generation, an identifier
+   `GENERATOR_ERROR_<kind>_<name>` is printed in place of the term (`erules/generatorErrors.eol`); it is
+   declared nowhere, so Isabelle stops at the command that contains it and names it:
+   `GENERATOR_ERROR_missing_action_<paragraph>` for an action missing in the Z model (seen in the
+   controller memory paragraph of test model c7, a controller with an operation; before, "Called method
+   'parseAction' on undefined object" and no file), `GENERATOR_ERROR_unsupported_toolkit_<package>_<f>`
+   for a toolkit function that is not supported (`range`, `iter`, `squash`, `extract`, the relation and
+   function toolkits) and `GENERATOR_ERROR_size_of_set` for `size` of a set (printed as calls), and
+   `GENERATOR_ERROR_no_precondition_guard_<f>` as a guard. Before this branch, the last three stopped the
+   generation with an error (since the toolkit change above). A clash of type names (generator issue W)
+   still stops the generation.
+
+Not checked: how IsaCircus reports the markers (no IsaCircus session on the workstation); for the HOL-CSP
+output Isabelle reports them as "Extra variables on rhs".

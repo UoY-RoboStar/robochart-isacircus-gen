@@ -1,0 +1,59 @@
+/****************************
+Markers for known unsupported or erroneous input (16 Nov 2026, Fang; generator CLAUDE.md, "M2T errors and
+output"). Imported by RC2Z.eol and by the three templates circusM2T.egl, circusM2T_HOLCSP.egl and
+circusM2T_HOLCSP_trans_core.egl (as tupleSelection.eol and toolkitFunctions.eol).
+
+Generator convention, not a rule of the manual. Where the generator meets a case that it knows it cannot
+translate, it prints an identifier GENERATOR_ERROR_<kind>_<name> in place of the term and goes on, instead of
+stopping the generation. The identifier is not declared anywhere, so Isabelle stops at the command that
+contains it (for a definition or fixrec: "Extra variables on rhs" naming it), and the name says what is
+missing and where. Cases (kinds):
+  missing_action_<paragraph>       an action of the Z model that is not there (templates, parseActionOrMarker),
+                                   e.g. the memory paragraph of a controller with an operation (test model c7);
+                                   <paragraph> is the enclosing action or process paragraph
+  unsupported_toolkit_<function>   a toolkit function not in toolkitFunctionTable (RC2Z, toolkitCallName),
+                                   printed as a call GENERATOR_ERROR_unsupported_toolkit_<package>_<f>(args)
+  size_of_set                      size applied to a set (RC2Z, toolkitCallName), printed as a call
+  no_precondition_guard_<function> a toolkit function with a precondition but no pre_ entry in the table
+                                   (RC2Z, toolkitGuardsOf), printed as the guard
+Other exceptions of a template are caught per template by the plugin and by dev-tools (PartialOutput.java):
+the text generated so far is written, with INCOMPLETE at the beginning and GENERATOR ERROR at the end.
+******************************/
+
+//the marker identifier GENERATOR_ERROR_<kind>_<name>, name reduced to letters, digits and _
+operation generatorErrorMarker(kind: String, name: String): String{
+	var m = "GENERATOR_ERROR_" + kind;
+	if(name.isDefined() and name <> ""){
+		m = m + "_" + markerSafe(name);
+	}
+	return m;
+}
+
+//s with every character other than a letter, a digit or _ replaced by _
+operation markerSafe(s: String): String{
+	var result = "";
+	var i = 0;
+	while(i < s.length()){
+		var c = s.substring(i, i + 1);
+		if(c.matches("[A-Za-z0-9_]")){
+			result = result + c;
+		} else {
+			result = result + "_";
+		}
+		i = i + 1;
+	}
+	return result;
+}
+
+//the marker for an action that is missing below owner: the name of the enclosing action or process paragraph
+operation missingActionMarker(owner: Any): String{
+	var p = owner;
+	while(p.isDefined() and not (p.isKindOf(Z!ActionPara) or p.isKindOf(Z!ProcessPara))){
+		p = p.eContainer();
+	}
+	var name = "unknown";
+	if(p.isDefined() and p.name.isDefined() and p.name.word.isDefined()){
+		name = p.name.word;
+	}
+	return generatorErrorMarker("missing_action", name);
+}

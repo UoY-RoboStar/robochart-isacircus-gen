@@ -12,6 +12,7 @@ import org.eclipse.epsilon.eol.execute.context.Variable;
 import org.eclipse.xtext.resource.XtextResourceSet;
 import circus.robocalc.robochart.textual.RoboChartStandaloneSetup;
 import circus.robocalc.robochart.epsilon.isacircus.loader.RctLoader;
+import circus.robocalc.robochart.epsilon.isacircus.m2t.PartialOutput;
 
 /**
  * Generates the HOL-CSP theory of a .rct without RoboTool: RctLoader (cross-file references resolved),
@@ -24,7 +25,9 @@ import circus.robocalc.robochart.epsilon.isacircus.loader.RctLoader;
  * registry (the plugin's behaviour before the fix).
  * closure (default): RctLoader with fallback; all: all source files of the project; single: the selected file
  * alone, without RctLoader (the plugin's former behaviour, to test the defensive check of RC2Z.eol).
- * Writes <out>/<base>_circus.model and <out>/HOLCSP_<base>_<tag>.thy (theory HOLCSP_<base>_<tag>).
+ * Writes <out>/<base>_circus.model and <out>/HOLCSP_<base>_<tag>.thy (theory HOLCSP_<base>_<tag>); with
+ * alltemplates also IsaCircus_enriched_<base>_<tag>.thy and HOLCSP_trans_core_<base>_<tag>.thy. A template that
+ * fails writes its partial output (PartialOutput) and the exit code is 2; a failure of RC2Z stops as before.
  */
 public class GenAll {
   public static void main(String[] a) throws Exception {
@@ -93,31 +96,35 @@ public class GenAll {
 
     EmfModel zr = new EmfModel();
     zr.setName("Z"); zr.setMetamodelUri(pkg.getNsURI()); zr.setModelFile(zPath); zr.setReadOnLoad(true); zr.setStoredOnDisposal(false); zr.load();
-    EglTemplateFactoryModuleAdapter mod = new EglTemplateFactoryModuleAdapter(new EglTemplateFactory());
-    if (!mod.parse(new File(a[2], "circusM2T_HOLCSP.egl"))) { System.out.println(mod.getParseProblems()); System.exit(1); }
-    mod.getContext().getModelRepository().addModel(zr);
-    mod.getContext().getFrameStack().put(Variable.createReadOnlyVariable("z", zr.getAllOfType("Spec").iterator().next()));
-    mod.getContext().getFrameStack().put(Variable.createReadOnlyVariable("baseName", base));
-    mod.getContext().getFrameStack().put(Variable.createReadOnlyVariable("ts", a[5]));
-    mod.getContext().setOutputStream(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
-    Path thy = new File(out, "HOLCSP_" + base + "_" + a[5] + ".thy").toPath();
-    Files.writeString(thy, mod.execute().toString());
-    System.out.println("wrote " + zPath + "\nwrote " + thy);
-    if (opts.contains("alltemplates")) {
-      // the two other templates of CircusM2T.egx, on the same Z model
-      String[][] more = { { "circusM2T.egl", "IsaCircus_enriched_" }, { "circusM2T_HOLCSP_trans_core.egl", "HOLCSP_trans_core_" } };
-      for (String[] t : more) {
-        EglTemplateFactoryModuleAdapter m2 = new EglTemplateFactoryModuleAdapter(new EglTemplateFactory());
-        if (!m2.parse(new File(a[2], t[0]))) { System.out.println(m2.getParseProblems()); System.exit(1); }
-        m2.getContext().getModelRepository().addModel(zr);
-        m2.getContext().getFrameStack().put(Variable.createReadOnlyVariable("z", zr.getAllOfType("Spec").iterator().next()));
-        m2.getContext().getFrameStack().put(Variable.createReadOnlyVariable("baseName", base));
-        m2.getContext().getFrameStack().put(Variable.createReadOnlyVariable("ts", a[5]));
-        m2.getContext().setOutputStream(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
-        Path f = new File(out, t[1] + base + "_" + a[5] + ".thy").toPath();
-        try { Files.writeString(f, m2.execute().toString()); System.out.println("wrote " + f); }
-        catch (Exception e) { System.out.println("FAILED " + t[0] + ": " + e); }
+    System.out.println("wrote " + zPath);
+    // The templates of CircusM2T.egx on the same Z model, each caught on its own (16 Nov 2026, as the plugin:
+    // PartialOutput): a template that throws writes the text generated so far, with INCOMPLETE at the beginning
+    // and GENERATOR ERROR at the end, and the next template still runs. Without alltemplates only HOL-CSP.
+    String[][] templates = { { "circusM2T_HOLCSP.egl", "HOLCSP_" }, { "circusM2T.egl", "IsaCircus_enriched_" },
+        { "circusM2T_HOLCSP_trans_core.egl", "HOLCSP_trans_core_" } };
+    int failed = 0;
+    for (String[] t : templates) {
+      if (!t[0].equals("circusM2T_HOLCSP.egl") && !opts.contains("alltemplates")) continue;
+      EglTemplateFactoryModuleAdapter m2 = new EglTemplateFactoryModuleAdapter(new EglTemplateFactory());
+      if (!m2.parse(new File(a[2], t[0]))) { System.out.println(m2.getParseProblems()); System.exit(1); }
+      m2.getContext().getModelRepository().addModel(zr);
+      m2.getContext().getFrameStack().put(Variable.createReadOnlyVariable("z", zr.getAllOfType("Spec").iterator().next()));
+      m2.getContext().getFrameStack().put(Variable.createReadOnlyVariable("baseName", base));
+      m2.getContext().getFrameStack().put(Variable.createReadOnlyVariable("ts", a[5]));
+      m2.getContext().setOutputStream(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
+      Path f = new File(out, t[1] + base + "_" + a[5] + ".thy").toPath();
+      String text;
+      try {
+        text = m2.execute().toString();
+        System.out.println("wrote " + f);
+      } catch (Exception e) {
+        PartialOutput.Recovered r = PartialOutput.recover(m2.getContext(), t[0], f.toString(), e);
+        text = r.text;
+        failed++;
+        System.out.println("INCOMPLETE " + f + ": " + r.failure);
       }
+      Files.writeString(f, text);
     }
+    if (failed > 0) System.exit(2);
   }
 }
