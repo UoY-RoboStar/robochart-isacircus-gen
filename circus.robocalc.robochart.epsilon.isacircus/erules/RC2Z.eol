@@ -142,6 +142,11 @@ statement are guarded by the preconditions of the toolkit functions they call (t
 withToolkitGuards in createStmtAsAction), placed and collected as in the CSP-M generator
 (CStatementGenerator.xtend, robochart-csp-gen a6412b40c8); the guards for division and indexing of the
 CSP-M generator are not generated.
+
+16 Nov 2026, branch composite-states (Fang)
+Rule 60 (Behaviour): machineVarNames follows allVariables(stm) of the CSP-M generator: also the parameters of
+an operation definition and the variables of provided interfaces (empty for every model the RoboChart
+validator accepts). No change for state machines.
 ******************************/
 
 
@@ -6469,15 +6474,30 @@ operation machineOf(nc: RC!NodeContainer): RC!NodeContainer{
 }
 
 //Auxiliary of Rule 60 (Behaviour).
-//The names of the variables declared in the machine of nc: those for which createchanParaNC declares the
-//channels get_, set_, setL_, setR_ (variables of the machine itself and of the interfaces it uses). After
-//the FQN pre-processing v.name is already the qualified name.
+//The names of the variables of the machine of nc, as allVariables(stm) of RoboTool's CSP-M generator
+//(GeneratorUtils.xtend, allVariables, https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/GeneratorUtils.xtend#L483),
+//in its order: the parameters of an operation definition, the variables of the machine itself, of the
+//interfaces it provides and of the interfaces it uses (16 Nov 2026: parameters and provided interfaces
+//added). For a state machine there are no parameters, and the RoboChart validator forbids state machines and
+//operation definitions to provide interfaces ("... cannot provide interface"), so for every model accepted
+//by RoboTool the provided part is empty; it is kept to follow the source. After the FQN pre-processing
+//v.name is the qualified name of a variable of a state machine.
 operation machineVarNames(nc: RC!NodeContainer): Sequence<String>{
 	var m = machineOf(nc);
 	var names = new Sequence<String>;
+	if(m.isKindOf(RC!OperationDef)){
+		for(v in m.parameters){ names.add(v.name); }
+	}
 	for(vl in m.variableList){
 		if(vl.modifier = RC!VariableModifier#VAR){
 			for(v in vl.vars){ names.add(v.name); }
+		}
+	}
+	for(provided_interface in m.pInterfaces){
+		for(vl in provided_interface.variableList){
+			if(vl.modifier = RC!VariableModifier#VAR){
+				for(v in vl.vars){ names.add(v.name); }
+			}
 		}
 	}
 	for(defined_interface in m.interfaces){
