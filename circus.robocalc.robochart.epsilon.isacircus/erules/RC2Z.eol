@@ -8182,6 +8182,17 @@ operation RC!Statement toolkitGuards(): Sequence{
 		}
 		if(self.isKindOf(RC!Assignment) and self.left.isKindOf(RC!ArrayAssignable)
 			and self.left.parameters.size() = 1){
+			//EXPERIMENT (branch index-division-guards, 16 Nov 2026): the index guard of the CSP-M generator
+			//for an indexed left-hand side x[i] = e (CStatementGenerator.xtend, guards(Statement), lines
+			//462-477): (i >= 1), (i <= length(x)), only when x is a variable of a sequence type; then the guards
+			//of i.
+			var l = self.left;
+			if(l.value.isKindOf(RC!VarRef) and l.value.name.isKindOf(RC!Variable)
+				and l.value.name.type.resolveType().isKindOf(RC!SeqType)){
+				conds.add(guardExpr("guard_index_lower", Sequence{l.parameters.first().createExpr()}));
+				conds.add(guardExpr("guard_index_upper",
+					Sequence{l.parameters.first().createExpr(), l.value.name.name.createRefExpr(false,false)}));
+			}
 			conds.addAll(toolkitGuardsOf(self.left.parameters.first()));
 		}
 	}
@@ -8192,11 +8203,18 @@ operation RC!Statement toolkitGuards(): Sequence{
 operation toolkitGuardsOf(o: Any): Sequence{
 	var conds = new Sequence;
 	if(o.isKindOf(RC!Div)){
+		//EXPERIMENT (branch index-division-guards): the guard of the CSP-M generator for a division,
+		//right != 0 (CStatementGenerator.xtend, guards(Expression), lines 490-496)
+		conds.add(guardExpr("guard_div", Sequence{o.right.createExpr()}));
 		conds.addAll(toolkitGuardsOf(o.left));
 		conds.addAll(toolkitGuardsOf(o.right));
 	} else if(o.isKindOf(RC!ArrayExp)){
 		var t = o.value.rcType();
 		if(t.isDefined() and t.isKindOf(RC!SeqType) and o.parameters.size() = 1){
+			//EXPERIMENT (branch index-division-guards): the guards of the CSP-M generator for s[i],
+			//(i >= 1), (i <= length(s)) (CStatementGenerator.xtend, guards(Expression), lines 497-511)
+			conds.add(guardExpr("guard_index_lower", Sequence{o.parameters.first().createExpr()}));
+			conds.add(guardExpr("guard_index_upper", Sequence{o.parameters.first().createExpr(), o.value.createExpr()}));
 			conds.addAll(toolkitGuardsOf(o.value));
 			conds.addAll(toolkitGuardsOf(o.parameters.first()));
 		}
@@ -8222,6 +8240,16 @@ operation toolkitGuardsOf(o: Any): Sequence{
 		}
 	}
 	return conds;
+}
+
+//EXPERIMENT (branch index-division-guards): a guard condition as a call of name (printed by the table of
+//toolkitFunctions.eol) with the given arguments
+operation guardExpr(name: String, args: Sequence): Z!ApplExpr{
+	var g = new Z!ApplExpr;
+	g.mixFix = false;
+	g.leftExpr = name.createRefExpr(false,false);
+	g.rightExpr = args.createTupleExpr();
+	return g;
 }
 
 //the action of a statement under its guards (toolkitGuards), nested in the reverse order

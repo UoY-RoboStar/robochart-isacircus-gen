@@ -111,7 +111,15 @@ operation toolkitFunctionTable(): Map{
 		"pre_sequence_toolkit_max" = "(\\<exists>rc_m\\<in>$1. \\<forall>rc_k\\<in>$1. rc_k \\<le> rc_m)",
 		//size: pre isFinite(a); always true for a sequence, the only case supported: no guard. The CSP-M
 		//generator writes pre_sequence_toolkit_size(s) here, which is function_toolkit_isFinite(s), true.
-		"pre_sequence_toolkit_size" = ""
+		"pre_sequence_toolkit_size" = "",
+
+		//EXPERIMENT (branch index-division-guards, 16 Nov 2026): not toolkit functions, the other guards of the
+		//CSP-M generator (CStatementGenerator.xtend, guards): a division e1 / e2 needs (e2 != 0); an index i of
+		//a sequence s (RoboChart, from 1) needs (i >= 1) and (i <= length(s)). $1 is the divisor or the
+		//RoboChart index (not shifted), $2 the sequence.
+		"guard_div" = "($1 \\<noteq> 0)",
+		"guard_index_lower" = "(1 \\<le> $1)",
+		"guard_index_upper" = "($1 \\<le> length $2)"
 	};
 }
 
