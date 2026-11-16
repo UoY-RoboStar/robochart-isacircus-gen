@@ -1,6 +1,16 @@
 [*14052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
+[*16 Nov 2026, branch m2t-partial-output (Fang). Generator convention, not a rule of the manual: an action
+that is missing in the Z model is printed as the marker GENERATOR_ERROR_missing_action_<paragraph>
+(parseActionOrMarker, missingActionMarker of generatorErrors.eol, imported with the other shared modules)
+instead of stopping with "Called method 'parseAction' on undefined object"; Isabelle stops at the command
+that contains the marker and names it. Found with test model c7 (controller with an operation: the memory
+paragraph of the controller has an external choice without left action). Any other exception of the
+template is caught by the plugin and dev-tools (PartialOutput.java), which write the text generated so far
+with INCOMPLETE at the beginning and GENERATOR ERROR at the end. Shared by circusM2T.egl,
+circusM2T_HOLCSP.egl and circusM2T_HOLCSP_trans_core.egl.
+*]
 [*16 Nov 2026, branch composite-states (Fang). Generator issue AA: calls of toolkit functions (qualified
 names <package>_<function> from RC2Z) and the guards for their preconditions (pre_<package>_<function>) are
 printed by toolkitFunctionTable of toolkitFunctions.eol (imported at the first line), shared by
@@ -38,7 +48,7 @@ Composite states (RC2Z.eol, Rules 52 and 60). Generator conventions for printing
     of the node (isCompositePart), so that fixrec has no continuity obligation for Behaviour;
 (3) interleaving is printed as ||| (the notation of HOL-CSP).
 *]
-[%import "tupleSelection.eol";%][%import "toolkitFunctions.eol";%][%var CHAN_EVENT_PLUGIN_THRESHOLD = 80;%]theory HOLCSP_[%=baseName%]_[%=ts%]
+[%import "tupleSelection.eol";%][%import "toolkitFunctions.eol";%][%import "generatorErrors.eol";%][%var CHAN_EVENT_PLUGIN_THRESHOLD = 80;%]theory HOLCSP_[%=baseName%]_[%=ts%]
 	imports "RC_HOL-CSP.RoboChart_Library" HOL.Real
 begin
 
@@ -219,7 +229,7 @@ actions  is "(mychan, unit) action" where
 
 \<comment> \<open>Main action of the process\<close>
 [%if(procpara.circusProcess.instanceOf(Z!BasicProcess)){%]
-definition "ProcDef = cProcess [%= procpara.circusProcess.mainAction.parseAction()%]"
+definition "ProcDef = cProcess [%= parseActionOrMarker(procpara.circusProcess.mainAction, procpara.circusProcess)%]"
 	[%} else {%]
 definition "ProcDef = cProcess [%= procpara.name.word%].ProcDef"
 	[%}%]
@@ -238,7 +248,7 @@ begin
 fixrec [%= actpara.name.word%] :: "[%=actpara.paramType()%] \<rightarrow> chan_event process"
 where
 [simp del] :\<open>[%= actpara.name.word%]\<cdot>n = 
-	[%=actpara.circusAction.parseAction()%] \<close>
+	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close>
 [%}%]
 
 [%//Generator convention, not a rule of the manual (15 Nov 2026): the order in which the paragraphs of
@@ -282,7 +292,7 @@ for(c in containerOrder.select(c | c.containerDepth(nidsMap) > 0)){
 fixrec [%= actpara.name.word%] :: "chan_event process"
 where 
 [simp del] :\<open>[%= actpara.name.word%] = 
-	[%=actpara.circusAction.parseAction()%] \<close> 
+	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close> 
 [%		}
 	}
 }%]
@@ -293,7 +303,7 @@ fixrec
 where
 	[%for(actpara_nd in actparas.select(ap|ap.name.word.isParaOfNode(nd) and not ap.name.word.isCompositePart(nd, nidsMap))){%]
 [simp del] :\<open>[%= actpara_nd.name.word%] = 
-	[%=actpara_nd.circusAction.parseAction()%] \<close> [%if(hasMore){%] | [%}%]
+	[%=parseActionOrMarker(actpara_nd.circusAction, actpara_nd)%] \<close> [%if(hasMore){%] | [%}%]
 	
 	[%}%]	
 [%}%]
@@ -304,7 +314,7 @@ where
 fixrec [%= actpara.name.word%] :: "chan_event process"
 where 
 [simp del] :\<open>[%= actpara.name.word%] = 
-	[%=actpara.circusAction.parseAction()%] \<close> 
+	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close> 
 [%		}
 	}
 }%]
@@ -332,7 +342,7 @@ or innerParaNames.includes(ap.name.word)
 fixrec [%= actpara.name.word%] :: "[%= actpara.actionWithSig()%]chan_event process"
 where 
 [simp del] :\<open>[%= actpara.nameWithSig()%] = 
-	[%=actpara.circusAction.parseAction()%] \<close> 
+	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close> 
 [%}%]
 
 [*end of locale actions; the end below closes the theory (issue M: before, only one end was printed)*]
@@ -413,7 +423,7 @@ end
 		("line 177, actpara = " + actpara.name).println();
 		
 		("line 177, actpara.circusAction = " + actpara.circusAction).println();
-		str = str + "\"" + actpara.nameWithSig() + " = " + actpara.circusAction.parseAction() + "\"";
+		str = str + "\"" + actpara.nameWithSig() + " = " + parseActionOrMarker(actpara.circusAction, actpara) + "\"";
 		if(hasMore){
 
 			str = str +  " | "  + "\r\n" + "\r\n";
@@ -438,7 +448,14 @@ end
 }%]
 
 
-[%operation Z!CircusAction parseAction(){
+[%//16 Nov 2026 (generatorErrors.eol): the action a, or the marker GENERATOR_ERROR_missing_action_<paragraph>
+//if a is missing; owner is the element that should contain a (for the name of the enclosing paragraph).
+operation parseActionOrMarker(a: Any, owner: Any): String{
+	if(a.isUndefined()){
+		return missingActionMarker(owner);
+	}
+	return a.parseAction();
+}%][%operation Z!CircusAction parseAction(){
 	if(self.instanceOf(Z!PrefixingAction)){
 		return self.parsePrefixingAction();
 	} //else
@@ -510,10 +527,10 @@ end
 	   if(guarded_actions.at(1).circusAction.communication.channelExpr.name.word = "aviol"){
 	   		// assume inv Trans(n) (...)
 	   		//guarded_actions.at(0).pred = TruePred, so print out True directly instead of parsePred
-	   		return "(assume True (" + guarded_actions.at(1).circusAction.circusAction.parseAction() + ") " + guarded_actions.at(0).circusAction.parseAction() + ")";
+	   		return "(assume True (" + parseActionOrMarker(guarded_actions.at(1).circusAction.circusAction, guarded_actions.at(1).circusAction) + ") " + parseActionOrMarker(guarded_actions.at(0).circusAction, guarded_actions.at(0)) + ")";
 	   } else if(guarded_actions.at(1).circusAction.communication.channelExpr.name.word = "gviol"){
 	   		// guar inv (set_v!3 -> Skip)
-	   		return "(guar True " + guarded_actions.at(0).circusAction.parseAction() + ")";
+	   		return "(guar True " + parseActionOrMarker(guarded_actions.at(0).circusAction, guarded_actions.at(0)) + ")";
 	   }
 	} 
 	
@@ -529,9 +546,9 @@ end
 //        action if true then a else (if bl then b else c end) end, or
 //        action if true then if bl then b else c end  end }
 	else {
-		string = "(if " + guarded_actions.at(0).pred.parseMemPred() + "then " + guarded_actions.at(0).circusAction.parseAction() ;
+		string = "(if " + guarded_actions.at(0).pred.parseMemPred() + "then " + parseActionOrMarker(guarded_actions.at(0).circusAction, guarded_actions.at(0)) ;
 		if(size = 2){
-			string = string + "else" + guarded_actions.at(1).circusAction.parseAction();
+			string = string + "else" + parseActionOrMarker(guarded_actions.at(1).circusAction, guarded_actions.at(1));
 		}
 		return string + ")";
 			
@@ -541,15 +558,15 @@ end
 
 
 [%operation Z!PrefixingAction parsePrefixingAction(): String{
-	return  "(" + self.communication.parseCommu() + " \\<rightarrow> " + self.circusAction.parseAction() + ")";
+	return  "(" + self.communication.parseCommu() + " \\<rightarrow> " + parseActionOrMarker(self.circusAction, self) + ")";
 }%]
 
 [%operation Z!InterruptAction parseInterruptAction(): String{
-	return  "(" + self.leftAction.parseAction() + " \\<triangle> " + self.rightAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.leftAction, self) + " \\<triangle> " + parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 [%operation Z!ExtChoiceAction parseExtChoiceAction(): String{
-	return  "(" + self.leftAction.parseAction() + "\r\n" + "		\\<box>" + "\r\n" + "		" + self.rightAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.leftAction, self) + "\r\n" + "		\\<box>" + "\r\n" + "		" + parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 
@@ -562,16 +579,16 @@ end
 }%]
 
 [%operation Z!SeqAction parseSeqAction(): String{
-	return  "(" + self.leftAction.parseAction() + "\\<^bold>;  " + self.rightAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.leftAction, self) + "\\<^bold>;  " + parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 [%operation Z!SeqActionIte parseSeqActionIte(): String{
-	return  "( \\<^bold>; "  +  self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet>  " + self.circusAction.parseAction() + " )";
+	return  "( \\<^bold>; "  +  self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet>  " + parseActionOrMarker(self.circusAction, self) + " )";
 }%]
 
 [%operation Z!GuardedAction parseGuardedAction(): String{
 
-	return  "(" + self.pred.parseMemPred() + " \\<^bold>& " + "(" + self.circusAction.parseAction() + ")" + ")";
+	return  "(" + self.pred.parseMemPred() + " \\<^bold>& " + "(" + parseActionOrMarker(self.circusAction, self) + ")" + ")";
 	//The type of self.pred is MemPred, so self.pred.parse() points to "operation Z!MemPred parseMemPred()"
 }%]
 
@@ -582,7 +599,7 @@ end
 
 [%operation Z!HideAction parseHideAction(): String{
 	//space after \ : the channel set may be a name (e.g. enteredSS_in_stmbd_<stm>), not only {...} or (...)
-	return  "(" + self.circusAction.parseAction() + " \\ " + self.channelSet.parseChannelSet() + ")";
+	return  "(" + parseActionOrMarker(self.circusAction, self) + " \\ " + self.channelSet.parseChannelSet() + ")";
 }%]
 
 [*
@@ -602,43 +619,43 @@ end
 		}
 	}
 
-	return  "\"" + param + " \\<zspot> " + self.circusAction.parseAction() + ")";
+	return  "\"" + param + " \\<zspot> " + parseActionOrMarker(self.circusAction, self) + ")";
 }%]
 *]
 
 [%operation Z!ParamAction parseParamAction(): String{
 	
-	return  "(" + self.circusAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.circusAction, self) + ")";
 }%]
 
 [%operation Z!ParallelAction parseParallelAction(): String{
-	return  "(" + self.leftAction.parseAction() + "\r\n" + "		\\<lbrakk> " + self.channelSet.parseChannelSet() + " \\<rbrakk> " + "\r\n" + "		" + self.rightAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.leftAction, self) + "\r\n" + "		\\<lbrakk> " + self.channelSet.parseChannelSet() + " \\<rbrakk> " + "\r\n" + "		" + parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 
 [%operation Z!ParallelActionIte parseParallelActionIte(): String{
-	return  "(" + " \\<lbrakk> " + self.channelSet.parseChannelSet() + " \\<rbrakk> " + self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet> " + self.circusAction.parseAction() + ")";
+	return  "(" + " \\<lbrakk> " + self.channelSet.parseChannelSet() + " \\<rbrakk> " + self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet> " + parseActionOrMarker(self.circusAction, self) + ")";
 }%]
 [*suppose there is only one parameter for iteration*]
 
 
 [%operation Z!InterleaveActionIte parseInterleaveActionIte(): String{
-	return  "( \\<interleave> "  +  self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet>  " + self.circusAction.parseAction() + " )";
+	return  "( \\<interleave> "  +  self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet>  " + parseActionOrMarker(self.circusAction, self) + " )";
 }%]
 [*suppose there is only one parameter for iteration*]
 
 [%operation Z!InterleaveAction parseInterleaveAction(): String{
 	//Rule 60 (During) is the first rule that produces an interleaving of actions. 15 Nov 2026:
 	//HOL-CSP writes interleaving P ||| Q (Inter_syntax in Synchronization_Product.thy); \<interleave> is not its notation
-	return  "(" + self.leftAction.parseAction() + " ||| " +	self.rightAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.leftAction, self) + " ||| " +	parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 
 [%operation Z!RenameAction parseRenameAction(): String{
 	if(self.assignmentPairs.isDefined() and self.assignmentPairs.hasRenamePairs()){
-	return  "(" + self.circusAction.parseAction() + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenaming() + "\\<rbrakk>\\<rbrakk>)";}
+	return  "(" + parseActionOrMarker(self.circusAction, self) + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenaming() + "\\<rbrakk>\\<rbrakk>)";}
 	else {
-	return  "(" + self.circusAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.circusAction, self) + ")";
 	}
 }%]
 

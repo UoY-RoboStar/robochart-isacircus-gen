@@ -1,4 +1,5 @@
 import "toolkitFunctions.eol";
+import "generatorErrors.eol";
 /****************************
 Due to Rule 60 Semantics of composite states,
 we have to transform most of the RoboChart components into actions instead of processes
@@ -147,6 +148,16 @@ CSP-M generator are not generated.
 Rule 60 (Behaviour): machineVarNames follows allVariables(stm) of the CSP-M generator: also the parameters of
 an operation definition and the variables of provided interfaces (empty for every model the RoboChart
 validator accepts). No change for state machines.
+
+16 Nov 2026, branch m2t-partial-output (Fang)
+Markers instead of stopping (generatorErrors.eol, imported here and by the templates). An unsupported toolkit
+function and size of a set (toolkitCallName) are written as calls of GENERATOR_ERROR_unsupported_toolkit_
+<package>_<function> and GENERATOR_ERROR_size_of_set, a missing pre_ entry (toolkitGuardsOf) as the guard
+GENERATOR_ERROR_no_precondition_guard_<function>; before, each stopped the generation. Isabelle stops at the
+command containing the marker. The type name clash of issue W still stops the generation here (M2M): a
+declaration under a marker name would be a valid declaration, and every reference to the type is printed by
+its unqualified name, so no marker can make Isabelle stop at the right place (generator CLAUDE.md, "M2T
+errors and output").
 ******************************/
 
 
@@ -8130,8 +8141,11 @@ operation RC!CallExp createCallExpr(): Z!ApplExpr{
 
 
 //Generator convention, not a rule of the manual (16 Nov 2026, generator issue AA). The qualified name
-//<package>_<function> of a call of a toolkit function, or null for another call. Stops the generation for a
-//toolkit function that is not supported (not in toolkitFunctionTable) and for size of a set.
+//<package>_<function> of a call of a toolkit function, or null for another call. For a toolkit function that
+//is not supported (not in toolkitFunctionTable) and for size of a set, the marker of generatorErrors.eol
+//(GENERATOR_ERROR_unsupported_toolkit_<package>_<function>, GENERATOR_ERROR_size_of_set) in place of the
+//name, printed as a call; Isabelle stops there (16 Nov 2026, branch m2t-partial-output; before, these cases
+//stopped the generation).
 operation toolkitCallName(c: RC!CallExp): Any{
 	var f = c.`function`;
 	if(not (f.isTypeOf(RC!RefExp) and f.ref.isKindOf(RC!Function))){
@@ -8143,14 +8157,16 @@ operation toolkitCallName(c: RC!CallExp): Any{
 	}
 	var name = pkg.name + "_" + f.ref.name;
 	if(not toolkitFunctionTable().containsKey(name)){
-		throw "Toolkit function " + f.ref.name + " (package " + pkg.name + ") is not supported by the HOL-CSP "
-			+ "generator yet (generator issue AA; see toolkitFunctions.eol). No theory is generated.";
+		("Toolkit function " + f.ref.name + " (package " + pkg.name + ") is not supported by the HOL-CSP "
+			+ "generator yet (generator issue AA; see toolkitFunctions.eol); printed as a marker.").println();
+		return generatorErrorMarker("unsupported_toolkit", name);
 	}
 	if(name = "sequence_toolkit_size"){
 		var t = c.args.first().rcType();
 		if(t.isDefined() and t.isKindOf(RC!SetType) and not t.isKindOf(RC!SeqType)){
-			throw "Toolkit function size applied to a set is not supported by the HOL-CSP generator yet "
-				+ "(generator issue AA: the Isabelle term would be card). No theory is generated.";
+			("Toolkit function size applied to a set is not supported by the HOL-CSP generator yet "
+				+ "(generator issue AA: the Isabelle term would be card); printed as a marker.").println();
+			return generatorErrorMarker("size_of_set", "");
 		}
 	}
 	return name;
@@ -8202,12 +8218,15 @@ operation toolkitGuardsOf(o: Any): Sequence{
 		}
 	} else if(o.isKindOf(RC!CallExp)){
 		var name = toolkitCallName(o);
-		if(name.isDefined() and o.`function`.ref.preconditions.size() > 0){
+		//a marker (unsupported function, size of a set) has no guard of its own: the call is the marker
+		if(name.isDefined() and not name.startsWith("GENERATOR_ERROR_")
+			and o.`function`.ref.preconditions.size() > 0){
 			var pre = "pre_" + name;
 			if(not toolkitFunctionTable().containsKey(pre)){
-				throw "No guard for the precondition of toolkit function " + name + " (generator issue AA).";
+				//no pre_ entry in the table: the marker as the guard (16 Nov 2026; before, an exception)
+				pre = generatorErrorMarker("no_precondition_guard", name);
 			}
-			if(toolkitFunctionTable().get(pre) <> ""){
+			if(pre.startsWith("GENERATOR_ERROR_") or toolkitFunctionTable().get(pre) <> ""){
 				var g = new Z!ApplExpr;
 				g.mixFix = false;
 				g.leftExpr = pre.createRefExpr(false,false);
