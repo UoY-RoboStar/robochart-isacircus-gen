@@ -633,6 +633,50 @@ per container in the generator against one pair for the machine in the CSP-M: in
 pair is in the `hideSet` of the inner core, inside `Behaviour`, as claimed; the FDR check of the
 equivalence (Section 4.1, "TO VERIFY") is still to be run.
 
+### 5.8 Check against the source of RoboTool's CSP-M generator (16 Nov 2026)
+
+Source given by Pedro: `UoY-RoboStar/robochart-csp-gen` at commit
+`a6412b40c83ded4ab2c18c2b9bd28575ec270983` (cloned read-only to `~/Git/robochart-csp-gen`). Composite
+states have no rule of their own: `compileNode(State)` and `Node_rule(State)` distinguish them by
+`state.nodes.size` ([CStateGenerator.xtend, lines 273-423](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CStateGenerator.xtend#L273-L423)).
+Methods read: `compileCompositeStateBehaviour` (340-356), `ncBehaviour_rule` (57-68),
+`NCCoreBehaviour_rule` (78-106), `stmVars` and `nodeVars` (446-457), `memParallelCompose` of
+[CGeneratorUtils.xtend, 1514-1542](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CGeneratorUtils.xtend#L1514-L1542), `allVariables` of
+[GeneratorUtils.xtend, 483-](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/GeneratorUtils.xtend#L483), and `transitionGuardVariables`,
+`transitionTriggerVariables` of [CTransitionGenerator.xtend, 281-305](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CTransitionGenerator.xtend#L281-L305).
+
+| Point | Source | Generator (`composite-states`) | |
+|---|---|---|---|
+| frame of the node | `Active = Entry ; Behaviour ; share__choice(exit -> SKIP) ; Exit ; share__choice(exited -> SKIP) ; Inactive` (377-380) | Rule 60, as Rule 59 | same |
+| exited under SStop | `share__choice(exited -> SKIP)` (380) | `(SSTOP /\ (exited -> Skip)) ; Inactive` | same |
+| Behaviour | `memParallelCompose(ncBehaviour_rule(state), stmVars, stmVars, union(enteredSS,{\| interrupt, terminate \|}), stmVars, stmVars, During) \ union(enteredSS,{terminate})` (340-356; `dbisim` is an FDR compression) | `createTwoSidedWriteSync(ncBehaviour_S, During_S, enteredSS u {interrupt_S, terminate}, vars)` then hiding of enteredSS and terminate | same structure |
+| inner flow events hidden | `ncBehaviour_rule`: `\ union(enterSS,{\|exit,exited,internal__\|})`, then the trigger renaming (57-68) | Rule 40 with the state as container | same |
+| interrupt in the synchronisation set | `interrupt` of the module of the state (one event) | `interrupt_<state>` | same |
+| During, RUN(enteredSS) | `share__choice([] e__ : enteredSS @ e__ -> SKIP) ; entered -> ((CRUN(enteredSS) \|\|\| during ; SStop) /\ interrupt -> share__choice(terminate -> SKIP))` (388-389; CRUN = RUN untimed) | `RunEntered_S` (a recursive paragraph) | same |
+| enteredSS | `state.nodes.filter[x \| x instanceof State]` (288-294): states and final states | `enteredSS(nc)`: `RC!State`, Final is a State | same |
+| write synchronisation of Behaviour: variables | `stmVars(state)` = `gu.allVariables(stm)` on all four sides: the variables of the machine, of its PROVIDED interfaces (`PInterfaces`), of its defined interfaces, and the parameters of an operation | `machineVarNames`: the machine's own variables and those of its defined interfaces | DIFFERENT: provided interfaces and operation parameters are missing in the generator. Follow the source (to fix; no test model has them) |
+| Rule 41 (inner and outer level): variables | `memParallelCompose(composeNodes tidsR, nodeVars, nodeVars, cs, transitionGuardVariables(nc), transitionTriggerVariables(nc), initial::enter -> Transitions)`, `nodeVars = allVariables(stm)` (78-106, 446-450; comment: the semantics should not depend on the actual states) | as the manual: `pr = pw = vars(nc.nodes)`, `qr = vtguards(nc)`, `qw = {}` | KNOWN DIFFERENCE D2, now explained: the CSP-M uses every variable of the machine on the node side and the trigger-parameter variables as qw (hence setR for a variable bound by a trigger, Legitimate). Not changed: it changes the synchronisation sets of every generated theory, flat ones included; FDR on Legitimate showed no difference in behaviour. To decide (Fang) |
+
+Result: the scheme of 5.1 to 5.5 and the implementation agree with the source on every point except the
+two sets of variables of the write synchronisation; for Behaviour the source is to be followed (provided
+interfaces, operation parameters), for Rule 41 the difference D2 stays until decided.
+
+Toolkit functions and guards (for generator issue AA), from the same source:
+- Calls: [ExpressionGenerator.xtend, compileCallExpression, 190-237](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/ExpressionGenerator.xtend#L190-L237):
+  `size` -> `length` (sequence) or `card` (set), any other function -> `<package>_<function>(args)`
+  (`gu.id(function)`). The definitions are the library files `lib/semantics/<package>.csp` of the
+  generator plugin, copied into `csp-gen/defs/<package>_defs.csp`.
+- Guards: [CStatementGenerator.xtend, guards and guard, 447-562](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CStatementGenerator.xtend#L447-L562).
+  `guards(Expression)` gives `pre_<package>_<function>(args)` for every precondition of a called
+  function (any function, toolkit or user-defined), `right != 0` for a division, `i >= 1`, `i <=
+  length(s)` for a sequence index; it descends only through divisions, sequence indexing and call
+  arguments (a call inside `+`, for example, is not reached). `guards(Statement)`: a communication: its
+  value; otherwise every expression of the statement, and the index of an indexed left-hand side.
+  `guard(s)` joins `s.guards.reverse` with `&`. It is applied to an operation call (212-216), a
+  communication statement (254-259), an if statement (its condition, 273-275) and an assignment
+  (343-348), always inside `readState(vars, guard & ...)`; NOT to transition conditions, so it covers
+  entry, during and exit actions and transition actions, not guards of transitions.
+
 ## 6. Suggested order of work (not started)
 
 1. Fang generates the CSP-M of c1 to c6 in RoboTool; compare with Section 5 (and with the generator
