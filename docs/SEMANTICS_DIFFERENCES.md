@@ -76,10 +76,12 @@ the generator).
   variables of provided, defined (`uses`) and required interfaces), on all four sides.
 - This generator: Rule 60 (`createCompositeStateAsActionParas`), `createTwoSidedWriteSync(ncBehaviour_S,
   During_S, cs, machineVarNames(S))`; `machineVarNames` = parameters of an operation definition, own
-  variables, provided interfaces, defined interfaces. NOT the variables of REQUIRED interfaces
-  (`RInterfaces`, last loop of [C5]): a gap found on 16 Nov 2026 while writing this entry; no generated
-  model is affected (Adaptation_Plan has only `uses`; c7, the only test model with `requires`, cannot be
-  generated). Not changed (to decide; generator CLAUDE.md, issue EE).
+  variables, provided, defined and required interfaces, in the order of [C5] (a name already in the list is
+  not added again; `stmVars` collects them in a set). The required interfaces (`RInterfaces`, last loop of
+  [C5]) were missing until 16 Nov 2026 (generator issue EE, found while writing this entry, fixed the same
+  day); no generated model changed (Adaptation_Plan has only `uses`; c7, the only test model with
+  `requires`, cannot be generated; c1-c6, ex10, Legitimate, flat MakePlan and full Adaptation_Plan
+  regenerated: the same tokens).
 - Kind: manual incomplete; this generator follows the CSP-M (superset).
 - Background: our analysis (research notes 5.7): `During` is not under SStop at `entered_S`; with smaller
   sets a write of the inner machine at that moment would not be synchronised with `During`. Pedro
@@ -88,8 +90,8 @@ the generator).
   (the variables the machine provides and those required by the called operations); the CSP semantics of
   the nodes alone, or of the operations alone, is not enough; the CSP-M uses all variables of the machine
   for convenience, a superset that guarantees the right behaviour.
-- Status: DECIDED (Fang, 16 Nov 2026): allVariables as the CSP-M. Open: required interfaces (issue EE).
-  Comment at `createTwoSidedWriteSync` in RC2Z.eol.
+- Status: DECIDED (Fang, 16 Nov 2026): allVariables as the CSP-M, required interfaces included (issue EE
+  fixed). Comments at `createTwoSidedWriteSync` and `machineVarNames` in RC2Z.eol.
 
 ## 3. exited under SStop (Rules 58 to 60)
 

@@ -165,6 +165,10 @@ a transition leaving it whose trigger binds a variable x, an exit action of an i
 reads or writes x gives a warning (generatorNote on Behaviour_<state>, printed as a comment by the templates,
 reported by the plugin and dev-tools); the generation goes on. Comments at Rules 41 and 60: Pedro's
 explanations of 16 Nov 2026 (docs/SEMANTICS_DIFFERENCES.md).
+
+16 Nov 2026, branch composite-states (Fang)
+Rule 60 (Behaviour): machineVarNames also takes the variables of the required interfaces (rInterfaces), as
+allVariables of the CSP-M generator (generator issue EE). No change for the models generated so far.
 ******************************/
 
 
@@ -6576,10 +6580,11 @@ operation machineOf(nc: RC!NodeContainer): RC!NodeContainer{
 //operation definitions to provide interfaces ("... cannot provide interface"), so for every model accepted
 //by RoboTool the provided part is empty; it is kept to follow the source. After the FQN pre-processing
 //v.name is the qualified name of a variable of a state machine.
-//DIFFERENT FROM allVariables (found 16 Nov 2026, not changed; docs/SEMANTICS_DIFFERENCES.md entry 2, generator
-//issue EE): allVariables also adds the variables of the REQUIRED interfaces (stm.RInterfaces, its last loop);
-//they are missing here. No generated model is affected (Adaptation_Plan has only defined interfaces; c7, the
-//only test model with requires, cannot be generated yet).
+//Required interfaces (stm.RInterfaces, the last loop of allVariables) added on 16 Nov 2026 (generator issue EE;
+//docs/SEMANTICS_DIFFERENCES.md entry 2): before, they were missing. All variables of the machine are a safe
+//superset (Pedro, 16 Nov 2026). No generated model changes (Adaptation_Plan has only defined interfaces; c7,
+//the only test model with requires, cannot be generated yet, issue DD). A required variable whose name is
+//already in the list is not added again (stmVars of the CSP-M collects allVariables in a set).
 operation machineVarNames(nc: RC!NodeContainer): Sequence<String>{
 	var m = machineOf(nc);
 	var names = new Sequence<String>;
@@ -6602,6 +6607,14 @@ operation machineVarNames(nc: RC!NodeContainer): Sequence<String>{
 		for(vl in defined_interface.variableList){
 			if(vl.modifier = RC!VariableModifier#VAR){
 				for(v in vl.vars){ names.add(v.name); }
+			}
+		}
+	}
+	//required interfaces (16 Nov 2026, generator issue EE): the last loop of allVariables
+	for(required_interface in m.rInterfaces){
+		for(vl in required_interface.variableList){
+			if(vl.modifier = RC!VariableModifier#VAR){
+				for(v in vl.vars){ if(not names.includes(v.name)){ names.add(v.name); } }
 			}
 		}
 	}
