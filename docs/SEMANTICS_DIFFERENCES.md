@@ -9,8 +9,13 @@ written "checked with FDR"; a result that was predicted or read, not run, says s
 
 Sources:
 
-- Manual: RoboChart Reference Manual (PDF used by Fang; page numbers are the printed ones, which are the
-  PDF page numbers).
+- Manual: RoboChart Reference Manual, the PDF of August 2022 used by Fang (created 15 Aug 2022, built from
+  commit 646c38f of `UoY-RoboStar/robochart-reference`; page numbers are the printed ones, which are the PDF
+  page numbers). Rules are numbered per chapter (Chapter 5, the probabilistic semantics, has its own Rule 1,
+  2, ...); every rule cited here is a rule of Chapter 4 (Semantics) and is written "Chapter 4 Rule n".
+  Rule numbers are unchanged in the source of June 2026 (master 04e7b96, which adds only Appendix F); page
+  numbers can differ by one in a new build, so they are given for the August 2022 PDF. Annotated copy:
+  `laila-fangyan/robochart-reference`, branch `csp-m-differences` (notes "Note on RoboTool's CSP-M").
 - CSP-M generator: `UoY-RoboStar/robochart-csp-gen` at commit `a6412b40c83ded4ab2c18c2b9bd28575ec270983`
   (given by Pedro; read-only clone in `~/Git/robochart-csp-gen`). The links below point to that commit:
   - [C1] [CStateGenerator.xtend 80-108, `NCCoreBehaviour_rule`](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CStateGenerator.xtend#L80-L108)
@@ -25,6 +30,8 @@ Sources:
   - [C10] [lib/semantics/sequence_toolkit.csp 43-50 (head, tail, front), 100-103 (pre_)](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/lib/semantics/sequence_toolkit.csp#L43-L103)
   - [C11] [GeneratorUtils.xtend 285-324, `typeDefaultValue`](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/GeneratorUtils.xtend#L285-L324)
     and [ExpressionGenerator.xtend 547-559, `initialValue`](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/ExpressionGenerator.xtend#L547-L559)
+  - [C12] [lib/semantics/state.csp 19-20, `CRUN` (untimed)](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/lib/semantics/state.csp#L19-L20)
+    and [lib/semantics/timed/state_timed.csp 20-21, `CRUN` (timed)](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/lib/semantics/timed/state_timed.csp#L20-L21)
 - This generator: operations of `circus.robocalc.robochart.epsilon.isacircus/erules/RC2Z.eol` and of the
   templates, named by operation (line numbers change).
 - Other records: the generator's CLAUDE.md (in the claude-context repository; issue letters), the research
@@ -37,18 +44,18 @@ the generator).
 
 ---
 
-## 1. Rule 41: variables of the write synchronisation (node side and Trans side)
+## 1. Chapter 4 Rule 41: variables of the write synchronisation (node side and Trans side)
 
-- Manual: Rule 41, p. 47, with Definition C.2.2, p. 165:
+- Manual: Chapter 4 Rule 41 with Definition C.2.2 (pp. 47 and 165 of the Aug 2022 PDF):
   `|[vars(nc.nodes) | flowevts ∪ transSync(nc) ∪ {end} | vtguards(nc) : {}]|`, i.e. pr = pw =
-  vars(nc.nodes) (Rules 46, 48, 50), qr = the variables read by the guards, qw = {}. Reason given in the
+  vars(nc.nodes) (Chapter 4 Rules 46, 48, 50), qr = the variables read by the guards, qw = {}. Reason given in the
   manual: the transitions run between the nodes and are taken to write nothing in parallel.
 - CSP-M: [C1], [C2], [C3], [C4]: `memParallelCompose(nodes, nodeVars, nodeVars, cs,
   transitionGuardVariables(nc), transitionTriggerVariables(nc), Transitions)`, `nodeVars =
   allVariables(stm)` ([C5]): node side every variable of the machine; Trans side reads = guard variables,
   writes = variables bound by trigger parameters. Hence `setL_v` for every variable read by a guard (also
   one no node writes, e.g. v1 of ex10) and `setR_v` for a trigger variable (candidateModel of Legitimate).
-- This generator: `ncCoreBehaviour` (Rule 41), `createMetaParallelAction(nc, ..., vars(nc.nodes),
+- This generator: `ncCoreBehaviour` (Chapter 4 Rule 41), `createMetaParallelAction(nc, ..., vars(nc.nodes),
   vars(nc.nodes), cs, vtguards(nc), Set{}, ...)`: as the manual.
 - Kind: form (with respect to the CSP-M: extra synchronised variables, same behaviour) and manual
   incomplete (node side, see the hazard).
@@ -58,7 +65,7 @@ the generator).
   state is active, and when a transition is triggered no action of any state (inner states included) is
   running. The extra variables of the CSP-M on the Trans side are not needed but harmless.
 - HAZARD (manual incomplete, node side): vars(nc.nodes) contains for an operation call only the
-  arguments and requiredVariables (Rule 50, p. 49: the operation's parameters), not the variables that the
+  arguments and requiredVariables (Chapter 4 Rule 50, p. 49 of the Aug 2022 PDF: the operation's parameters), not the variables that the
   called operation's definition reads or writes. A node whose action calls an operation that writes a
   variable occurring nowhere in the nodes would not have that write synchronised. Pedro (16 Nov 2026):
   vars(s.nodes) should include the variables of the called operations (see entry 2). No effect now:
@@ -67,14 +74,14 @@ the generator).
   are implemented, the node side must include the variables read and written by the called operations, or
   use all variables of the machine as the CSP-M does. Comment at `ncCoreBehaviour` in RC2Z.eol.
 
-## 2. Rule 60: variables of the write synchronisation of Behaviour (composite state)
+## 2. Chapter 4 Rule 60: variables of the write synchronisation of Behaviour (composite state)
 
-- Manual: Rule 60, p. 53: `Behaviour = (... |[vars(s.nodes) | enteredSS(s) ∪ {|end, interrupt|} |
-  vars(s.during)]| During) \ ...`, Definition C.2.2 (p. 165) with the variables of each side.
+- Manual: Chapter 4 Rule 60, p. 53 of the Aug 2022 PDF: `Behaviour = (... |[vars(s.nodes) | enteredSS(s) ∪ {|end, interrupt|} |
+  vars(s.during)]| During) \ ...`, Definition C.2.2 (p. 165, Aug 2022 PDF) with the variables of each side.
 - CSP-M: [C6], [C2]: `memParallelCompose(ncBehaviour_rule(state), stmVars, stmVars, cs, stmVars, stmVars,
   During)`, `stmVars = allVariables(stm)` ([C5]: parameters of an operation definition, own variables,
   variables of provided, defined (`uses`) and required interfaces), on all four sides.
-- This generator: Rule 60 (`createCompositeStateAsActionParas`), `createTwoSidedWriteSync(ncBehaviour_S,
+- This generator: Chapter 4 Rule 60 (`createCompositeStateAsActionParas`), `createTwoSidedWriteSync(ncBehaviour_S,
   During_S, cs, machineVarNames(S))`; `machineVarNames` = parameters of an operation definition, own
   variables, provided, defined and required interfaces, in the order of [C5] (a name already in the list is
   not added again; `stmVars` collects them in a set). The required interfaces (`RInterfaces`, last loop of
@@ -93,14 +100,14 @@ the generator).
 - Status: DECIDED (Fang, 16 Nov 2026): allVariables as the CSP-M, required interfaces included (issue EE
   fixed). Comments at `createTwoSidedWriteSync` and `machineVarNames` in RC2Z.eol.
 
-## 3. exited under SStop (Rules 58 to 60)
+## 3. exited under SStop (Chapter 4 Rules 58 to 60)
 
-- Manual: Rule 59, p. 52: `Exiting = (SStop △ exit → Skip) ; [[s.exit]] ; exited → Inactive`: `exited` is
-  NOT under SStop; Rule 60 (p. 53) the same for a composite state. Rule 58 (final state, p. 52):
+- Manual: Chapter 4 Rule 59, p. 52 of the Aug 2022 PDF: `Exiting = (SStop △ exit → Skip) ; [[s.exit]] ; exited → Inactive`: `exited` is
+  NOT under SStop; Chapter 4 Rule 60 (p. 53, Aug 2022 PDF) the same for a composite state. Chapter 4 Rule 58 (final state, p. 52 of the Aug 2022 PDF):
   `Interrupted = SStop △ exit → exited → Inactive`.
 - CSP-M: [C7] 377-380: `share__choice(exit -> SKIP) ; ExitAction ; share__choice(exited -> SKIP) ;
   Inactive` for every state, simple and composite.
-- This generator: Rules 59 and 60 (`createSimpleStateAsActionParas`, `createCompositeStateAsActionParas`):
+- This generator: Chapter 4 Rules 59 and 60 (`createSimpleStateAsActionParas`, `createCompositeStateAsActionParas`):
   `(SSTOP △ (exited → Skip)) ; Inactive_X`, as the CSP-M, since 6 Nov 2026 (branch `holcsp-fixes`, commit
   e7cf9ef); before, as the manual. Final states and junctions agreed with the CSP-M already.
 - Kind: semantic (the manual's process refuses `share` between the exit action and `exited`).
@@ -112,12 +119,12 @@ the generator).
   forms are acceptable for deadlock freedom.
 - Status: DECIDED, CSP-M form adopted (6 Nov 2026).
 
-## 4. Rule 60: interrupt in the synchronisation set of Behaviour
+## 4. Chapter 4 Rule 60: interrupt in the synchronisation set of Behaviour
 
-- Manual: Rule 60, p. 53: the set `enteredSS(s) ∪ {|end, interrupt|}`: the whole channel `interrupt`.
+- Manual: Chapter 4 Rule 60, p. 53 of the Aug 2022 PDF: the set `enteredSS(s) ∪ {|end, interrupt|}`: the whole channel `interrupt`.
 - CSP-M: [C6]: `union(enteredSS, {| interrupt, terminate |})` inside the CSP-M module of the state, where
   `interrupt` is the one event of that module (channels are declared per module).
-- This generator: `interrupt_<state FQN>` only (Rule 60, `cs = enteredSS(self) ∪ {terminate,
+- This generator: `interrupt_<state FQN>` only (Chapter 4 Rule 60, `cs = enteredSS(self) ∪ {terminate,
   interrupt_S}`).
 - Kind: form. The interrupt events of the inner nodes do not reach the synchronisation of Behaviour: inside
   the inner level they are images of the trigger events under the interrupt renaming of composeNodes (Rule
@@ -127,25 +134,28 @@ the generator).
 
 ## 5. enteredSS: states only
 
-- Manual: defined only locally, Rule 29, p. 44: `enteredSS = {|x : stm.nodes • entered.id(x)|}` (all nodes
-  of the machine); Rule 60 (p. 53) uses `enteredSS(s)` as a function of a state, which is not defined.
+- Manual: Chapter 4 Rule 29, p. 44 of the Aug 2022 PDF: `enteredSS = {|x : stm.nodes • entered.id(x)|}` (all nodes of the machine, in the
+  where clause of that rule); Chapter 4 Rule 60, p. 53 of the Aug 2022 PDF, defines `enteredSS(s)` in its where clause:
+  `enteredSS(s) = {| x : s.nodes @ entered.id(x) |}` (all nodes of the state, junctions included).
 - CSP-M: [C7] 288-294: `entered` of the nodes that are states (`instanceof State`; final states are states).
 - This generator: `enteredSS(nc)`: the `RC!State` nodes (a Final is a State).
-- Kind: form (junctions have no `entered` event, so `entered.id(j)` of a junction never occurs) and manual
-  incomplete (the function `enteredSS(s)` of Rule 60 is not defined).
+- Kind: form (junctions have no `entered` event, so `entered.id(j)` of a junction never occurs).
+- CORRECTED 17 Nov 2026: this entry said that `enteredSS(s)` of Chapter 4 Rule 60 is not defined in the manual and
+  counted it as "manual incomplete". That was wrong: the where clause of Chapter 4 Rule 60 defines it (checked in the
+  August 2022 PDF and in `chapter4.tex` of the manual's source).
 - Status: adopted (same as the CSP-M).
 
 ## 6. Exit actions of inner states and the assignment of an input trigger (composite states)
 
-- Manual: Rule 54 (p. 50) with Rule 55 (p. 51): a transition from a state with input trigger `e?x` is
+- Manual: Chapter 4 Rule 54 (p. 50, Aug 2022 PDF) with Chapter 4 Rule 55 (p. 51, Aug 2022 PDF): a transition from a state with input trigger `e?x` is
   `e.id(src).in?x → (SStop △ set_x!x → Skip) ; (SStop △ exit → Skip) ; ...`; the same event, renamed to
-  `interrupt.id(S)` (Rule 41), interrupts the composite state S, whose inner states then run their exit
-  actions inside Behaviour (Rules 59, 60). The write `set_x!x` of Trans and these exit actions are not
+  `interrupt.id(S)` (Chapter 4 Rule 41), interrupts the composite state S, whose inner states then run their exit
+  actions inside Behaviour (Chapter 4 Rules 59, 60). The write `set_x!x` of Trans and these exit actions are not
   ordered. The exit action of S itself runs after `exit`, i.e. after the write.
 - CSP-M: the same structure ([C1], [C7]); no check.
 - This generator: the same structure. Since 16 Nov 2026 (branch `composite-states`) a check:
-  `exitTriggerConflicts` (RC2Z.eol, at Rule 60): for every transition leaving S whose trigger binds x, every
-  state inside S (any depth) whose exit action reads or writes x (vars of Rule 50) gives a warning; it is
+  `exitTriggerConflicts` (RC2Z.eol, at Chapter 4 Rule 60): for every transition leaving S whose trigger binds x, every
+  state inside S (any depth) whose exit action reads or writes x (vars of Chapter 4 Rule 50) gives a warning; it is
   stored on the paragraph `Behaviour_<S>` (attribute `generatorNote`, entry 15), printed as
   `(* GENERATOR WARNING: ... *)` at S in the HOL-CSP and IsaCircus theories, reported by the plugin (dialog
   and log) and by dev-tools (a line `GENERATOR WARNING`). The generation is not stopped and the
@@ -162,8 +172,9 @@ the generator).
 
 ## 7. Toolkit functions
 
-- Manual: Appendix D (pp. 167-170) lists the toolkits; nothing about how their functions are translated.
-  Rule 45 (`usedVariables`, p. 48) is "standard and omitted".
+- Manual: Appendix D (pp. 167-171, Aug 2022 PDF) lists the four toolkits (set p. 168, relation p. 169, function p. 170,
+  sequence p. 171); nothing about how their functions are translated.
+  Chapter 4 Rule 45 (`usedVariables`, p. 48 of the Aug 2022 PDF) is "standard and omitted".
 - CSP-M: [C8]: `size` → `length` (sequence) or `card` (set); any other function → `<package>_<function>(args)`,
   defined in the library files `lib/semantics/<package>.csp`, copied into `csp-gen/defs/<package>_defs.csp`;
   statements guarded by `pre_<package>_<function>(args)` ([C9]; entry 11).
@@ -176,19 +187,22 @@ the generator).
 - Background: generator issue AA (16 Nov 2026).
 - Status: adopted for the sequence and set toolkits; the guards are under reconsideration (entry 11, entry 16).
 
-## 8. Appendix D lacks the sequence toolkit
+## 8. (WITHDRAWN 17 Nov 2026) Appendix D and the sequence toolkit: no difference
 
-- Manual: Appendix D (pp. 167-170) announces four toolkits but shows only set, relation and function.
-- CSP-M / RoboTool: the sequence toolkit exists (`lib/robochart/sequence_toolkit.rct` of
-  `circus.robocalc.robochart.textual`; `lib/semantics/sequence_toolkit.csp` of the CSP-M generator).
-- This generator: translates it (entry 7).
-- Kind: manual incomplete. Source: our reading of the manual (16 Nov 2026).
-- Status: recorded for an internal version of the manual.
+- This entry said (16 Nov 2026) that Appendix D announces four toolkits but shows only set, relation and
+  function. That was WRONG: the sequence toolkit is on p. 171 of the August 2022 PDF (a diagram turned by
+  90 degrees, `diagrams/toolkit/sequence_toolkit.pdf` in the manual's source, included since 2019); the
+  first reading stopped at p. 170 of the Aug 2022 PDF.
+- Manual: Appendix D has the four toolkits, and they agree with the `.rct` files in RoboTool's jar
+  (`lib/robochart/{set,relation,function,sequence}_toolkit.rct` of
+  `circus.robocalc.robochart.textual_3.1.0.202610211110.jar`): the same functions in each toolkit, and the
+  definitions of the 22 functions of the sequence toolkit read one by one against the diagram (17 Nov 2026).
+- Kind: none. The entry is kept under its number so that the numbers of the other entries do not change.
 
 ## 9. tail and front on the empty sequence
 
-- Manual: no translation (entry 7). The toolkit (`sequence_toolkit.rct`) defines `tail(<>) = <>` and
-  `front(<>) = <>`, no precondition.
+- Manual: no translation (entry 7). The sequence toolkit (Appendix D, p. 171 of the Aug 2022 PDF, the same as
+  `sequence_toolkit.rct`) defines `tail(<>) = <>` and `front(<>) = <>`, no precondition.
 - CSP-M: [C10]: `sequence_toolkit_tail(<x>^xs) = xs`, `sequence_toolkit_front(xs^<x>) = xs`: no case for
   `<>`, so FDR stops with an evaluation error on `tail(<>)`; `pre_sequence_toolkit_tail(s) = true`, no
   guard.
@@ -200,7 +214,7 @@ the generator).
 
 ## 10. Uninitialised variables
 
-- Manual: Rule 35, p. 45: `Memory(v)` starts with the initial value if there is one, else with an internal
+- Manual: Chapter 4 Rule 35, p. 45 of the Aug 2022 PDF: `Memory(v)` starts with the initial value if there is one, else with an internal
   choice over the type: `⊓ i : [[v.type]] • Memory(i)`.
 - CSP-M: [C11]: `initialValue` = the initial expression or `typeDefaultValue` (0 for int and nat, `true`
   for boolean, `<>`, `{}`, the first literal of an enumeration, ...): a fixed value, not a choice.
@@ -214,13 +228,13 @@ the generator).
   (FDR prediction D.2a, `stm_nodes_and_parallel/dti-plan-deadlock-fdr/`, NOT RUN). CORRECTED 16 Nov 2026:
   this is not so for the flat MakePlan of D1.3, whose modelToCheck appends `<0>` to modelScore (see the proof
   repository, `stm_nodes_and_parallel/DEFINEDNESS_NOTES.md`). In the flat model an arbitrary initial value
-  (Rule 35) of modelRanking would make the unguarded indices in the conditions undefined; the default `<>`
+  (Chapter 4 Rule 35) of modelRanking would make the unguarded indices in the conditions undefined; the default `<>`
   does not.
 - Status: as the CSP-M; to decide whether to follow the manual (choice over the type) in the memory.
 
 ## 11. Guards for division and sequence indexing
 
-- Manual: none (Rules 65-69, pp. 55-56, translate statements without guards).
+- Manual: none (Chapter 4 Rules 65-69, pp. 55-56 of the Aug 2022 PDF, translate statements without guards).
 - CSP-M: [C9]: `right != 0` for a division, `i >= 1` and `i <= length(s)` for a sequence index, in the
   guard of an assignment, call, communication or if statement; not for transition conditions.
 - This generator: not generated on `composite-states`; generated as the CSP-M on branch
@@ -236,17 +250,17 @@ the generator).
   against definedness obligations: proof repository `stm_nodes_and_parallel/DEFINEDNESS_NOTES.md`.
 - Status: PENDING (Fang, 16 Nov 2026): the branch stays unmerged until entry 16 is decided with Ana.
 
-## 12. Rules 45 to 50: vars and usedVariables
+## 12. Chapter 4 Rules 45 to 50: vars and usedVariables
 
-- Manual: Rule 45 (p. 48) `usedVariables` "standard and omitted"; Rule 49 (p. 49) `vars(t) =
+- Manual: Chapter 4 Rule 45 (p. 48, Aug 2022 PDF) `usedVariables` "standard and omitted"; Chapter 4 Rule 49 (p. 49, Aug 2022 PDF) `vars(t) =
   vars(t.condition) ∪ vars(t.action) ∪ vars(t.deadline)`, but `vars` is defined only for nodes, transitions
-  and statements (Rules 46-51), not for expressions; Rule 50 (p. 49) has no case for an INPUT
+  and statements (Chapter 4 Rules 46-51), not for expressions; Chapter 4 Rule 50 (p. 49, Aug 2022 PDF) has no case for an INPUT
   communication statement (it writes its parameter) and uses `usedVariables(s.left)` for the left-hand side
   of an assignment (an assignable, not an expression).
 - CSP-M: computes the variable sets differently (entries 1, 2: all variables of the machine).
-- This generator: `vars` (RC2Z.eol, Rules 46-51), corrected 15 Nov 2026: Rule 49 uses usedVariables for the
-  condition and the deadline; Rule 50 takes the variable of the left-hand side (`rootVarName`, also for an
-  indexed one) and the parameter of an INPUT communication; Rule 47 returns a set instance.
+- This generator: `vars` (RC2Z.eol, Chapter 4 Rules 46-51), corrected 15 Nov 2026: Chapter 4 Rule 49 uses usedVariables for the
+  condition and the deadline; Chapter 4 Rule 50 takes the variable of the left-hand side (`rootVarName`, also for an
+  indexed one) and the parameter of an INPUT communication; Chapter 4 Rule 47 returns a set instance.
 - Kind: manual incomplete.
 - Status: corrections adopted (comments at the rules in RC2Z.eol).
 
@@ -270,6 +284,11 @@ the generator).
 - D3: the node's `Inactive` is closed with the exception operator, `Inactive [| {terminate} |> SKIP`
   ([C7] 392), where the manual (and this generator) have `Termination = end → Skip` in a choice.
 - D4: entry actions with a doubled `share__choice` and `true &`.
+- D5 (17 Nov 2026): the During of a composite state (Chapter 4 Rule 60) has `RUN(enteredSS(s))` in the manual
+  and `CRUN(enteredSS)` in the CSP-M ([C7] 389, 412). The untimed library defines `CRUN(x__) = RUN(x__)`
+  ([C12], `state.csp` line 20, copied into `csp-gen/defs/state_defs.csp`), with FDR's built-in `RUN`: the same
+  process. The timed library defines `CRUN(x__) = RUN(union(x__,{tock}))` (`state_timed.csp` line 21), which
+  belongs to the timed semantics and is not compared here. Checked by reading the sources, not with FDR.
 - Kind: form. Source: proof repository CLAUDE.md (FDR comparison on Legitimate, all assertions pass,
   checked with FDR).
 - Status: no action.
@@ -286,10 +305,10 @@ the generator).
 
 ## 16. Undefined expressions (definedness)
 
-- Manual: nothing. Rules 65-69 (pp. 55-56) translate an assignment as `SStop △ set_x![[e]] → Skip`, a
+- Manual: nothing. Chapter 4 Rules 65-69 (pp. 55-56, Aug 2022 PDF) translate an assignment as `SStop △ set_x![[e]] → Skip`, a
   communication with `[[value]]`, an if statement with `[[s.expression]]`, without any guard; `[[e]]Expr` is
-  used (e.g. Rule 35) but not defined; the preconditions of functions appear only in the metamodel
-  (Function.preconditions, p. 155) and in the informal overview (p. 148). No rule says what happens when an
+  used (e.g. Chapter 4 Rule 35) but not defined; the preconditions of functions appear only in the metamodel
+  (Function.preconditions, p. 155 of the Aug 2022 PDF) and in the informal overview (p. 148, Aug 2022 PDF). No rule says what happens when an
   expression is undefined (head of an empty sequence, division by zero, an index out of range, a function
   applied outside its precondition). Checked by reading the manual, 16 Nov 2026.
 - CSP-M: [C9]: guards `pre_<f>(args)`, `right != 0`, `1 <= i <= length(s)` before the statement, so that the

@@ -3,8 +3,10 @@ Functions of the RoboChart toolkits (generator issue AA, 16 Nov 2026, Fang).
 Imported by RC2Z.eol and by the three templates circusM2T.egl, circusM2T_HOLCSP.egl and
 circusM2T_HOLCSP_trans_core.egl (as tupleSelection.eol).
 
-Generator convention, not a rule of the manual. The manual (Appendix D) defines no translation of the toolkit
-functions, and does not contain the sequence toolkit at all. RoboTool's CSP-M generator
+Generator convention, not a rule of the manual. The manual (Appendix D, pp. 167-171 of the August 2022 PDF)
+shows the four toolkits (set, relation, function, sequence; the same functions as the .rct files below) but
+defines no translation of their functions. (Corrected 17 Nov 2026: this comment said that the manual does not
+contain the sequence toolkit; it is on p. 171.) RoboTool's CSP-M generator
 (https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/
 circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/ExpressionGenerator.xtend#L190-L237)
 writes a call with the qualified name <package>_<function> (e.g. sequence_toolkit_head) and defines these

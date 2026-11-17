@@ -133,8 +133,10 @@ components of the RoboChart product type. The templates print the projection of 
 (tupleSelection.eol); before, component 2 was always printed as snd, which is wrong for n > 2.
 
 16 Nov 2026, branch composite-states (Fang)
-Toolkit functions (generator issue AA). The manual has no rule for them (Rule 45 omits usedVariables of
-expressions, Appendix D lists the toolkits but not the sequence toolkit). createCallExpr writes a call of a
+Toolkit functions (generator issue AA). The manual has no rule for them (Chapter 4 Rule 45 omits usedVariables
+of expressions; Appendix D, pp. 167-171 of the August 2022 PDF, shows the four toolkits, the sequence toolkit
+on p. 171, but no translation; corrected 17 Nov 2026, this comment said that Appendix D lacks the sequence
+toolkit). createCallExpr writes a call of a
 function of a toolkit with its qualified name <package>_<function> (toolkitCallName), as RoboTool's CSP-M
 generator; the templates print it by toolkitFunctions.eol (imported here as well). Supported: the sequence and
 set toolkits except range, iter, squash, extract; size for sequences only. Any other toolkit function stops
