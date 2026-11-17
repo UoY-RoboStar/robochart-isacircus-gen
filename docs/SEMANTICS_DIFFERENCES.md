@@ -13,8 +13,9 @@ Sources:
   commit 646c38f of `UoY-RoboStar/robochart-reference`; page numbers are the printed ones, which are the PDF
   page numbers). Rules are numbered per chapter (Chapter 5, the probabilistic semantics, has its own Rule 1,
   2, ...); every rule cited here is a rule of Chapter 4 (Semantics) and is written "Chapter 4 Rule n".
-  Rule numbers are unchanged in the source of June 2026 (master 04e7b96, which adds only Appendix F); page
-  numbers can differ by one in a new build, so they are given for the August 2022 PDF. Annotated copy:
+  Rule numbers are unchanged in the source of June 2026 (master 04e7b96, which adds only Appendix F); a build
+  of that source on the Linux workstation (17 Nov 2026) gives the same rule numbers and the same pages as the
+  August 2022 PDF (List of rules and Chapter 4 compared page by page); pages are cited for that PDF. Annotated copy:
   `laila-fangyan/robochart-reference`, branch `csp-m-differences` (notes "Note on RoboTool's CSP-M").
 - CSP-M generator: `UoY-RoboStar/robochart-csp-gen` at commit `a6412b40c83ded4ab2c18c2b9bd28575ec270983`
   (given by Pedro; read-only clone in `~/Git/robochart-csp-gen`). The links below point to that commit:
