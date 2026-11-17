@@ -33,6 +33,9 @@ Sources:
     and [ExpressionGenerator.xtend 547-559, `initialValue`](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/ExpressionGenerator.xtend#L547-L559)
   - [C12] [lib/semantics/state.csp 19-20, `CRUN` (untimed)](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/lib/semantics/state.csp#L19-L20)
     and [lib/semantics/timed/state_timed.csp 20-21, `CRUN` (timed)](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/lib/semantics/timed/state_timed.csp#L20-L21)
+  - [C13] [CStateMachineGenerator.xtend 83-162, `channelDeclarations`](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CStateMachineGenerator.xtend#L83-L162);
+    node modules [CStateGenerator.xtend 176-336](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CStateGenerator.xtend#L176-L336);
+    `NIDS` [CTransitionGenerator.xtend 39-47](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CTransitionGenerator.xtend#L39-L47)
 - This generator: operations of `circus.robocalc.robochart.epsilon.isacircus/erules/RC2Z.eol` and of the
   templates, named by operation (line numbers change).
 - Other records: the generator's CLAUDE.md (in the claude-context repository; issue letters), the research
@@ -329,3 +332,28 @@ the generator).
 - Status: PENDING, to be discussed with Ana (Fang, 16 Nov 2026). Until then: the existing pre_ guards of
   `composite-states` (head, last, min, max) stay as they are, `index-division-guards` stays unmerged, issue CC
   is not fixed.
+
+## 17. Channel declarations (17 Nov 2026)
+
+- Manual: the untimed rules of Chapter 4 (Rules 1 to 73) use channels and events (`enter`, `entered`,
+  `exit`, `exited`, `interrupt`, `internal`, `end`, `share`, `get_x`, `set_x`, `set_EXT_x` / `set_Ext_x`,
+  `setL(v)`/`setR(v)` of Definition C.2.2, `eventId(e).in/out`, `eventId(e)__.id(src).in`, `o.nameCall`) and the
+  identifiers `vid`, `eventId`, `id` without declaring them: parameters, their types and the place of the
+  declaration are not given. Inconsistencies inside the manual: `set_EXT_` (Chapter 4 Rules 3, 25, 37)
+  against `set_Ext_` (Chapter 4 Rules 12, 19, 20); `shared` in Chapter 4 Rule 25 where `share` is meant (the
+  CSP-M has `share__`); the introduction of Chapter 4 says that RoboTool realises the identifiers as qualified
+  names, but the CSP-M uses plain names inside CSP-M modules.
+- CSP-M: declared per CSP-M module: the state machine module declares `internal__ : NIDS`, `interrupt`,
+  `exit`, `exited`, `terminate`, `get_x, set_x, setL_x, setR_x : T` for every variable, `set_EXT_x` for the
+  required ones, `e__ : NIDS.InOut[.T]` and `e : InOut[.T]` for every event, `oCall` for operations without
+  definition ([C13] lines 83-162); each node is a module with `enter`, `entered`, `interrupt` (and
+  `enteredL`, `enteredR`, declared but unused), so `enter.id(n)` is `n::enter`; a composite state's module
+  declares its own `NIDS`, `internal__` and `e__`; `datatype NIDS = NID_<node> | ...` per node container;
+  `share__` and `datatype InOut = in | out` in the library. Names differ: `end` is `terminate`, `share` is
+  `share__`, `internal` is `internal__`.
+- This generator: its own conventions (entry 13), not part of the manual.
+- Kind: manual incomplete.
+- Manual annotation: Appendix G "Channel declarations in RoboTool's CSP-M" of the annotated manual
+  (`laila-fangyan/robochart-reference`, branch `csp-m-differences`, shown with the notes switched on), with
+  the tables of declarations and of correspondence, and a note at the start of Chapter 4.
+- Status: recorded.
