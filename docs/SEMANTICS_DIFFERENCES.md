@@ -215,6 +215,22 @@ the generator).
 - Background: our reading of the sources (16 Nov 2026); relevant to Replan of Adaptation_Plan (`tail` of a
   one-element ranking gives `<>`, which is defined).
 - Status: adopted (toolkit definition).
+- FDR (checked with FDR, 19 Nov 2026, Windows, FDR 4.2.7; proof repository, branch `trigger-fqn-naming`,
+  `stm_nodes_and_parallel/definedness-fdr/`, toy models d1-d3 with `s = tail(s)` in a transition action):
+  "Compilation Failed: Pattern match failure whilst attempting to evaluate: sequence_toolkit_tail(<>)"
+  for every assertion. So in the CSP-M `tail(<>)` neither BLOCKS (as a guarded statement does: the index and
+  division guards of entry 11 and the `pre_` guards of head and last make the statement STOP) nor takes
+  SOME VALUE: it makes FDR's evaluation fail, and the model cannot be checked at all. FDR stopped also in two
+  models in which the call is not reachable with `<>` in the composed machine: it evaluates each sequential
+  component on its own, every input over its whole type (inferred from these results), so a guard
+  protects a call only if it comes after the last read of the variable; the CSP-M's statements read their
+  variables again (`get_x?x` before each statement), so a condition or an `if` on an earlier read does not
+  protect them (Replan of Adaptation_Plan: `if size(modelRanking) > 0 then modelRanking = tail(modelRanking)`).
+  Against this generator: no guard either, but Isabelle's `tl [] = []` is DEFINED (it is `hd []` that is
+  unspecified), so the HOL-CSP follows the toolkit and the process goes on. RoboTool emits `pre_` guards only
+  for toolkit functions with a precondition (CStatementGenerator.xtend 535-546: head, last, size, min, max,
+  squash); tail and front have none. Analysis and changed predictions: proof repository
+  `stm_nodes_and_parallel/DEFINEDNESS_NOTES.md`, Section 5.
 
 ## 10. Uninitialised variables
 
