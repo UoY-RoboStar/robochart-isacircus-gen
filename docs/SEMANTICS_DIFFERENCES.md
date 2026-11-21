@@ -190,6 +190,57 @@ the generator).
 - Kind: manual incomplete; convention (the Isabelle terms).
 - Background: generator issue AA (16 Nov 2026).
 - Status: adopted for the sequence and set toolkits; the guards are under reconsideration (entry 11, entry 16).
+- The pre_ guards in detail (checked by reading the code, 21 Nov 2026; `toolkitFunctions.eol`, RC2Z
+  `toolkitGuards`, `toolkitGuardsOf`, `withToolkitGuards`, `createStmtAsAction`, `createStmtInContextAsAction`
+  on `composite-states` 251834f, against [C9] and `lib/semantics/{sequence,function}_toolkit.csp` of the
+  CSP-M generator; nothing generated or run):
+  - Which functions. Of all four toolkits, only six functions declare a precondition, all in the sequence
+    toolkit (`lib/robochart/*.rct` of `circus.robocalc.robochart.textual_3.1.0.202610211110.jar`):
+    `head`, `last` (`isNonEmpty(s)`), `min` (`hasMin(a)`), `max` (`hasMax(a)`), `size` (`isFinite(a)`),
+    `squash` (`isFiniteFunction(f)`). This generator guards four of them: `head`, `last` (`s ≠ []`), `min`,
+    `max` (the existence of a least / greatest member). `size`: the table entry `pre_sequence_toolkit_size`
+    is `""`, so `toolkitGuardsOf` adds no guard; `size` is supported for sequences only, for which
+    `isFinite` holds. The CSP-M writes `pre_sequence_toolkit_size(s)`, defined as
+    `function_toolkit_isFinite(s)`, which the CSP-M library defines as `true` for every argument (sets and
+    sequences; its comment: "sets in our encoding in CSPM are always finite"): the same process. `squash`:
+    not supported (`toolkitCallName` gives the marker
+    `GENERATOR_ERROR_unsupported_toolkit_sequence_toolkit_squash`, and `toolkitGuardsOf` adds no guard for a
+    marker); Isabelle stops at the marker, so there is no output to compare. In the CSP-M its guard
+    `pre_sequence_toolkit_squash(f)` = `function_toolkit_isFiniteFunction(f)` = `function_toolkit_isFinite(f)`
+    = `true`. So of the six, the CSP-M guards that can be false are those of `head`, `last`, `min`, `max`,
+    exactly the four guarded here. Also different: the CSP-M guards the preconditions of EVERY function with
+    a precondition (`pre_<id>(args)` also for user-defined functions); this generator only those of toolkit
+    functions (`toolkitGuardsOf` requires a toolkit call name).
+  - Where. In both generators only in the four kinds of statement (assignment, operation call,
+    communication statement, if statement), as a guard of the statement placed after the reads of the
+    statement and before it (CSP-M `readState(vars, guard & stmt)`; here `createStmtInContextAsAction`:
+    `readState(usedVariables(self), ...)` around `withToolkitGuards(...)`). The calls collected are those in
+    the statement's own expressions (for a communication its value, for an if statement its condition, for
+    an assignment its right-hand side and the index of an indexed left-hand side), descending ONLY through
+    divisions, sequence indexing (`s[i]`: base and index) and the arguments of calls, in both. NOT guarded,
+    in both: transition conditions (CSP-M `compileTransitionCondition`, CTransitionGenerator.xtend 50, prints
+    the condition alone; here conditions do not go through `createStmtAsAction`); calls below any other
+    operator, e.g. `x = 1 + head(s)`, `b = head(s) > 0`, in the value or body of a `let`, in a conditional
+    expression, under a tuple selection (`(head(s))[1]` is not a sequence index). Entry, during and exit
+    actions consist of statements and are guarded as above. So the positions are the same as in the CSP-M;
+    the differences are the set of functions (above) and the index and division guards of [C9], which are not
+    generated on this branch (entry 11). For an unguarded call the meanings differ: the CSP-M has only
+    `sequence_toolkit_head(<x>^xs) = x`, so an unguarded `head(<>)` (e.g. in `x = 1 + head(s)`) makes FDR's
+    evaluation fail (as `tail(<>)`, entry 9); in Isabelle `hd []` is an unspecified value and the process
+    goes on.
+  - A second, older guard (generator issue CC; not fixed, decision of 16 Nov 2026): in
+    `createAssignmentStmtAsAction`, an assignment whose right-hand side is itself a call of a function with
+    preconditions is guarded by the precondition expressions of the function, with the FORMAL parameters
+    not replaced by the arguments; for a toolkit function this comes in addition to the guard above. By
+    reading: `entry x = head(s)` in the toy models `robochart-models/definedness-tests/d1_head_tail.rct` and
+    `d2_guarded_return.rct` (proof repository) would get `s ≠ []` twice, right only because the model's
+    variable has the name of the formal parameter of `head`; `x = size(t)` would get the marker of
+    `function_toolkit_isFinite`. Not generated for these models. (Issue CC said "not reached by the present
+    models"; the toy models d1 and d2, written the same day, reach it.)
+  - Status: PENDING, as entries 11 and 16. Whether the HOL-CSP keeps the pre_ guards at all (and if so,
+    whether it adds those of user-defined functions and the index and division guards, and fixes CC), or has
+    no guards and the generator lists definedness proof obligations instead, waits for the decision with Ana
+    on guards against definedness obligations. Until then the code is not changed.
 
 ## 8. (WITHDRAWN 17 Nov 2026) Appendix D and the sequence toolkit: no difference
 
