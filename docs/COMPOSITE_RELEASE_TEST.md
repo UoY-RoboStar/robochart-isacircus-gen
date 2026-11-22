@@ -201,4 +201,17 @@ the dev-tools output of Sections 4 and 5 and load them in Isabelle.
 
 ## 10. Merge (not pushed)
 
-MERGE_RESULT
+Local branch `release-composite`, created from `origin/main` 2976313 (fetched 22 Nov 2026; `main` has no
+commit after 2976313), with `composite-states` merged by `git merge --no-ff`. No conflict: `composite-states`
+descends from 2976313 (the merge base), so the tree after the merge is the tree of `composite-states`
+(checked: `git diff composite-states release-composite` is empty). Build of the merged tree as the CI does
+it, with `verify` instead of `install` (JDK 11, Maven 3.9.16, `mvn -B clean verify` on a `git archive`
+export): BUILD SUCCESS, plugin 1.0.0.<build time>. NOT pushed, neither `main` nor `release-composite`.
+
+What a push does (`.github/workflows/main.yml`): every push of any branch runs the job `build`
+(`mvn clean install`, JDK 11). Only a push to `main` also deploys: the update site
+`circus.robocalc.robochart.epsilon.isacircus.site/target/repository/` is copied by
+UoY-RoboStar/ga-eclipse-deploy to robostar.cs.york.ac.uk under `robotool/robochart-isacircus-gen/`, and a
+commit comment with the address is created. RoboTool installations that use that update site
+(`.../robotool/robochart-isacircus-gen/update`, the source of the installed 1.0.0.202611071400) are then
+offered the new version by their automatic update check.
