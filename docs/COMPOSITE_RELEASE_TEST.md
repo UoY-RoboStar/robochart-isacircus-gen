@@ -61,6 +61,9 @@ still present (not loaded); the jar 1400 is no longer there (removed by p2, not 
 
 ## 3. ITP 2026 examples
 
+CORRECTED by Section 11 (second search, 22 Nov 2026): the models of the running example and of LRE were
+found, and the history of the GasAnalysis model; the statements below on these three are superseded.
+
 Repository laila-fangyan/RoboChart-Deadlock-HOLCSP-AG, commit 59b534a (cloned to
 `~/Git/RoboChart-Deadlock-HOLCSP-AG`, read only). It contains the library and the six example theories
 (generated semantics with hand-written invariants and proofs), NOT the RoboChart models (.rct).
@@ -83,9 +86,9 @@ normalised away):
 |---|---|---|
 | TurtleBot ddlf (ddlf_auto, ddl_ag_true) | `RoboChart2Circus_development_repo/Turtlebot-robochart-deadlock-free/Adaptation_Plan_flat_ddlf.rct` | Trans token for token |
 | TurtleBot ddl | `RoboChart2Circus_development_repo/Turtlebot-robochart2/Adaptation_Plan_flat_ddlk.rct` | Trans token for token |
-| running example | `RoboChart2Circus_development_repo/Abstract_examples/example_robot_DDLK.rct`, stm0 | Trans the same except one `Skip ;` removed by hand in the ITP theory; but the file is a controller `robot_ctrl_D` with two machines, the ITP theory names `robot_ctrl` |
+| running example (SUPERSEDED, 11.1) | `RoboChart2Circus_development_repo/Abstract_examples/example_robot_DDLK.rct`, stm0 | Trans the same except one `Skip ;` removed by hand in the ITP theory; but the file is a controller `robot_ctrl_D` with two machines, the ITP theory names `robot_ctrl` |
 | GasAnalysis | two candidates, neither the ITP model: `ChemicalDetector-autonomous8_GA_corrected/GasAnalysis.rct` (stm GasAnalysis, functions in the imported package Chemical, `gs` initially `<>`); `Test1/GasAnalysis/GasAnalysis.rct` (package Chem, stm GA, all in one file) | the ITP Trans sets `gs` to `[⦇c=0,i=0⦈]` and `anl` to `Front` on the initial transition and has an assume after the input trigger; neither candidate has this |
-| LRE | `LRE_2D_coordToPair/lre_beh.rct`, `LRE/lre_beh.rct` | not generated: M2M fails ("Called feature 'name' on undefined object"), on `main` 2976313 as well |
+| LRE (SUPERSEDED, 11.1: not the ITP model) | `LRE_2D_coordToPair/lre_beh.rct`, `LRE/lre_beh.rct` | not generated: M2M fails ("Called feature 'name' on undefined object"), on `main` 2976313 as well |
 
 Regeneration and proof (new generator, library RC_HOL-CSP of AG-dev; the Trans-core theory, which is the
 form of the ITP theories, with the ITP invariants put in at the same places and the ITP proof scripts):
@@ -167,6 +170,9 @@ unexplained difference.
 
 ## 8. Found while testing, not fixed
 
+CORRECTED by Section 11: the evidence below was a single version (FF) or models that are not the ITP
+models (GG, HH). Section 11 has the check on all generator versions and the causes.
+
 - An `if` statement in an entry action (toy model d3: `entry if size(s) > 0 then x = head(s) end`) makes
   RC2Z fail with `StackOverflowError`, on `main` 2976313, on 8c1a37c and on 3bf32cf. Not investigated.
 - Functions of an imported package are not declared (`consts`) in the HOL-CSP theory: types are (W), functions
@@ -215,3 +221,149 @@ UoY-RoboStar/ga-eclipse-deploy to robostar.cs.york.ac.uk under `robotool/robocha
 commit comment with the address is created. RoboTool installations that use that update site
 (`.../robotool/robochart-isacircus-gen/update`, the source of the installed 1.0.0.202611071400) are then
 offered the new version by their automatic update check.
+
+## 11. Second search for the ITP models and re-check of FF, GG, HH (22 Nov 2026, evening)
+
+Investigation only; nothing in any repository changed except this document and CLAUDE.md. Models taken with
+`git archive` / `git show` from RoboChart2Circus_development_repo (no checkout); generator versions exported
+to the scratchpad with `git archive`; all generation with dev-tools GenAll (its loader is the current
+RctLoader for every version: for versions before 25e7662 this is NOT how they ran).
+
+### 11.1 Where the ITP models are
+
+RoboChart2Circus_development_repo has one branch (`main`) and 23 commits; the first, c0e67a0 (8 Feb 2026), is
+a bulk import, so no state from December 2025 is in git. Relevant commits: c0e67a0 and 5e58d63 (12 May 2026,
+two days after the ITP commit 59b534a). The Epsilon launch configurations and generated theories stored in
+the repository give the history:
+
+- Running example: launch configurations of 4 Sep 2025 read `Abstract_examples/example_robot.model` (EMF
+  XMI, tracked since c0e67a0): controller `robot_ctrl`, machine `stm0`, states `detect`, `stop`, `move`,
+  `i0`, `f0`. This is the ITP model. It has no `.rct` counterpart (`example_robot.rct` has other names and
+  types, `example_robot_DDLK.rct` is a controller `robot_ctrl_D` with two machines). A textual equivalent
+  written by hand from the XMI (scratchpad, not in a repository) gives, with the current generator, a
+  Trans core equal to the ITP `Trans` token for token except one `Skip ;` that the ITP theory removed.
+- GasAnalysis: launch configurations of 1 and 2 Dec 2025 read `Test1/GasAnalysis/GasAnalysis.rct`
+  (Z model `GA_circus.model`); generated theories of 1 Dec 2025 to 16 Jan 2026 are stored in
+  `Test1/GasAnalysis/circus_gen/hol-csp_gen/`. The ITP generator (11.3) on `Test1/GasAnalysis/GasAnalysis.rct`
+  of c0e67a0 reproduces the stored generations of 5 Dec 2025 and 16 Jan 2026 exactly (Trans normalised, ratio
+  1.000; the package and machine were renamed in between). The ITP theory descends from the stored
+  `HOLCSP_GasAnalysis.thy`, which has `gs = <>; anl = Front` on the initial transition: a model state between
+  1 and 5 Dec 2025 that is not in git. On top of that the ITP theory is HAND-EDITED (its own comment says so):
+  `gs` initially `[⦇c=0,i=0⦈]`, the input trigger written `gas__in_NID_Reading`, an assume after the trigger,
+  the sequential compositions moved under the assumes, the final state's share/interrupt branches dropped.
+  No model reproduces it; the closest is `Test1/GasAnalysis/GasAnalysis.rct` of c0e67a0. Its imported
+  packages: none besides the sequence toolkit (types and functions in the same file), so issue GG does not
+  apply to the ITP GasAnalysis.
+- LRE: launch configurations of 18 Nov 2025 read `LRE_2D_coordToPair/Circus-gen/lre_beh.model` (EMF,
+  tracked since c0e67a0); the stored `Circus-gen/hol-csp_gen/HOLCSP_LRE_2D.thy` equals the ITP
+  `Trans_LRE_Beh` except the hand-edited trigger (ratio 0.997); `Trans_LRE_Beh_core` was written from it by
+  hand. GenAll cannot read XMI. `LRE_2D_coordToPair/lre_beh_complete.rct` (c0e67a0; moved to `Test1/` in
+  5e58d63) is the same machine in one file: the ITP generator on it reproduces the stored generation except
+  one read (`get_reqV?reqV` before `advVel!reqV`), which the EMF route lost because the variables of the
+  EMF model still pointed to the interface (RC2Z comment "rct Vs EMF (1)"). `lre_beh.rct` (with `uses`/
+  `requires` of interfaces in other files) is NOT the ITP model.
+
+### 11.2 Regression with the new generator (d364c8c), the ITP invariants and the ITP scripts
+
+| Example | Model | Result |
+|---|---|---|
+| TurtleBot ddlf, ag_true, ddl | as Section 3 | proved / counterexamples found (Section 3) |
+| running example, `Trans_ag_true_findcounterexample` | textual equivalent of `example_robot.model`, variant without the controller and with `dest` a constant of the machine (see below) | nitpick `[expect = genuine]` holds: counterexample found, as in the baseline |
+| running example, `Trans_enriched_ddlf` | same, invariant at both assumes and at the guarantee of `set_pos` | NOT PROVED: `apply blast+` did not finish in 30 min (stopped by timeout). `deadlock_free'` leaves 5 goals; 1-3 are the guard coverage, 4-5 are `DFI ⊑ Trans⋅NID_move ❙; enter_detect → ...`: the fallback `aviol → Trans⋅n` of the inner assume is followed by the rest of the transition, because the generator puts the assume inside the sequential composition. The ITP theory removed that `Skip ;` by hand, the "manual step" its GasAnalysis comment describes. The ITP generator (a8177dc) prints the same `Skip ;`, so this is not a regression |
+| GasAnalysis (ADAPTED: closest model, ITP invariant `size(gs) > 0` at the reads of gs before `location(gs)` and at the guarantee of `set_anl`) | `Test1/GasAnalysis/GasAnalysis.rct` of c0e67a0 | NOT PROVED: 2 goals left after the ITP script, of the same shape (`Trans⋅NID_GasDetected ❙; ...` after the fallback). The ITP's own hand restructuring is what made its proof go through |
+| LRE (`Trans_ddlf` on the core) | `lre_beh_complete.rct` of c0e67a0, with ONE hand correction: the type of `CDA` (issue II below; the ITP theory has the same correction) | NOT PROVED: `using atLeastAtMost_iff apply blast+` did not finish in 30 min. `deadlock_free'` leaves 12 goals of the form `DFI ⊑ (guard) ❙& ...` that it did not decompose. Differences to the ITP core: the extra read of `reqV` with its assume (EMF/rct, 11.1), the order of the reads of `pos` and `vel`, the trigger written as generated. Not analysed further |
+
+Without the variant the running example does not load: the controller version declares `get_obs` twice
+(controller variable and interface variable; DD); a machine without controller does not declare the constant
+`dest` of its required interface (new finding, JJ below). The machine itself is unchanged in the variant.
+
+So of the ITP proofs only TurtleBot ddlf goes through unchanged; the other three depend on hand edits of the
+generated text that the ITP generator also needed (moving sequential compositions under the assumes; the type
+of CDA; the GasAnalysis rewrite). The counterexample results (running example, TurtleBot ag_true and ddl) are
+the same as in the baseline.
+
+### 11.3 Generator versions
+
+| Name | What | Source |
+|---|---|---|
+| ITP | rules of December 2025 to May 2026 | RoboChart2Circus_development_repo `Test1/` (RC2Z.eol, circusM2T_HOLCSP.egl, circusM2T.egl, CircusM2T.egx, circus_metamodel.ecore) at c0e67a0 and at 5e58d63; the generator repository starts on 24 May 2026 (a8177dc) with these rules (RC2Z.eol differs from 5e58d63 in 16 lines, the HOL-CSP template in 1, the EGX in the output names) |
+| a8177dc | first commit of the generator repository | |
+| 2fba5ea | RoboTool 1.3's plugin 1.0.0.202610092009 | |
+| 2976313 | main, published 1.0.0.202611071400 | |
+| 8c1a37c | composite-states before the CC fix | |
+| d364c8c | composite-states, latest | |
+
+The rules of December 2025 themselves (before c0e67a0) are not available.
+
+### 11.4 FF: `if` without `else` in a state action
+
+Models: d3; minimal ff1 (one state, `entry if x > 0 then x = 1 end`); ff2 (with `else`); ff3 (the same `if`
+in a transition action); ff4 (`entry x = 1 ; if x > 0 then x = 2 end`).
+
+| | ITP (c0e67a0, 5e58d63) | a8177dc | 2fba5ea | 2976313 | 8c1a37c | d364c8c |
+|---|---|---|---|---|---|---|
+| d3, ff1, ff4 | fail | fail | fail | fail | fail | fail |
+| ff2, ff3 | generate | generate | generate | generate | generate | generate |
+
+Real, in every version since the ITP rules; NOT introduced by composite-states and not related to AA. Cause
+(stack trace and reading, confirmed by a patched scratch copy): Rule 50 `vars(stmt)` for an `IfStmt` computes
+`vars(stmt.then).includingAll(vars(stmt.else))`; without `else` the argument is undefined, EOL dispatches
+`vars(undefined)` to the Rule 46 overload `vars(nodeset)`, whose `for(n in nodeset) ... vars(n)` calls itself
+again: StackOverflowError (reported as "Unknown reason" or StackOverflowError). Rule 50 is reached through
+Rule 48 (variables of the actions of a state, for the write synchronisation), not for transition actions,
+hence ff3 works. With `if(stmt.else.isDefined())` around the second part (as createIfStmtAsAction already
+does) d3 and ff1-ff4 generate (scratch copy only). Suggested fix: that guard; optionally make Rule 46 reject
+an undefined argument.
+
+### 11.5 GG: functions of an imported package
+
+Minimal model: package `gglib` with `function noBody(n : int) : int { }` and `function withBody(n : int) :
+int { precondition n > 0 postcondition result == n + 1 }`; package `gg` imports it and calls both. All
+versions generate; no version declares either function (`consts` only for functions of the selected file's
+package: `createFunctionDefsAsAxParas(pkg)`, which also skips a function named `card`). Isabelle: d364c8c
+"Extra variables on rhs: "withBody", "noBody""; 2976313 the same and `"n"` (the formal of the CC guard before
+its fix). The same for GasAnalysis of `ChemicalDetector-autonomous8_GA_corrected` ("location", "goreq").
+Real, in every version; NOT introduced by composite-states (W, on composite-states, declares the types of
+imported packages, not the functions). Does not affect the ITP GasAnalysis (one file). Suggested fix: collect
+the functions of the non-toolkit packages the selected file reaches, as `typeDeclsToTranslate` does for types,
+with the same name-clash check.
+
+### 11.6 HH: required interface declared in another file
+
+Minimal models: hha (interface `I` with `var v : int` in another file and package, machine `requires I`),
+hhb (the same with `var v : int = 3`), hhc (interface in the same file); and `lre_beh.rct`.
+
+| | a8177dc | 2fba5ea | 2976313 | 8c1a37c | d364c8c |
+|---|---|---|---|---|---|
+| hha, lre_beh.rct | fail | fail | fail | fail | fail |
+| hhb, hhc | generate | generate | generate | generate | generate |
+
+Real, in every version run through the current loader, and NOT introduced by composite-states. Cause (probe in
+a scratch copy): RctLoader (since 25e7662, 5 Nov 2026, issue C) gives RC2Z a copy of the selected file in a
+resource of its own (`memory:/<file>`, in a resource set of its own); objects of the other loaded files are
+reached through references but are not owned by the RC model (`RC.owns(...)` false). EOL's `type()` is
+undefined for them, so `defaultValueAsZExpr` (`self.type().name`, for a variable without initial value) fails
+with "Called feature 'name' on undefined object"; the ITP rules fail at another `type()` /
+`RC!Variable.all()` (shared array variable). Before 25e7662 the plugin loaded the selected file alone (GenAll
+`single` on 2fba5ea and 2976313: fails as well, with unresolved references, issue C), so a required interface in
+another file never worked in the plugin. The ITP LRE was generated from the EMF `lre_beh.model`, so the ITP
+did not meet it. Suggested fix: give the RC model all loaded resources (or keep the selected resource in the
+loader's resource set and make the model expand to it) instead of the lone copy, then check that
+`RC!RCPackage.all()` and the other `.all()` (60 places) still select what they should; or, narrower, replace
+EOL `type()` by `eClass().name` in RC2Z (45 uses).
+
+### 11.7 Further findings (not fixed)
+
+- II. Function types with three or more parameters: the parameter product is printed nested to the left,
+  `((A×B)×C) ⇒ R`, while calls are printed as flat tuples `(a, b, c)`, which Isabelle reads as `A×(B×C)`:
+  type error at the first call (LRE: `CDA`). Introduced by 9faa957 (9 Oct 2026, "Extend RC2Z and IsaCircus/
+  HOL-CSP templates for DTI ..."); before (ITP rules, a8177dc, 8a019bf, a8d4304) the type was printed
+  without parentheses, `real×real×(real×real list)×real×real`, also wrong (the components of a product
+  parameter run together, `real×real list` is `real × (real list)`). The ITP theory has the type corrected by
+  hand. Two parameters are right. Suggested fix: print the parameter types as a right-nested product with
+  each component parenthesised, matching the call.
+- JJ. A machine without controller that requires an interface with a constant does not declare the constant
+  (running example variant: "Extra variables on rhs: "dest""); with the controller the controller declares it,
+  but then the variable of the interface is declared twice (DD).
+- The `Skip ;` / sequential composition after an assume (11.2) is the generator's form since the ITP rules;
+  the deadlock-freedom scripts of the ITP need it moved under the assume by hand.

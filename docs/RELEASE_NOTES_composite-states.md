@@ -77,10 +77,17 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
   `GENERATOR_ERROR_size_of_set`. Supported functions and their translation: `erules/toolkitFunctions.eol`.
 - Quantifiers (`exists`, `forall`) are not translated in any position; in a precondition of a function
   called as `x = f(args)` they give the guard marker `GENERATOR_ERROR_untranslated_precondition_<f>`.
-- Found while testing this release, not fixed: an `if` statement in an entry action (toy model d3) makes
-  the model-to-model step fail with a stack overflow, also on `main` 2976313; the LRE model
-  (`LRE_2D_coordToPair/lre_beh.rct`) fails in the model-to-model step ("Called feature 'name' on undefined
-  object"), also on `main`.
+- Found while testing this release, not fixed, all present since the generator of the ITP 2026 paper and NOT
+  introduced by this release (docs/COMPOSITE_RELEASE_TEST.md, Section 11):
+  - an `if` without `else` in an entry, during or exit action stops the model-to-model step with a stack
+    overflow (FF);
+  - functions of an imported package are not declared in the HOL-CSP theory; Isabelle reports them as extra
+    variables (GG);
+  - a required interface declared in another file whose variables have no initial value stops the
+    model-to-model step ("Called feature 'name' on undefined object") (HH);
+  - a function with three or more parameters gets a parameter type that does not match its calls; Isabelle
+    reports a type error (II);
+  - a state machine without controller does not declare the constants of the interfaces it requires (JJ).
 - Guards for preconditions are PROVISIONAL. A function applied outside its precondition makes the statement
   block, so it shows up as a DEADLOCK in the HOL-CSP (as in RoboTool's CSP-M), not as an error. The
   reference manual does not treat preconditions as guards; this will change to definedness proof
