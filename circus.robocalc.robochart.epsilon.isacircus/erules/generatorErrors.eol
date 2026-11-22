@@ -16,6 +16,9 @@ missing and where. Cases (kinds):
   size_of_set                      size applied to a set (RC2Z, toolkitCallName), printed as a call
   no_precondition_guard_<function> a toolkit function with a precondition but no pre_ entry in the table
                                    (RC2Z, toolkitGuardsOf), printed as the guard
+  untranslated_precondition_<f>    a precondition of a user-defined function f that createExpr cannot translate
+                                   (e.g. exists, forall; RC2Z, userPreconditionGuard, generator issue CC, 22 Nov
+                                   2026), printed as the guard
 Other exceptions of a template are caught per template by the plugin and by dev-tools (PartialOutput.java):
 the text generated so far is written, with INCOMPLETE at the beginning and GENERATOR ERROR at the end.
 ******************************/

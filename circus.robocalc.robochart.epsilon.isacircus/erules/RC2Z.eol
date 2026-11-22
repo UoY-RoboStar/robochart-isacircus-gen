@@ -171,6 +171,18 @@ explanations of 16 Nov 2026 (docs/SEMANTICS_DIFFERENCES.md).
 16 Nov 2026, branch composite-states (Fang)
 Rule 60 (Behaviour): machineVarNames also takes the variables of the required interfaces (rInterfaces), as
 allVariables of the CSP-M generator (generator issue EE). No change for the models generated so far.
+
+22 Nov 2026, branch composite-states (Fang)
+Preconditions of user-defined functions (generator issue CC; createAssignmentStmtAsAction, Rule 66;
+userPreconditionGuard, substitutedPrecondition). For x = f(args) with f user-defined, the guard is the
+conjunction of the preconditions of f with the arguments in place of the formal parameters (by position, on a
+copy; bound names of the precondition that occur in an argument renamed first). Toolkit functions are skipped
+there (AA guards them). A precondition that createExpr cannot translate (quantifiers) is printed as the guard
+GENERATOR_ERROR_untranslated_precondition_<f>. Before, the preconditions were copied with the formal parameters,
+also for toolkit functions (second guard besides AA). The guards are provisional (decision of Fang, 22 Nov
+2026, for the release of composite-states): as the CSP-M; the manual does not treat preconditions as guards
+(Ana and Alvaro, January 2026); removed when preconditions become definedness proof obligations. Changes the
+output of models with x = f(args) for a function with preconditions (toy models d1, d2; test model c9).
 ******************************/
 
 
@@ -7413,32 +7425,124 @@ operation RC!Assignment createAssignmentStmtAsAction(): Z!CircusAction{
 	
 	
 
-	//if assignment.right is a function call, and the function has a precondition, then circusAction should be guarded with function.precondition
-	//e.g., pre_Chemical_location(gs) & (share__choice(set_anl!Chemical_location(gs) -> SKIP)
-	if(self.right.instanceOf(RC!CallExp)){
-		("line 3207, self.right.`function`.type = " + self.right.`function`.type()).println();
-		("line 3208, self.right.`function`.ref = " + self.right.`function`.ref).println();
-		
-		var size = self.right.`function`.ref.preconditions.size();
-			
-		if(size>0){
-			var precond = self.right.`function`.ref.preconditions.at(0).createExpr();
-			if(size>1){
-				precond = createAndExpr(precond, self.right.`function`.ref.preconditions.at(1).createExpr());
-				var i = 2;
-				while(i<size){
-					precond = createAndExpr(precond, self.right.`function`.ref.preconditions.at(i).createExpr());
-					i++;
-				} 
-			}
-			
-			var pred = precond.createMemPredEquality();
-			circusAction = createGuardedAction(pred, circusAction);
-	
+	//if assignment.right is a call of a USER-DEFINED function with preconditions, circusAction is guarded by
+	//the conjunction of its preconditions with the arguments of the call in place of the formal parameters,
+	//e.g. x = location(gs) with precondition size(gs) > 0 gives (size(gs) > 0) & (SSTOP /\ set_x!location(gs) -> Skip);
+	//the CSP-M writes pre_Chemical_location(gs) & ... (userPreconditionGuard below).
+	//Fix of generator issue CC (22 Nov 2026, branch composite-states). Before, the precondition was copied with the
+	//FORMAL parameters (x = head(q) got the guard of head with the formal of head) and toolkit functions got a
+	//second guard besides the one of AA (toolkitGuards). Now: toolkit functions are skipped (AA guards them), the
+	//formals are replaced by the arguments (by position, each argument in parentheses), and a bound name of the
+	//precondition (quantifier, lambda, set comprehension, let) that occurs in an argument is renamed first.
+	//PROVISIONAL: the preconditions are guards as in RoboTool's CSP-M. In January 2026 Ana and Alvaro concluded that
+	//the right semantics is that of the manual, which does not treat a precondition as a guard; the guards of the
+	//CSP-M are a pragmatic choice. The ITP 2026 paper uses the semantics with guards. When preconditions become
+	//definedness proof obligations, this guard is removed (with the guards of AA, in the same change).
+	//Only for an assignment whose right-hand side is the call itself (as before the fix); AA covers four kinds of
+	//statement and descends into divisions, sequence indexing and arguments (docs/SEMANTICS_DIFFERENCES.md, entry 7).
+	if(self.right.isKindOf(RC!CallExp)){
+		var g = self.right.userPreconditionGuard();
+		if(g.isDefined()){
+			circusAction = createGuardedAction(g.createMemPredEquality(), circusAction);
 		}
 	}
-	
+
 	return circusAction;
+}
+
+//Generator issue CC (22 Nov 2026): the guard of a call of a user-defined function with preconditions, or null.
+//null for a call of a toolkit function (guarded by AA, toolkitGuardsOf), of a function-typed variable or constant
+//(no preconditions) and of a function without preconditions. Several preconditions are joined by conjunction.
+operation RC!CallExp userPreconditionGuard(): Any{
+	var f = self.`function`;
+	if(not (f.isTypeOf(RC!RefExp) and f.ref.isKindOf(RC!Function))){
+		return null;
+	}
+	var pkg = packageOf(f.ref);
+	if(pkg.isDefined() and toolkitPackages().includes(pkg.name)){
+		return null;
+	}
+	var pres = f.ref.preconditions;
+	if(pres.size() = 0){
+		return null;
+	}
+	var precond = null;
+	for(p in pres){
+		var e = self.substitutedPrecondition(p).createExpr();
+		if(e.isUndefined()){
+			//createExpr has no case for the expression (e.g. exists, forall, lambda, set comprehension: not translated
+			//anywhere by this generator); the marker as the guard, so that Isabelle stops here instead of the guard
+			//being lost (22 Nov 2026; before the fix of CC such a guard was not checked)
+			("Precondition of " + f.ref.name + " not translated (expression not supported, e.g. a quantifier); "
+				+ "printed as the guard marker").println();
+			return generatorErrorMarker("untranslated_precondition", f.ref.name).createRefExpr(false,false);
+		}
+		if(precond.isUndefined()){
+			precond = e;
+		} else {
+			precond = createAndExpr(precond, e);
+		}
+	}
+	return precond;
+}
+
+//Generator issue CC (22 Nov 2026): a copy of the precondition pre of the function called by self with the arguments
+//of the call in place of the formal parameters (by position; a copy of each argument, printed in parentheses). Bound names of
+//the copy that occur in an argument are renamed first (name_1, name_2, ...; fresh with respect to the names of the
+//arguments and of the precondition), so that no name of an argument is captured. The copy keeps its references to
+//its own bound variables (EcoreUtil.copy), so renaming a bound variable renames its occurrences.
+operation RC!CallExp substitutedPrecondition(pre: RC!Expression): RC!Expression{
+	var fn = self.`function`.ref;
+	var copy = clone(pre);
+	var argNames = new Set;
+	for(a in self.args){
+		for(x in Sequence{a}.includingAll(allContentsOf(a))){
+			if(x.isKindOf(RC!RefExp)){ argNames.add(x.ref.name); }
+		}
+	}
+	var copyNodes = Sequence{copy}.includingAll(allContentsOf(copy));
+	var used = new Set;
+	used.addAll(argNames);
+	for(x in copyNodes){
+		if(x.isKindOf(RC!RefExp)){ used.add(x.ref.name); }
+		if(x.isKindOf(RC!Variable) or x.isKindOf(RC!Declaration)){ used.add(x.name); }
+	}
+	for(x in copyNodes){
+		if((x.isKindOf(RC!Variable) or x.isKindOf(RC!Declaration)) and argNames.includes(x.name)){
+			var k = 1;
+			while(used.includes(x.name + "_" + k)){ k++; }
+			("CC: bound name " + x.name + " of a precondition of " + fn.name + " renamed to " + x.name + "_" + k
+				+ " (it occurs in an argument)").println();
+			x.name = x.name + "_" + k;
+			used.add(x.name);
+		}
+	}
+	var emfTool = new Native("org.eclipse.epsilon.emc.emf.tools.EmfTool");
+	var ecoreUtil = emfTool.ecoreUtil;
+	for(x in copyNodes){
+		if(x.isKindOf(RC!RefExp) and fn.parameters.includes(x.ref)){
+			//a copy of the argument, not a new RC!ParExp: a new object would be added to the RoboChart model as a
+			//root. The parentheses come from the printers, which print every binary operation, call and
+			//indexing in parentheses or as an atom (createExpr drops a ParExp anyway).
+			var arg = clone(self.args.at(fn.parameters.indexOf(x.ref)));
+			if(x = copy){
+				copy = arg;
+			} else {
+				ecoreUtil.replace(x, arg);
+			}
+		}
+	}
+	return copy;
+}
+
+//all objects contained in o, at any depth (eContents recursively)
+operation allContentsOf(o: Any): Sequence{
+	var r = new Sequence;
+	for(c in o.eContents()){
+		r.add(c);
+		r.addAll(allContentsOf(c));
+	}
+	return r;
 }
 
 operation createStopAction(): Z!StopAction{
@@ -8292,8 +8396,9 @@ operation toolkitCallName(c: RC!CallExp): Any{
 //indexing and the arguments of calls, as there. The guard is placed after the reads of the statement and
 //before it, as there (readState(vars, guard & stmt)); several guards are nested in the reverse order, as the
 //CSP-M writes g1 & g2 & ... & stmt. Only toolkit functions; DIFFERENT FROM CSP-M: the guards of the CSP-M
-//for division by zero and for an index outside the sequence, and the preconditions of user-defined
-//functions, are not generated here. Transition conditions are not guarded, in the CSP-M neither.
+//for division by zero and for an index outside the sequence are not generated here; the preconditions of
+//user-defined functions only for x = f(args) (createAssignmentStmtAsAction, generator issue CC, fixed 22 Nov
+//2026). Transition conditions are not guarded, in the CSP-M neither. PROVISIONAL (22 Nov 2026): see CC.
 operation RC!Statement toolkitGuards(): Sequence{
 	var conds = new Sequence;
 	if(self.isKindOf(RC!CommunicationStmt)){

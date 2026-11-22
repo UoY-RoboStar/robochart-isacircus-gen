@@ -209,8 +209,9 @@ the generator).
     `pre_sequence_toolkit_squash(f)` = `function_toolkit_isFiniteFunction(f)` = `function_toolkit_isFinite(f)`
     = `true`. So of the six, the CSP-M guards that can be false are those of `head`, `last`, `min`, `max`,
     exactly the four guarded here. Also different: the CSP-M guards the preconditions of EVERY function with
-    a precondition (`pre_<id>(args)` also for user-defined functions); this generator only those of toolkit
-    functions (`toolkitGuardsOf` requires a toolkit call name).
+    a precondition (`pre_<id>(args)` also for user-defined functions); this generator, by AA, only those of toolkit
+    functions (`toolkitGuardsOf` requires a toolkit call name); user-defined functions only for
+    `x = f(args)` (CC, below).
   - Where. In both generators only in the four kinds of statement (assignment, operation call,
     communication statement, if statement), as a guard of the statement placed after the reads of the
     statement and before it (CSP-M `readState(vars, guard & stmt)`; here `createStmtInContextAsAction`:
@@ -228,19 +229,38 @@ the generator).
     `sequence_toolkit_head(<x>^xs) = x`, so an unguarded `head(<>)` (e.g. in `x = 1 + head(s)`) makes FDR's
     evaluation fail (as `tail(<>)`, entry 9); in Isabelle `hd []` is an unspecified value and the process
     goes on.
-  - A second, older guard (generator issue CC; not fixed, decision of 16 Nov 2026): in
-    `createAssignmentStmtAsAction`, an assignment whose right-hand side is itself a call of a function with
-    preconditions is guarded by the precondition expressions of the function, with the FORMAL parameters
-    not replaced by the arguments; for a toolkit function this comes in addition to the guard above. By
-    reading: `entry x = head(s)` in the toy models `robochart-models/definedness-tests/d1_head_tail.rct` and
-    `d2_guarded_return.rct` (proof repository) would get `s ≠ []` twice, right only because the model's
-    variable has the name of the formal parameter of `head`; `x = size(t)` would get the marker of
-    `function_toolkit_isFinite`. Not generated for these models. (Issue CC said "not reached by the present
-    models"; the toy models d1 and d2, written the same day, reach it.)
-  - Status: PENDING, as entries 11 and 16. Whether the HOL-CSP keeps the pre_ guards at all (and if so,
-    whether it adds those of user-defined functions and the index and division guards, and fixes CC), or has
-    no guards and the generator lists definedness proof obligations instead, waits for the decision with Ana
-    on guards against definedness obligations. Until then the code is not changed.
+  - A second, older guard (generator issue CC). Before 22 Nov 2026: in `createAssignmentStmtAsAction`, an
+    assignment whose right-hand side is itself a call of a function with preconditions was guarded by the
+    precondition expressions of the function, with the FORMAL parameters not replaced by the arguments; for a
+    toolkit function this came in addition to the guard above. Generated on 22 Nov 2026 with the rules of
+    8c1a37c (dev-tools GenAll): `entry x = head(s)` in the toy models d1 and d2 got `s ≠ []` twice (the
+    second with the bare formal `s`, which is not the machine's variable `s_D1_...`); `x = head(q)` in test
+    model c9 got `q_C9_... ≠ []` and `s ≠ []`; `y = small(a + 1)` got `n * 2 < 10` with the formal `n`; a
+    precondition with a quantifier stopped the generation ("Called method 'createMemPredEquality' on
+    undefined object").
+  - FIXED 22 Nov 2026 (`composite-states`; decision of Fang, 22 Nov 2026: this release keeps the guards for
+    preconditions, as the CSP-M, PROVISIONALLY, and only CC is fixed). `userPreconditionGuard`,
+    `substitutedPrecondition`: only USER-DEFINED functions (a toolkit function is skipped, AA guards it);
+    the arguments replace the formal parameters by position (on a copy of the precondition; the printers
+    print every compound argument in parentheses); a bound name of the precondition (quantifier, lambda,
+    set comprehension, let) that occurs in an argument is renamed first (`g` to `g_1`); a precondition that
+    `createExpr` cannot translate (quantifiers: the generator translates none, in any position) is printed
+    as the guard marker `GENERATOR_ERROR_untranslated_precondition_<f>` instead of stopping the generation.
+    Machine variables cannot be captured: RC2Z gives them the suffix of their container before
+    translating, so only names such as a function name can clash. Test models c9, c9b (proof repository,
+    `robochart-models/composite-tests/`), results in `docs/COMPOSITE_RELEASE_TEST.md`.
+  - Remaining difference to the CSP-M (NOT changed, decision of Fang, 22 Nov 2026: record, do not extend):
+    the guard of a user-defined function is added ONLY for an assignment whose right-hand side is the call
+    itself (`x = f(args)`), as before the fix. The CSP-M guards user-defined functions as toolkit
+    functions: in all four kinds of statement and in the positions described above (`y = 1 + f(a)` is not
+    guarded in either; `y = g(f(a))`, `send!f(a)`, `if f(a) > 0 then ...` and an operation call with
+    argument `f(a)` are guarded in the CSP-M, not here). Order where both apply: the guards of AA outside,
+    the guard of CC inside, both after the reads and before the statement.
+  - Status: the guards are PROVISIONAL. The conclusion of Ana and Alvaro (January 2026) is that the right
+    semantics is that of the manual, which does not treat a precondition as a guard, and that the guards of
+    the CSP-M are a pragmatic choice; the ITP 2026 paper uses the semantics with guards. When preconditions
+    become definedness proof obligations (entry 16), the guards of AA and of CC are removed in the same
+    change.
 
 ## 8. (WITHDRAWN 17 Nov 2026) Appendix D and the sequence toolkit: no difference
 
@@ -387,18 +407,21 @@ the generator).
   undefined expression; without the guard it stops with an error); its side effect is that undefinedness
   shows as deadlock.
 - This generator: `composite-states`: pre_ guards for toolkit functions only (entry 7); no guards for
-  division and indexing (entry 11 on a separate branch); for `x = f(args)` an older guard copies the
-  precondition of f verbatim with the formal parameters NOT replaced by the arguments (generator issue CC,
-  present since the initial commit a8177dc; not reached by the present models). In HOL functions are total:
+  division and indexing (entry 11 on a separate branch); for `x = f(args)` with f user-defined, a guard by
+  the preconditions of f with the arguments in place of the formal parameters (generator issue CC, fixed
+  22 Nov 2026; before, the preconditions were copied with the formal parameters, also for toolkit
+  functions; entry 7). In HOL functions are total:
   without a guard an undefined expression has an unspecified value (`hd []`, `x div 0`, `xs ! i` out of
   range) and the process goes on; a deadlock-freedom result is then more optimistic than the CSP-M's.
 - Alternative under consideration: no guards in the HOL-CSP; the generator lists definedness proof
   obligations (for each expression with a precondition: whenever execution reaches it, the precondition
   holds), proved separately from deadlock freedom.
 - Kind: manual incomplete; semantic between the CSP-M and the unguarded HOL-CSP.
-- Status: PENDING, to be discussed with Ana (Fang, 16 Nov 2026). Until then: the existing pre_ guards of
-  `composite-states` (head, last, min, max) stay as they are, `index-division-guards` stays unmerged, issue CC
-  is not fixed.
+- Status: PENDING, to be discussed with Ana (Fang, 16 Nov 2026). DECISION for the release of
+  `composite-states` (Fang, 22 Nov 2026): the guards for preconditions stay, as in the CSP-M, PROVISIONALLY
+  (pre_ guards of toolkit functions, AA; guards of user-defined functions for `x = f(args)`, CC, now with the
+  arguments); `index-division-guards` stays unmerged. When preconditions become definedness proof obligations,
+  the guards are removed in the same change.
 
 ## 17. Channel declarations (17 Nov 2026)
 
