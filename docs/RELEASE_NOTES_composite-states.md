@@ -8,6 +8,10 @@ The plugin writes three theories per state machine: the HOL-CSP semantics (`HOLC
 HOL-CSP Trans core (`HOLCSP_trans_core_<model>_<time>.thy`) and the IsaCircus semantics
 (`IsaCircus_enriched_<model>_<time>.thy`). Where an item below changes only one of them it is said.
 
+Loading the generated HOL-CSP theories needs the latest RC_HOL-CSP of RoboChart-Deadlock-HOLCSP-AG-dev (the
+generated theories import `RC_HOL-CSP.RoboChart_Library`; the relational renaming and other definitions they use
+exist there only since November 2026).
+
 ## New: composite states
 
 States that contain a state machine of their own (any depth of nesting), with entry, during and exit
