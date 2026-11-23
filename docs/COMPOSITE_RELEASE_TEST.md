@@ -645,3 +645,83 @@ Found on the way (not fixed, new):
 - NN. A record with a field named `x` or `y` gives a type error in its own `discrete_cpo` instantiation
   (`(x::'a Point_ext) ⊑ y ⟷ x = y`, circusM2T_HOLCSP.egl 157-160, trans core 152-155: the field selector `x`
   captures the variable name).
+
+## 15. Fixes of KK, LL, MM, NN; exit-action check removed (23 Nov 2026)
+
+composite-states f585967. Plugin built from it (`git archive`, JDK 11, `mvn -B package`, BUILD SUCCESS),
+1.0.0.202611231420, installed with the p2 director into `~/tools/robotool-1.3-composite` (replaces 1.0.0.202611230023;
+`bundles.info` checked; the ten `erules/` files of the installed jar identical to f585967; automatic updates still
+off; the RoboTool copy was not running). The original RoboTool still has 1.0.0.202611071400. Test models:
+proof repository (RoboChart-Deadlock-HOLCSP-AG-dev, branch `trigger-fqn-naming`), `robochart-models/regression-tests/`
+(own README; also ff1-ff4, gg, ggc, iy of Section 13). Isabelle as before (one process at a time, `setsid`,
+process groups recorded; none left over).
+
+### 15.1 The four issues on main 2976313 (before the fix)
+
+Generated with main's rules (dev-tools GenAll): `kk_defaults` generates, with `datatype Shape = Circle | Square`
+(MM: the parameter of `Circle(real)` lost), the defaults `0` for the enumeration, the record and the string (KK),
+and the record instance `(x::'a Point_ext) ⊑ y ⟷ x = y` (NN: a field `x` captures the variable; Isabelle: type error
+at the instance); `ll_records` and `nn_names` stop in RC2Z ("The 'no null' constraint is violated", LL: field access);
+`mm_enums` stops at `Shape::Circle(1.0)` (MM); `kk_unsupported` stops at the channel declaration of a relation type.
+So all four are present in the published version; none is introduced by composite-states.
+
+### 15.2 Changes
+
+- Exit-action check (c8): removed (Fang's decision of 23 Nov 2026: RoboTool's CSP-M has the same unordered structure,
+  read in CTransitionGenerator/CStateGenerator; RoboTool gives no hint, validator and CSP generator checked).
+  SEMANTICS_DIFFERENCES entry 6 with an internal note. The generatorNote mechanism stays (GG).
+- KK: `defaultValueAsZExpr` as `typeDefaultValue` of the CSP-M (SEMANTICS_DIFFERENCES entry 10); `char ::
+  discrete_cpo` in the templates (string variables); relation, vector and matrix types: markers for the type and the
+  default (before, the generation stopped); the parameter type of a Memory fixrec of a function type parenthesised.
+- LL: `Selection` → `(R.f r)`, `RecordExp` → `⦇R.f = e, ...⦈`, field names qualified in selection, update and literal;
+  `usedVariables` and Rule 50 `vars` of an assignment to a field or element include the root variable and the index
+  variables (before, `s.a.y = q.x` left `s` free).
+- MM: `Branch.expr` (parameter types), constructor application `_conapp_`.
+- NN: `x__a`, `y__a`, `n__id`, `value__v`, `b__a`, `Q__a`, `P__a` (names ending in `_` are rejected by Isabelle, "Bad
+  name"); field and constructor names quoted (a field `value`, an Isabelle keyword, gave an outer syntax error).
+  Checked in Isabelle: with two records with a field `x`, the unqualified `x p0` is a type error for the first record
+  (the qualified `Point.x p0` loads), quoted `"value"` and `"where"` load.
+
+### 15.3 New test models (generation and Isabelle)
+
+| Model | Generation | HOL-CSP theory | Trans-core theory |
+|---|---|---|---|
+| kk_defaults | no warning; defaults 0, 0, 0, True, `''''`, Red, `(Circle (0))`, `⦇Point.x = 0, Point.y = 0⦈`, `[]`, `(0,True)` | loads (1:32) | loads |
+| kk_function | no warning; `(λ_. 0)`, `Memory_vf :: (int ⇒ int)→...` | loads (0:34) | not run |
+| kk_unsupported | no warning; markers | stops at `GENERATOR_ERROR_type_RelationType` (expected) | the same |
+| ll_records | no warning | loads (0:49) | lemma stops at `done` (issue T) |
+| mm_enums | no warning | loads (0:33) | lemma stops at `done` (issue T) |
+| nn_names | no warning | loads (0:37) | lemma stops at `done` (issue T) |
+| ff1-ff4, gg, iy | no warning | load | |
+| ggc | the GG name-clash warning (expected) | loads | |
+
+RoboTool's validator (circus.robocalc.robochart.textual 3.1.0.202610211110, run outside RoboTool) throws a
+ClassCastException on `Shape::Circle(1.0)` (`constantConstructionWellTyped`): a defect of RoboTool, noted in the model.
+
+### 15.4 Regression (generation; f585967 against 5a8a377, Section 13.4)
+
+All models of Section 13.4 plus the ObsDetect variants (Section 14.3), by tokens, after mapping the NN names back
+(`n__id`→`n`, ...), ignoring the quotes and the new `char` instance: identical or the same tokens in another order,
+except: c8 (the GENERATOR WARNING comment removed; no warning in GenAll); flat and full Adaptation_Plan (one more read
+`get_modelRanking?modelRanking` before an indexed assignment to modelRanking, LL); GasAnalysis a8 (`noGas` and `Left`
+instead of `0` as initial values of `sts` and `anl`, KK). LRE (`LRE/`, `LRE_2D_coordToPair/`) still stops in RC2Z
+(HH, as before). DTI full Adaptation_Plan: the record types ImageData, EstimatedPosition, ScrewImageData are declared
+as before with quoted field names; the model does not access their fields (the values are passed as a whole).
+
+### 15.5 Regression (Isabelle)
+
+HOL-CSP theories of f585967: c1 (1:01), c2, c3, c4, c5 (3:09), c6 (3:15), c8 (2:25), c9, d1, d2, d3, flat
+Adaptation_Plan (8:30), full Adaptation_Plan (3:40), GasAnalysis a8 (1:42; it NOW loads without the scratch copy with
+initial values of Section 13.2, KK), ff1-ff4, gg, ggc, iy load; c7 stops at the duplicate `chan_event.a_in` (DD), c9b at
+`GENERATOR_ERROR_untranslated_precondition_half`, both as before. ITP configurations (Section 14, the same edits, the
+Trans-core theories of f585967): TurtleBot ddlf proved (1:05), ag_true counterexample, ddl with invariant counterexample
+(6:02); running example (EMF) enriched proved, ag_true and no_ag counterexamples; ObsDetect enriched proved, ag_true and
+no_ag counterexamples; GasAnalysis proved (2:13); LRE proved (1:39). All conclusions as in Section 14. The theories were
+built from the new generated text and the locale part of the Section 14 theories (with E1, G3, G4 and the invariants),
+after checking for each that the generated Trans equation of f585967 is that of 5a8a377 with `n` renamed `n__id`.
+
+### 15.6 Corrections of earlier sections
+
+Section 3 and Sections 12, 13 ran the TurtleBot `ddl` configuration without the invariant and the running example
+ag_true with E1, and did not run `Trans_no_ag`; corrected in Section 14.2 (conclusions unchanged). Section 13.2: the a8
+theory now loads without initial values (KK fixed).

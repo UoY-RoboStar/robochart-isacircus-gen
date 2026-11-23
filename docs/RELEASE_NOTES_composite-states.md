@@ -1,6 +1,6 @@
 # Release notes (DRAFT): composite states
 
-22 Nov 2026. Draft for the release of branch `composite-states` into `main`. NOT released: `main` is still
+22 Nov 2026, updated 23 Nov 2026 (composite-states f585967, plugin 1.0.0.202611231420). Draft for the release of branch `composite-states` into `main`. NOT released: `main` is still
 2976313 (published plugin 1.0.0.202611071400). The test results behind this draft are in
 `docs/COMPOSITE_RELEASE_TEST.md`.
 
