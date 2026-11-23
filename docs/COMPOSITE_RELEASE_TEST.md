@@ -514,3 +514,134 @@ stops at the duplicate `chan_event.a_in` (DD, as before); c9b stops at `GENERATO
 Summary against Section 12: apart from the changes of FF (d3 generated, if without else), GG (consts of imported
 functions) and II (type of CDA), no output and no proof result changed; TurtleBot is still proved; LRE no longer
 needs the hand correction of CDA.
+
+## 14. Reproduction of all ITP 2026 results with the new generator, the ObsDetect running example, KK (23 Nov 2026)
+
+Generator composite-states 292def4 (code as 5a8a377, Section 13); Trans-core theories generated with dev-tools
+GenAll; library RC_HOL-CSP of AG-dev; each theory with `isabelle process_theories -l RC_HOL-CSP`, one at a time,
+`setsid`, 30 min limit, process groups recorded (none left over). Theories and logs in the session scratchpad
+(`reg3/`, `reg4/`, `obs/`, `kk/`), not in a repository. A counterexample lemma counts as "found" only with
+`nitpick [expect = genuine]` / `quickcheck [expect = counterexample]`, which make the batch run fail otherwise.
+No generator code changed.
+
+### 14.1 Results of the paper (source)
+
+The paper's text (Section 6 and its tables) is NOT on this workstation; the table is taken from the theories of
+59b534a (lemmas, their `done`/`oops`, comments) and from the material added in e7530ca (FDR screenshots, Isabelle
+time table). The baseline build of the ITP repository itself passes (Section 3).
+
+| Example | Theory (59b534a) | Model | Lemma | Invariant (a-g enrichment) | Script | Result |
+|---|---|---|---|---|---|---|
+| running example | `HOLCSP_robot_runningexample` | EMF `example_robot.model`, machine `stm0`, `nat` | `Trans_enriched_ddlf` | `(obs=1 ∨ obs=-1) ∧ pos ≤ dest` at the head reads and at the read of `pos` in t2 (assume and guar) | `declare GlobalDet_Guard [normalisation]`, `deadlock_free'`, `blast+` | proved |
+| | | | `Trans_ag_true_findcounterexample` | `True` everywhere | `find_counterexample`, `nitpick` | counterexample (comment: `st_var = NID_detect`, obs neither 1 nor -1, pos = 5) |
+| | | | `Trans_no_ag_findcounterexample` | no assume/guar at all | same | counterexample ("equivalent to the 2nd one") |
+| TurtleBot | `..._ddlf_auto` | `Adaptation_Plan_flat_ddlf` | `Trans_MakePlan_Adaptation_Plan_core_ddlf` | `fst minMaxRotation ≤ snd minMaxRotation` at the head read | `deadlock_free'`, `smt` | proved |
+| | `..._ddl_ag_true` | same model | `..._ag_true_counterexample_auto` | `True` | `find_counterexample`, `quickcheck` | counterexample (CalculateRotations, (0, -1)) |
+| | `..._ddl` | `Adaptation_Plan_flat_ddlk` | `Trans_MakePlan_counterexample_for_ddlf_auto` | `fst minMaxRotation ≤ snd minMaxRotation` | same | counterexample |
+| chemical detector | `HOLCSP_GasAnalysis` | GasAnalysis (package Chemical) | `Trans_stm4_core_ddlf_auto` | `size(gs) > 0` after the input trigger and at the read of `gs` before `location(gs)`; `True` elsewhere | `deadlock_free'`, `force`, `auto` | proved |
+| LRE | `HOLCSP_LRE_2D` | `LRE_Beh` (EMF) | `Trans_ddlf` | `True` everywhere | declarations `Det_Guard_to_GlobalDet`, `Guard_Det_to_GlobalDet`; `deadlock_free'`, `blast+` | proved |
+
+FDR (screenshots in e7530ca, RoboTool's CSP-M of the `.rct` models): running example `robot_ctrl::ObsDetect`:
+`Transitions(0, 0) :[deadlock free]` failed, `Transitions(0, 0) ; RUN({r__}) :[deadlock free]` passed (the machine
+terminates); GasAnalysis `Transitions(0, 0) ; RUN(Events)` passed; TurtleBot `MakePlan::Transitions(0) ;
+RUN(Events)` passed. Isabelle times (`case_study_isabelle_time_10run_average.pdf`, ten runs, unit not stated):
+TurtleBot 0.858, running example 0.382, GasAnalysis 0.446, "AUV" 4.028.
+
+### 14.2 Reproduction (all configurations)
+
+| Configuration | Hand edits (only the ITP kind) | Result | Time (wall, whole theory) | Paper |
+|---|---|---|---|---|
+| running example enriched | E1 (rest of t2 under the assume) | proved | 0:37 (13.5) | same |
+| running example ag_true | none (as generated) | counterexample (nitpick, genuine) | 0:43 | same |
+| running example no_ag | none; `assume True (...)` and `guar True` removed (this IS the configuration, as the ITP's `Trans_no_ag`) | counterexample (nitpick, genuine) | 0:40 | same |
+| TurtleBot ddlf | none | proved | 0:53 (13.5) | same |
+| TurtleBot ag_true | none | counterexample (quickcheck) | (13.5) | same |
+| TurtleBot ddl, WITH the ITP invariant | none | counterexample (quickcheck) | 5:28 | same |
+| GasAnalysis | G3, G4 (rest of the transition / action under the assume) | proved | 1:35 (13.5) | same |
+| LRE | none | proved | 1:20 (13.5) | same |
+
+The invariants are put into the generated `assume True` / `guar True` at the places the ITP theories have them; the
+declarations and scripts are the ITP's. The only edits of the generated text are E1, G3 and G4, all of one kind
+(moving the rest of the transition into the scope of the assume; the post-release to-do). All results agree with
+the paper. The times are not comparable with the paper's table (different measurement; they include loading the
+generated theory).
+
+CORRECTIONS of Sections 3, 12 and 13: (1) the TurtleBot `ddl` configuration was run there WITHOUT the invariant
+(`assume True`); the ITP theory has `fst minMaxRotation ≤ snd minMaxRotation`. With it (above) the counterexample is
+still found, so the conclusion is unchanged. (2) The running example ag_true was run there with E1; E1 is not
+needed for it (above, as generated). (3) `Trans_no_ag` had not been run; done above.
+
+Deviations of the inputs (unchanged from Section 12): the running example is the textual equivalent of the EMF
+model without controller and with `dest` a constant of the machine (DD, JJ); GasAnalysis is the closest model found
+(`Test1/GasAnalysis/GasAnalysis.rct`, c0e67a0); LRE `lre_beh_complete.rct` (c0e67a0).
+
+### 14.3 Running example from the `.rct` (machine ObsDetect)
+
+Model: RoboChart2Circus c0e67a0 `Abstract_examples/example_robot.rct` (controller `robot_ctrl`, `var obs : int = 0`,
+`const dest : real`; machine `ObsDetect`, states `Detect`, `Stop`, `Move`, `var pos : real`). This is the model of the
+paper's FDR check.
+
+- As it is: generated without error, but the HOL-CSP and Trans-core theories declare `get_obs` and `set_obs` twice
+  (controller variable channels and the machine's shared-variable channels; `docs/CONTROLLER_MODULE_STATUS.md`
+  Section 2.2); they do not load (DD).
+- Variant for the proofs (scratch file, header says so): the controller removed and `dest` a constant of the machine,
+  as for the EMF variant; types, names and transitions unchanged. Its Trans-core theory is, after mapping
+  `ObsDetect` to `stm0` and ignoring the case of the state names, identical to that of the EMF variant except
+  `nat` → `real` in `dest` and the channels of `pos` (checked with diff).
+
+| Configuration | Edits | ObsDetect (real) | EMF stm0 (nat) |
+|---|---|---|---|
+| enriched | E1 | proved (0:40) | proved |
+| ag_true | none | counterexample (nitpick, genuine) | counterexample |
+| no_ag | assume/guar removed | counterexample (nitpick, genuine) | counterexample |
+
+Effect of `real`: none on the results. The proof needs, in `Move` under the invariant, that one of `pos = dest`,
+`pos < dest` holds, true in any linear order; the counterexamples come from `obs` (an `int` in both). The
+difference is in what the invariant means: the guarantee of t2 checks the invariant on the value of `pos` read
+BEFORE `pos + 1` is written. With `nat`, `pos < dest` implies `pos + 1 ≤ dest`, so the invariant is preserved; with
+`real` it is not (pos = dest - 0.5), and the next read violates the assumption (`aviol`, then `Trans⋅n`), which the
+deadlock-freedom proof does not see. So the proved statement is the same, but for the real model the invariant is
+not inductive. Nitpick handles the real-typed variables (genuine counterexamples).
+
+### 14.4 KK: default values (investigation, not fixed)
+
+Code: `RC!Variable getInitialOrDefaultValueAsExpr` (RC2Z.eol 2955-2967) returns the initial value or
+`RC!Type defaultValueAsZExpr` (3131-3203). Used for the memory processes: Rule 31 `varMemory` (2888-2950: 2909, 2918,
+2926, 2943), Rule 33 `sharedVarMemory` (2974-: 2995, 3004, 3012, 3028), the controller memory (2162). Constants
+get no default (declared as `consts`, any value). CSP-M: `GeneratorUtils.typeDefaultValue`
+(`robochart-csp-gen` a6412b4, `untimed/GeneratorUtils.xtend` 285-326; `comp/untimed/CGeneratorUtils.xtend` 368 is
+identical), used by `ExpressionGenerator.initialValue` 547-559.
+
+Test model (scratch, one uninitialised variable of each type; HOL-CSP output of `varMemory_KK`):
+
+| Type | RC2Z (branch) | Printed | Isabelle | CSP-M | Agree |
+|---|---|---|---|---|---|
+| int | `0` (TypeRef `int`) | `0` | type checks | `0` | yes |
+| nat | `0` (TypeRef, "not int, not boolean") | `0` | type checks | `0` | yes |
+| real | `0` (same branch) | `0` | type checks | `0` (primitive, else) | yes |
+| boolean | `true` (fixed with L) | `True` | type checks | `true` | yes |
+| string | `0` (same branch) | not tested | (expected type error) | `""` | NO |
+| enumeration `Colour {Red Green}` | `0` (same branch) | `0` | type error (seen for `sts : Status` in gas_a8, 13.2) | first literal `Red` | NO |
+| enumeration with a parameter `Shape {Circle(real) Square}` | `0` | `0` | type error | `Circle.0` | NO; the datatype is also printed `Circle \| Square` without the parameter (MM below) |
+| Seq(int) | `<,,>` applied to `{}` | `[]` | type checks | `<>` | yes |
+| Set(int) | `{}` | not reached: generation stops earlier (BB) | — | `{}` | yes in the code |
+| record (`datatype Point {px : real py : real}`; RoboChart `datatype` is the record type) | `0` (same branch) | `0` | CONFIRMED type error `No type arity Point_ext :: zero` at the `varMemory_KK` fixrec | tuple of field defaults `(0,0)` | NO |
+| tuple `int * boolean` | tuple of component defaults | `(0,True)` | type checks | `(0,true)` | yes; a component of enumeration or record type inherits the error |
+| function, relation, vector, matrix, other | no branch: nothing returned (undefined) | not tested | — | `funcToSet(...)`, `{}`, tuples, `0` | NO |
+
+To fix KK (defaultValueAsZExpr, TypeRef branch, BEFORE the catch-all "not int and not boolean → 0" at 3152-3154):
+enumeration → the first literal as a reference expression (as `createEnumExpr` 8351 does, without its set
+wrapper); record → a record construction `⦇f1 = d1, ..., fn = dn⦈` with the field defaults, for which neither an
+RC2Z operation nor template printing exists (record literals are not translated at all, LL below); `nat`, `string`
+explicitly; the remaining type kinds as the CSP-M. Risk: only outputs with uninitialised variables of these types
+change, and those do not load today.
+
+Found on the way (not fixed, new):
+- LL. Record field selection `vp.px` and record literals are not translated: `createExpr` (RC2Z 8731-8866) has no
+  branch for `RC!Selection` (TO DO comment 8858-8863), returns nothing, and the transformation stops with "The 'no
+  null' constraint is violated" (8886, `createTupleExpr`).
+- MM. An enumeration literal with parameters (`Circle(real)`) is declared without them (`createTypeDeclPara`
+  529-537 uses only `l.name`).
+- NN. A record with a field named `x` or `y` gives a type error in its own `discrete_cpo` instantiation
+  (`(x::'a Point_ext) ⊑ y ⟷ x = y`, circusM2T_HOLCSP.egl 157-160, trans core 152-155: the field selector `x`
+  captures the variable name).
