@@ -443,3 +443,74 @@ the scripts fail on the new output is withdrawn.
   form, CLAUDE.md).
 - CDA (L3): issue II, a regression of 9faa957 against the (also wrong) form of the ITP rules; fixed below.
 No difference is a regression of the proofs except II.
+
+## 13. Fixes of FF, GG, II and the regression against Section 12 (23 Nov 2026)
+
+composite-states 5a8a377; plugin built from it (`git archive`, JDK 11, `mvn -B package`, BUILD SUCCESS) and
+installed with the p2 director into `~/tools/robotool-1.3-composite`: 1.0.0.202611230023 replaces 1.0.0.202611221803
+(bundles.info checked, the ten `erules/` files in the jar identical to 5a8a377, automatic updates still off); the
+original RoboTool still has 1.0.0.202611071400. Minimal test models are in the scratchpad of the session (not in a
+repository); their text is given where it matters.
+
+### 13.1 FF (if without else)
+
+Two causes, both present since the ITP rules: (1) Rule 50 `vars(stmt)` called `vars(stmt.else)` with else undefined
+(stack overflow, state actions only); (2) Rule 68 built a one-branch command, printed `if b then P` without else,
+which Isabelle does not parse (also transition actions; this was hidden behind (1) for state actions). Fixed: (1)
+`isDefined()` check; (2) the missing else is `(not e) & Skip`, as the CSP-M (SEMANTICS_DIFFERENCES entry 18); the
+templates print " else ". Checked: d3, ff1 (`entry if x > 0 then x = 1 end`), ff2 (with else), ff3 (the if in a
+transition action), ff4 (`entry x = 1 ; if x > 0 then x = 2 end`) generate and their HOL-CSP theories load.
+
+### 13.2 GG (functions of imported packages)
+
+`importedFunctionsToTranslate`: transitive closure of the calls from the selected file through the contents of the
+functions reached; toolkits excluded; callees first; a name clash gives a warning and only the function of the own
+package is declared. Checked: gg (package gglib with `noBody` without and `withBody` with pre- and postcondition,
+imported and called by package gg): both declared, loads; ggc (own `noBody`, imported `withBody` whose postcondition
+calls gglib's `noBody`): warning "Function noBody of package gglib is not declared: a function of the same name of
+package ggc is declared ...", in GenAll and as a comment in the IsaCircus theory, loads; GasAnalysis a8: the five
+functions of Chemical declared (`angle` and `intensity` reached only through `location`'s postcondition, declared
+before it). The a8 theory itself still does not load because of a different issue, KK (`sts : Status` without
+initial value gets the default `0`); with initial values for `sts` and `anl` (scratch copy of the model) it loads.
+
+### 13.3 II (functions with three or more parameters)
+
+9faa957 ("Extend RC2Z and IsaCircus/HOL-CSP templates for DTI and Axiomatic CyPhyCircus", 9 Oct 2026) changed
+`parseProdExpr` to parenthesise every product ("in Isabelle type constructors bind tighter than ×, so A×B list would
+mean A × (B list)"). That stays. RC2Z had always (a8177dc) folded function parameter types into nested binary
+products; before 9faa957 they were printed flat without parentheses, after it as `((A×B)×C)`. Fixed in RC2Z: one
+n-ary product. Relation with Y: none in the code (Y concerns RoboChart product types, which were already n-ary);
+checked on `iy`: `f3(a : int, b : real * real, c : Seq(int))` gives `(int×(real×real)×(int list)) ⇒ int`,
+`f4(a : int, b : boolean, c : real, d : nat)` gives `(int×bool×real×nat) ⇒ int`; `t3 : int * boolean * real` and
+`t4 : int * boolean * real * nat` with each component assigned to a variable of its own type print `fst t3`,
+`fst (snd t3)`, `snd (snd t3)`, `fst t4`, `fst (snd t4)`, `fst (snd (snd t4))`, `snd (snd (snd t4))`; the theory
+loads (a wrong projection would be a type error). LRE: `CDA :: ((real×real)×((real×real) list)×(real×real)) ⇒ real`,
+no hand correction needed. Operation parameters keep the old fold (operations unsupported, issue R).
+
+### 13.4 Regression (generation)
+
+All models of Sections 4, 5 and 11 (c1-c9, c9b, d1-d3, ex10, ex12, Legitimate, flat and full Adaptation_Plan, the
+TurtleBot, running example, GasAnalysis and LRE models), three theories each, d364c8c against 5a8a377, by tokens:
+identical (or the same tokens in another order) except d3 (now generated), GasAnalysis a8 (the five consts, GG) and
+LRE (one pair of parentheses less in the type of CDA, II). Nothing else changed.
+
+### 13.5 Regression (proofs; same edits as the "still needed" column of Section 12 except L3, which is no longer needed)
+
+| Example | Section 12 (d364c8c) | 5a8a377 |
+|---|---|---|
+| TurtleBot ddlf | proved | proved (0:53) |
+| TurtleBot ag_true, ddl | counterexamples | counterexamples (quickcheck, expect) |
+| running example enriched (E1) | proved | proved (0:37) |
+| running example ag_true | counterexample | counterexample (nitpick, genuine) |
+| GasAnalysis (G3, G4) | proved | proved (1:35) |
+| LRE | proved with L3 | proved WITHOUT any hand edit (1:20) |
+
+### 13.6 Regression (Isabelle, HOL-CSP theories of 5a8a377)
+
+c1 (0:46), c2, c3, c4, c5, c6, c8, c9 (1:01), d1, d2, d3 (new: loads, 0:31), full Adaptation_Plan (2:59) load; c7
+stops at the duplicate `chan_event.a_in` (DD, as before); c9b stops at `GENERATOR_ERROR_untranslated_precondition_half`
+(as before). Same as Sections 4 and 5, plus d3.
+
+Summary against Section 12: apart from the changes of FF (d3 generated, if without else), GG (consts of imported
+functions) and II (type of CDA), no output and no proof result changed; TurtleBot is still proved; LRE no longer
+needs the hand correction of CDA.
