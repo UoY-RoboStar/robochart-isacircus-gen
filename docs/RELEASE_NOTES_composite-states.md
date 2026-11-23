@@ -20,10 +20,6 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
   parallel with the during action of S, with the two-sided write synchronisation over all variables of the
   machine; `enteredSS` and `terminate` hidden), `During_S` and `RunEntered_S`.
 - The paragraphs of each node container are printed together, innermost container first.
-- Warning (not an error) when an exit action of an inner state reads or writes a variable bound by the
-  input trigger of a transition leaving the composite state: the two are not ordered. Shown as a dialog,
-  written to `~/.isacircus/compile.log`, and printed as a comment `(* GENERATOR WARNING: ... *)` at S in
-  the HOL-CSP and IsaCircus theories; the generation goes on.
 
 ## Changed: names
 
@@ -69,6 +65,29 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
 - II. A function with three or more parameters gets the parameter type `(A×B×C) ⇒ R`, matching its calls
   `f(a, b, c)`; before, the type was nested to the left (since 9 Oct 2026) or not parenthesised (before), and
   Isabelle reported a type error at the first call.
+- KK. A variable without initial value gets the default value of RoboTool's CSP-M: 0 for int, nat, real and types
+  declared with `type T`; `True`; `''''` for string; the first literal of an enumeration (with the defaults of its
+  parameters); the record of the defaults of its fields; `[]`; `{}`; the tuple of the defaults; the constant
+  function for a function type. Before, every type other than int and boolean got `0`, and Isabelle reported a
+  type error for enumerations, records and strings. Relation, vector and matrix types are not supported: their
+  type and default are `GENERATOR_ERROR_` markers (before, the generation stopped). Different from the manual
+  (Chapter 4 Rule 35 leaves the value arbitrary); `docs/SEMANTICS_DIFFERENCES.md`, entry 10.
+- LL. Records: field access `r.f`, record literals `R(| f = e |)` and field assignments `r.f = e` in guards,
+  conditions, actions and communications are translated (`(R.f r)`, `⦇R.f = e, ...⦈`, `r⦇R.f := e⦈`); field names are
+  qualified by the record, so two records may have a field of the same name. Before, field access and record
+  literals stopped the generation ("The 'no null' constraint is violated"). An assignment to a field or an element
+  (`r.f = e`, `x[i] = e`) now also reads the variable it updates (before, only the right-hand side was read).
+- MM. Enumeration literals with parameters, `enumeration Shape { Circle(real) Square }`, are declared with them
+  (`datatype Shape = Circle "real" | Square`, before `Circle | Square`), and `Shape::Circle(1.0)` is translated
+  to `(Circle (1.0))` (before, the generation stopped).
+- NN. Names of the model can no longer be captured by the variables of the generated definitions: these are now
+  `x__a`, `y__a`, `n__id` (parameter of `Trans`), `value__v` (parameter of the `Memory` processes), `b__a`, `Q__a`,
+  `P__a` (before `x`, `y`, `n`, `value`, `b`, `Q`, `P`: a record field `x` gave a type error in the record's
+  discrete_cpo instance). Record field and constructor names are printed quoted, so that a name that is an
+  Isabelle keyword (e.g. a field `value`) can be declared. Changes the text of every generated theory (these
+  names), not its meaning.
+- Function-typed variables: the parameter type of their Memory fixrec is parenthesised, `(int ⇒ int)→...`
+  (before, a type error).
 - Partial output. When a template fails, the theory is still written up to the last complete command,
   with `(* INCOMPLETE: ... *)` at the top and `(* GENERATOR ERROR: ... *)` and an `ML` error command at
   the end, so that Isabelle stops there; the other theories are still written. Known unsupported input is
@@ -78,6 +97,11 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
 
 ## Known limitations
 
+- An enumeration literal whose parameter is a record type does not load (the theory declares all enumerations
+  before all records). RoboTool's RoboChart validator throws an exception on a literal with arguments
+  (`Shape::Circle(1.0)`: "Error executing EValidator" in the editor); the model is valid and the generation works.
+- Names reserved by the generated theories: `share`, `terminate`, `aviol`, `gviol`, `SSTOP`, `assume`, `guar` and
+  the generated channel and process names; a model element with one of these names clashes (not checked).
 - Controllers are not supported by the HOL-CSP output (issue DD): operation definitions are translated
   only inside controllers, and the HOL-CSP template does not handle them. A model with a controller gives
   the marker `GENERATOR_ERROR_missing_action_crtlMemory_...`; Isabelle stops earlier (duplicate event
@@ -95,8 +119,6 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
   model and the transformation cannot ask for their types. Workarounds: give the variables an initial value, or
   declare the interface in the same file as the state machine. Present since the dependency loading of
   5 Nov 2026; before it, such references were not resolved at all.
-- A variable of an enumeration or record type without an initial value gets the default value `0`; Isabelle
-  reports a type error (KK). Workaround: give the variable an initial value.
 - A state machine without controller does not declare the constants of the interfaces it requires; Isabelle
   reports them as extra variables (JJ). Workaround: declare the constant in the state machine. With a
   controller, the variables of the interface are declared twice (controllers are not supported, DD).

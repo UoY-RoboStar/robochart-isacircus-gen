@@ -2,8 +2,9 @@
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 ????????????????*]
 [*16 Nov 2026, branch composite-states (Fang). A warning of RC2Z about a paragraph (attribute generatorNote
-of ActionPara, set on Behaviour_<state> when an exit action of an inner state reads or writes the variable of
-an input trigger leaving the composite state) is printed as the comment (* GENERATOR WARNING: ... *) by
+of ActionPara; at present only the name clash of GG, on the first action paragraph; the exit-action check
+of composite states that set it on Behaviour_<state> was removed on 23 Nov 2026) is printed as the comment
+(* GENERATOR WARNING: ... *) by
 generatorNoteComment of generatorErrors.eol: in circusM2T_HOLCSP.egl before the paragraphs of the composite
 state, in circusM2T.egl before the paragraph. circusM2T_HOLCSP_trans_core.egl prints no node paragraphs.
 *]
@@ -63,7 +64,7 @@ for(freepara in freeparas){
 	
 datatype [%=enumType.name.word%] = 
 	[%for(bran in enumType.branchList.branches){%]
-	[%=bran.name.word%] [%if(hasMore){%] | 
+	"[%=bran.name.word%]"[%=bran.branchArgs()%] [%if(hasMore){%] | 
  [%}}}%]
 
 
@@ -74,7 +75,7 @@ if(axParas.select(p|p.box = Z!Box#SchBox).size()>0){
 	for(ap in axParas.select(p|p.box = Z!Box#SchBox)){%]
 record [%=ap.zSchText.declList.decls.at(0).name.word%] =
 [%for(vardecl in ap.zSchText.declList.decls.at(0).expr.schText.declList.decls){%]
-	[%=vardecl.nameList.names.at(0).word%] :: "[%=vardecl.expr.parseExpr()%]"
+	"[%=vardecl.nameList.names.at(0).word%]" :: "[%=vardecl.expr.parseExpr()%]"
 [%}} }%]
 
 [*constants and functions declaration and/or definition*]
@@ -167,8 +168,15 @@ end
 
 [%var actparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ActionPara));
 if(procparas.size()=0 and actparas.size()>0){%]
-abbreviation "assume b Q P \<equiv> (if b then P else aviol \<rightarrow> Q)"
-abbreviation "guar b P \<equiv> (if b then P else gviol \<rightarrow> Stop)"
+[*23 Nov 2026 (generator issue NN): record field names and the names of datatype constructors (enumeration
+  literals, node identifiers) are printed quoted ("value" :: "int"), since a name that is an Isabelle keyword, e.g.
+  value or where, cannot be written bare there; the variables of the definitions written by the templates are x__a, y__a
+  (discrete_cpo), n__id (parameter of Trans), b__a, Q__a, P__a (assume, guar); RC2Z.eol names the parameter of
+  the Memory processes value__v. Before: x, y, n, b, Q, P, value, which a record field, an enumeration literal or a
+  function of the model with the same name captured (a constant, not a variable). Names ending in _ are not
+  allowed by Isabelle ("Bad name"), hence the letters after __.*]
+abbreviation "assume b__a Q__a P__a \<equiv> (if b__a then P__a else aviol \<rightarrow> Q__a)"
+abbreviation "guar b__a P__a \<equiv> (if b__a then P__a else gviol \<rightarrow> Stop)"
 
 actions  is "(mychan, unit) cyphyaction" where 
 "SSTOP = share  \<rightarrow>  SSTOP" |
@@ -836,6 +844,19 @@ operation parseActionOrMarker(a: Any, owner: Any): String{
 		return self.parseRecordUpdate();
 	} //else
 
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_reclit_"){
+		return self.parseRecordLiteral();
+	} //else
+
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_conapp_"){
+		return self.parseConstructorApp();
+	} //else
+
+	//the default value of a variable of a function type A -> B: the constant function (KK, 23 Nov 2026)
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_constfun_"){
+		return "(\\<lambda>_. " + self.rightExpr.exprList.exprs.at(0).parseExpr() + ")";
+	} //else
+
 	if(self.isTypeOf(Z!ApplExpr) and self.mixFix = false){
 		if(self.rightExpr.isTypeOf(Z!TupleExpr)){//this is a RC!CallExpr, arguments are always a TupleExpr
 			return self.parseApplExprAsCallExpr();}
@@ -1005,6 +1026,46 @@ operation parseActionOrMarker(a: Any, owner: Any): String{
 [%operation Z!ApplExpr parseRecordUpdate(): String{
 	var es = self.rightExpr.exprList.exprs;
 	return "(" + es.at(0).parseExpr() + "\\<lparr>" + es.at(1).parseExpr() + " := " + es.at(2).parseExpr() + "\\<rparr>)";
+}%]
+
+[*R(| f = e, ... |), and the default value of a record:  \<lparr>R.f = e, ...\<rparr>, the fields qualified by the
+  record and in the order of its declaration (23 Nov 2026, generator issues LL and KK; RC2Z.eol _reclit_)*]
+[%operation Z!ApplExpr parseRecordLiteral(): String{
+	var es = self.rightExpr.exprList.exprs;
+	var parts = new Sequence;
+	var i = 0;
+	while(i + 1 < es.size()){
+		parts.add(es.at(i).parseExpr() + " = " + es.at(i + 1).parseExpr());
+		i = i + 2;
+	}
+	return "\\<lparr>" + parts.concat(", ") + "\\<rparr>";
+}%]
+
+[*E::L(a, b), and the default value of an enumeration whose first literal has parameters:  (L (a) (b)), the
+  application of the datatype constructor to its arguments (23 Nov 2026, generator issues MM and KK; RC2Z.eol
+  _conapp_)*]
+[%operation Z!ApplExpr parseConstructorApp(): String{
+	var es = self.rightExpr.exprList.exprs;
+	var s = es.at(0).parseExpr();
+	var i = 1;
+	while(i < es.size()){
+		s = s + " (" + es.at(i).parseExpr() + ")";
+		i = i + 1;
+	}
+	return "(" + s + ")";
+}%]
+
+[*The parameters of a literal of an enumeration (Branch.expr, an n-ary product of the parameter types, set by
+  RC2Z.eol createTypeDeclPara) as the argument types of the datatype constructor, e.g. Circle "real"; "" for a
+  literal without parameters (23 Nov 2026, generator issue MM)*]
+[%operation Z!Branch branchArgs(): String{
+	var s = "";
+	if(self.expr.isDefined()){
+		for(pt in self.expr.exprList.exprs){
+			s = s + " \"" + pt.parseExpr() + "\"";
+		}
+	}
+	return s;
 }%]
 
 [*let x == e1; y == e2 @ b  ->  (let x = e1; y = e2 in b)*]

@@ -157,22 +157,24 @@ the generator).
   actions inside Behaviour (Chapter 4 Rules 59, 60). The write `set_x!x` of Trans and these exit actions are not
   ordered. The exit action of S itself runs after `exit`, i.e. after the write.
 - CSP-M: the same structure ([C1], [C7]); no check.
-- This generator: the same structure. Since 16 Nov 2026 (branch `composite-states`) a check:
-  `exitTriggerConflicts` (RC2Z.eol, at Chapter 4 Rule 60): for every transition leaving S whose trigger binds x, every
-  state inside S (any depth) whose exit action reads or writes x (vars of Chapter 4 Rule 50) gives a warning; it is
-  stored on the paragraph `Behaviour_<S>` (attribute `generatorNote`, entry 15), printed as
-  `(* GENERATOR WARNING: ... *)` at S in the HOL-CSP and IsaCircus theories, reported by the plugin (dialog
-  and log) and by dev-tools (a line `GENERATOR WARNING`). The generation is not stopped and the
-  translation is unchanged. Test model: `robochart-models/composite-tests/c8_exit_input.rct` (proof
-  repository): warnings for A (depth 1, writes x) and B (depth 2, reads x), none for S's own exit action
-  and for C; checked with dev-tools. Not covered: x used inside an operation called by the exit action
-  (entry 1, hazard).
-- Kind: manual incomplete (a known problem of the semantics itself, the same in the manual and the CSP-M);
-  the warning is a convention of this generator.
-- Background: known problem, mentioned again by Pedro in his reply of 16 Nov 2026. The models of the
-  proofs are not affected: Adaptation_Plan has no exit action and no trigger with a parameter
-  (proof repository, `stm_nodes_and_parallel/COMPOSITE_NOTES.md`, Section 2).
-- Status: warning implemented (16 Nov 2026); the semantics is unchanged.
+- This generator: the same structure, the same as the manual and the CSP-M. From 16 to 23 Nov 2026 (branch
+  `composite-states`) a check `exitTriggerConflicts` (RC2Z.eol, at Chapter 4 Rule 60) warned when an exit action of
+  a state inside S (any depth) read or wrote the variable bound by the input trigger of a transition leaving S
+  (dialog, log, comment `(* GENERATOR WARNING: ... *)`). REMOVED on 23 Nov 2026 (Fang): RoboTool's CSP-M has the
+  same unordered structure (read in robochart-csp-gen: CTransitionGenerator.xtend 57-80 `compileTransition`,
+  189-203 `compileTriggerForMemory`: `e__!id.in?x -> share__choice(set_x!x -> SKIP) ; share__choice(exit -> SKIP)
+  ; ...`; CStateGenerator.xtend 482-503 `tidsR`: `S::interrupt` renamed to the trigger event; 358-414 `Node_rule`:
+  the inner states run `exit ; exit action ; exited` inside Behaviour after the interrupt), and RoboTool gives no
+  hint (no check in the RoboChart validator, circus.robocalc.robochart.textual 3.1.0.202610211110; none in the
+  CSP generator). The warning mechanism (`generatorNote`, entry 15) stays; the name clash of GG uses it. Test
+  model `robochart-models/composite-tests/c8_exit_input.rct` (proof repository) stays: no warning, loads.
+- Kind: manual incomplete (a known problem of the semantics itself, the same in the manual and the CSP-M).
+- INTERNAL NOTE (23 Nov 2026): this is a known problem of the RoboChart semantics (Pedro, reply of 16 Nov 2026):
+  the value of x seen or left by such an exit action depends on the interleaving. It is no longer reported by the
+  generator. The models of the proofs are not affected: Adaptation_Plan has no exit action and no trigger with a
+  parameter (proof repository, `stm_nodes_and_parallel/COMPOSITE_NOTES.md`, Section 2). Not covered by the
+  former check either: x used inside an operation called by the exit action (entry 1, hazard).
+- Status: same as the manual and the CSP-M; the check was removed on 23 Nov 2026.
 
 ## 7. Toolkit functions
 
@@ -310,7 +312,17 @@ the generator).
 - CSP-M: [C11]: `initialValue` = the initial expression or `typeDefaultValue` (0 for int and nat, `true`
   for boolean, `<>`, `{}`, the first literal of an enumeration, ...): a fixed value, not a choice.
 - This generator: `getInitialOrDefaultValueAsExpr` / `defaultValueAsZExpr` (RC2Z.eol): fixed defaults as the
-  CSP-M (int 0, boolean true since issue L, empty sequence, empty set; other types 0).
+  CSP-M. Since 23 Nov 2026 (fix of generator issue KK) the same values as `typeDefaultValue` of the CSP-M
+  (robochart-csp-gen, untimed/GeneratorUtils.xtend 285-326): int, nat, real and a primitive type declared in the
+  model (`type T`, declared `type_synonym T = nat`) 0; boolean `True`; string `''''`; an enumeration its first
+  literal, applied to the defaults of its parameters (`Circle (0)`); a record the record of the defaults of its
+  fields (`\<lparr>Point.x = 0, Point.y = 0\<rparr>`; the templates now also declare `char :: discrete_cpo`, so that a
+  string variable can be the parameter of its Memory fixrec); a sequence `[]`; a set `{}`; a tuple the tuple of the
+  defaults; a function type the constant function `(\<lambda>_. d)` (CSP-M `funcToSet(\ x_ @ d, A)`). Relation,
+  vector and matrix types are not supported by this generator: their type and their default are the markers
+  `GENERATOR_ERROR_type_<kind>` and `GENERATOR_ERROR_default_value_<kind>` (Isabelle stops there; the CSP-M gives
+  `{}` and tuples). Before (also on main 2976313): 0 for every type other than int and boolean, a type error in
+  Isabelle for enumerations, records and strings (KK).
 - Kind: semantic (fixed default against nondeterministic choice).
 - Background: the comment in RC2Z says the CSP-M default is an FDR workaround. For the deadlock-freedom
   proofs at the ncCore level there is no memory and every value read is arbitrary, so the proofs cover the
@@ -321,7 +333,8 @@ the generator).
   repository, `stm_nodes_and_parallel/DEFINEDNESS_NOTES.md`). In the flat model an arbitrary initial value
   (Chapter 4 Rule 35) of modelRanking would make the unguarded indices in the conditions undefined; the default `<>`
   does not.
-- Status: as the CSP-M; to decide whether to follow the manual (choice over the type) in the memory.
+- Status: the default values are those of the CSP-M (since 23 Nov 2026 for every type, issue KK), DIFFERENT FROM
+  THE MANUAL (Chapter 4 Rule 35: a choice over the type); to decide whether to follow the manual in the memory.
 
 ## 11. Guards for division and sequence indexing
 
@@ -459,3 +472,35 @@ the generator).
   Isabelle does not parse (and, in a state action, a stack overflow before that: generator issue FF). Since
   22 Nov 2026 (`createIfStmtAsAction`, RC2Z.eol): the missing else is `Skip`, as the CSP-M.
 - Kind: form (now the same meaning as the CSP-M). Status: adopted (fix of issue FF, Fang's task of 22 Nov 2026).
+
+## 19. Records, enumerations with parameters, and the names of the generator (23 Nov 2026)
+
+- Manual: records (`datatype`/`record`) and enumerations with parameters are types of the model; the semantics of
+  their expressions (field access `r.f`, record literal `R(| f = e |)`, field assignment `r.f = e`, literal with
+  arguments `E::L(e)`) is that of the underlying data language and not given in Chapter 4.
+- CSP-M: the default value of a record is the tuple of the defaults of its fields, that of an enumeration the first
+  literal with the defaults of its parameters, `L.d` (GeneratorUtils.xtend 285-326, `typeDefaultValue`); the
+  translation of field access and record literals in the CSP-M was not read for this entry.
+- This generator, since 23 Nov 2026 (fixes of generator issues LL, MM, NN): a record is an Isabelle `record`; field
+  access `r.f` is `(R.f r)`, a record literal is `\<lparr>R.f = e, ...\<rparr>` (fields in the order of the
+  declaration), a field assignment is `set_r!(r\<lparr>R.f := e\<rparr>)` after reading r. Field names are QUALIFIED
+  by the record (`R.f`): with two records that have a field of the same name the unqualified name refers to the
+  record declared last (checked in Isabelle: `x p0` is a type error for `p0 :: Point` after `record Pixel = x ::
+  int`), and an unqualified field name clashes with any other constant of the theory. An enumeration literal with
+  parameters is a constructor with arguments (`datatype Shape = Circle "real" | Square`, `Shape::Circle(1.0)` is
+  `(Circle (1.0))`). The variables of the theory's own definitions are named so that they cannot be the name of a
+  constant declared for the model: `x__a`, `y__a` (discrete_cpo instances), `n__id` (parameter of `Trans`),
+  `value__v` (parameter of the `Memory` processes), `b__a`, `Q__a`, `P__a` (`assume`, `guar`); before, `x`, `y`,
+  `n`, `value`, `b`, `Q`, `P` were captured by a record field, enumeration literal or function of that name
+  (NN). Names ending in `_` cannot be used (Isabelle: "Bad name"). Record field names and datatype constructor
+  names (enumeration literals, node identifiers) are printed QUOTED in their declarations (`"value" :: "int"`,
+  `datatype Letter = "b" | ...`): a name that is an Isabelle keyword (e.g. `value`, `where`) cannot be written bare
+  there (checked: outer syntax error for a field `value`; quoted, it loads). Still reserved: the generated constants
+  `share`, `terminate`, `aviol`, `gviol`, `SSTOP`, `assume`, `guar` and the channel and process names; a model
+  element with one of these names clashes (not checked by the generator).
+- Kind: form (translation of the data language), convention (names).
+- Status: adopted (23 Nov 2026). Test models: proof repository, `robochart-models/regression-tests/`.
+  Known limits: the templates declare all enumerations before all records, so an enumeration literal with a
+  parameter of record type does not load; RoboTool's validator (circus.robocalc.robochart.textual
+  3.1.0.202610211110) throws a ClassCastException on a literal with arguments (`constantConstructionWellTyped`),
+  the editor shows "Error executing EValidator", the model is nevertheless valid.

@@ -305,9 +305,9 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
     return; // stop here, do not proceed to Step 2
 }
 
-        // Warnings of RC2Z (16 Nov 2026, GeneratorNotes; e.g. an exit action of an inner state of a composite
-        // state that reads or writes the variable of an input trigger leaving it): reported, the generation
-        // goes on; the theories carry them as comments
+        // Warnings of RC2Z (16 Nov 2026, GeneratorNotes; at present the name clash of functions of imported
+        // packages, GG; the exit-action check of composite states was removed on 23 Nov 2026): reported, the
+        // generation goes on; the theories carry them as comments
         final java.util.List<String> notes = circus.robocalc.robochart.epsilon.isacircus.m2t.GeneratorNotes.collect(circusModel);
         if (!notes.isEmpty()) {
             StringBuilder nb = new StringBuilder();

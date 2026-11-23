@@ -10,8 +10,9 @@ import org.eclipse.epsilon.eol.models.IModel;
 /**
  * Warnings of the model-to-model step (16 Nov 2026, Fang). RC2Z.eol puts a warning about a paragraph into the
  * optional attribute generatorNote of ActionPara (a deviation from CZT, marked in circus_metamodel.ecore); at
- * present only exitTriggerConflicts does (exit actions of the inner states of a composite state that read or
- * write the variable of an input trigger leaving the state; docs/SEMANTICS_DIFFERENCES.md). The templates print
+ * present only the name clash of functions of imported packages (GG, createFunctionDefsAsAxParas) does; the
+ * exit-action check of composite states (exitTriggerConflicts) that used it first was removed on 23 Nov 2026
+ * (docs/SEMANTICS_DIFFERENCES.md, entry 6). The templates print
  * the warnings as comments; the plugin and dev-tools read them here, after RC2Z, to report them. A warning does
  * not stop the generation.
  */

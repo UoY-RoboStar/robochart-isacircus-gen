@@ -64,6 +64,13 @@ if(givenParas.size()>0){
 type_synonym [%=gp.nameList.names.at(0).word%] = nat
 [%} }%]
 
+[*23 Nov 2026 (generator issue NN): record field names and the names of datatype constructors (enumeration
+  literals, node identifiers) are printed quoted ("value" :: "int"), since a name that is an Isabelle keyword, e.g.
+  value or where, cannot be written bare there; the variables of the definitions written by the templates are x__a, y__a
+  (discrete_cpo), n__id (parameter of Trans), b__a, Q__a, P__a (assume, guar); RC2Z.eol names the parameter of
+  the Memory processes value__v. Before: x, y, n, b, Q, P, value, which a record field, an enumeration literal or a
+  function of the model with the same name captured (a constant, not a variable). Names ending in _ are not
+  allowed by Isabelle ("Bad name"), hence the letters after __.*]
 [*enumType declaration*]
 [%
 var freeparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!FreePara));
@@ -78,14 +85,14 @@ for(freepara in freeparas){
 	
 datatype [%=enumType.name.word%] = 
 	[%for(bran in enumType.branchList.branches){%]
-	[%=bran.name.word%] [%if(hasMore){%] | 
+	"[%=bran.name.word%]"[%=bran.branchArgs()%] [%if(hasMore){%] | 
  [%}}%]
  
 instantiation [%=enumType.name.word%] :: discrete_cpo
 begin
 
 definition below_[%=enumType.name.word%]_def:
-  "(x::[%=enumType.name.word%]) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::[%=enumType.name.word%]) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance proof
 qed (rule below_[%=enumType.name.word%]_def)
@@ -99,7 +106,7 @@ instantiation int :: discrete_cpo
 begin
 
 definition below_int_def [simp]:
-  "(x::int) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::int) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -109,7 +116,7 @@ instantiation nat :: discrete_cpo
 begin
 
 definition below_nat_def [simp]:
-  "(x::nat) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::nat) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -119,7 +126,7 @@ instantiation bool :: discrete_cpo
 begin
 
 definition below_bool_def [simp]:
-  "(x::bool) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::bool) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -129,7 +136,19 @@ instantiation real :: discrete_cpo
 begin
 
 definition below_real_def [simp]:
-  "(x::real) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::real) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
+
+instance
+  by standard (simp)
+end
+
+[*23 Nov 2026 (generator issue KK): char, so that string = char list (HOLCF-Library.List_Cpo) can be the parameter
+  type of a Memory fixrec (a variable of type string; its default value is the empty string).*]
+instantiation char :: discrete_cpo
+begin
+
+definition below_char_def [simp]:
+  "(x__a::char) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -143,7 +162,7 @@ if(axParas.select(p|p.box = Z!Box#SchBox).size()>0){
 	for(ap in axParas.select(p|p.box = Z!Box#SchBox)){%]
 record [%=ap.zSchText.declList.decls.at(0).name.word%] =
 [%for(vardecl in ap.zSchText.declList.decls.at(0).expr.schText.declList.decls){%]
-	[%=vardecl.nameList.names.at(0).word%] :: "[%=vardecl.expr.parseExpr()%]"
+	"[%=vardecl.nameList.names.at(0).word%]" :: "[%=vardecl.expr.parseExpr()%]"
 [%}%]
 
 [*Issue K' (5 Nov 2026): discrete cpo instance for the record type constructor 'a R_ext (R = unit R_ext), needed
@@ -153,7 +172,7 @@ instantiation [%=ap.zSchText.declList.decls.at(0).name.word%]_ext :: (type) disc
 begin
 
 definition below_[%=ap.zSchText.declList.decls.at(0).name.word%]_ext_def [simp]:
-  "(x::'a [%=ap.zSchText.declList.decls.at(0).name.word%]_ext) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::'a [%=ap.zSchText.declList.decls.at(0).name.word%]_ext) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -198,8 +217,8 @@ for(chanpara in channelparas.select(cp|cp.declList.decls.exists(d|d.keptChans().
 	
 [%}%]
 
-abbreviation "assume b Q P \<equiv> (if b then P else aviol \<rightarrow> Q)"
-abbreviation "guar b P \<equiv> (if b then P else gviol \<rightarrow> STOP)"
+abbreviation "assume b__a Q__a P__a \<equiv> (if b__a then P__a else aviol \<rightarrow> Q__a)"
+abbreviation "guar b__a P__a \<equiv> (if b__a then P__a else gviol \<rightarrow> STOP)"
 abbreviation "SSTOP \<equiv> SSTOP_aux share"  
 
 
@@ -212,7 +231,7 @@ locale trans_core_action
 begin
 fixrec [%= actpara.name.word%] :: "[%=actpara.paramType()%] \<rightarrow> chan_event process"
 where
-[simp del] :\<open>[%= actpara.name.word%]\<cdot>n = 
+[simp del] :\<open>[%= actpara.name.word%]\<cdot>n__id = 
 	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close>
 	
 lemma [%=z.version%][%=actpara.lemmaSuffix()%]_trans_core_ddlf:
@@ -241,7 +260,7 @@ begin
 [%for(actpara in actparas.select(ap|ap.name.word.startsWith("Transc_"))){%]
 fixrec [%= actpara.name.word%] :: "[%=actpara.paramType()%] \<rightarrow> chan_event process"
 where
-[simp del] :\<open>[%= actpara.name.word%]\<cdot>n = 
+[simp del] :\<open>[%= actpara.name.word%]\<cdot>n__id = 
 	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close>
 	
 lemma [%=z.version%][%=actpara.lemmaSuffix()%]_trans_core_ddlf:
@@ -1126,6 +1145,19 @@ operation channelArities(): Map{
 		return self.parseRecordUpdate();
 	} //else
 
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_reclit_"){
+		return self.parseRecordLiteral();
+	} //else
+
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_conapp_"){
+		return self.parseConstructorApp();
+	} //else
+
+	//the default value of a variable of a function type A -> B: the constant function (KK, 23 Nov 2026)
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_constfun_"){
+		return "(\\<lambda>_. " + self.rightExpr.exprList.exprs.at(0).parseExpr() + ")";
+	} //else
+
 	if(self.isTypeOf(Z!ApplExpr) and self.mixFix = false){
 		if(self.rightExpr.isTypeOf(Z!TupleExpr)){//this is a RC!CallExpr, arguments are always a TupleExpr
 			return self.parseApplExprAsCallExpr();}
@@ -1296,6 +1328,46 @@ operation channelArities(): Map{
 [%operation Z!ApplExpr parseRecordUpdate(): String{
 	var es = self.rightExpr.exprList.exprs;
 	return "(" + es.at(0).parseExpr() + "\\<lparr>" + es.at(1).parseExpr() + " := " + es.at(2).parseExpr() + "\\<rparr>)";
+}%]
+
+[*R(| f = e, ... |), and the default value of a record:  \<lparr>R.f = e, ...\<rparr>, the fields qualified by the
+  record and in the order of its declaration (23 Nov 2026, generator issues LL and KK; RC2Z.eol _reclit_)*]
+[%operation Z!ApplExpr parseRecordLiteral(): String{
+	var es = self.rightExpr.exprList.exprs;
+	var parts = new Sequence;
+	var i = 0;
+	while(i + 1 < es.size()){
+		parts.add(es.at(i).parseExpr() + " = " + es.at(i + 1).parseExpr());
+		i = i + 2;
+	}
+	return "\\<lparr>" + parts.concat(", ") + "\\<rparr>";
+}%]
+
+[*E::L(a, b), and the default value of an enumeration whose first literal has parameters:  (L (a) (b)), the
+  application of the datatype constructor to its arguments (23 Nov 2026, generator issues MM and KK; RC2Z.eol
+  _conapp_)*]
+[%operation Z!ApplExpr parseConstructorApp(): String{
+	var es = self.rightExpr.exprList.exprs;
+	var s = es.at(0).parseExpr();
+	var i = 1;
+	while(i < es.size()){
+		s = s + " (" + es.at(i).parseExpr() + ")";
+		i = i + 1;
+	}
+	return "(" + s + ")";
+}%]
+
+[*The parameters of a literal of an enumeration (Branch.expr, an n-ary product of the parameter types, set by
+  RC2Z.eol createTypeDeclPara) as the argument types of the datatype constructor, e.g. Circle "real"; "" for a
+  literal without parameters (23 Nov 2026, generator issue MM)*]
+[%operation Z!Branch branchArgs(): String{
+	var s = "";
+	if(self.expr.isDefined()){
+		for(pt in self.expr.exprList.exprs){
+			s = s + " \"" + pt.parseExpr() + "\"";
+		}
+	}
+	return s;
 }%]
 
 [*let x == e1; y == e2 @ b  ->  (let x = e1; y = e2 in b)*]

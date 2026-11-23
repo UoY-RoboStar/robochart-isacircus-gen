@@ -161,12 +161,15 @@ declaration under a marker name would be a valid declaration, and every referenc
 its unqualified name, so no marker can make Isabelle stop at the right place (generator CLAUDE.md, "M2T
 errors and output").
 
-16 Nov 2026, branch composite-states (Fang)
-Exit actions of inner states and input triggers (exitTriggerConflicts, at Rule 60): for a composite state with
-a transition leaving it whose trigger binds a variable x, an exit action of an inner state (any depth) that
-reads or writes x gives a warning (generatorNote on Behaviour_<state>, printed as a comment by the templates,
-reported by the plugin and dev-tools); the generation goes on. Comments at Rules 41 and 60: Pedro's
-explanations of 16 Nov 2026 (docs/SEMANTICS_DIFFERENCES.md).
+16 Nov 2026, branch composite-states (Fang); check REMOVED 23 Nov 2026
+Exit actions of inner states and input triggers: from 16 to 23 Nov 2026 a check exitTriggerConflicts (at
+Rule 60) warned when an exit action of an inner state (any depth) of a composite state read or wrote the
+variable bound by the input trigger of a transition leaving it. Removed on 23 Nov 2026 (Fang): RoboTool's
+CSP-M has the same unordered structure (CTransitionGenerator compileTransition/compileTriggerForMemory,
+CStateGenerator Node_rule and tidsR) and RoboTool gives no hint (validator, CSP generator); it is a known
+problem of the semantics itself (Pedro, 16 Nov 2026), no longer reported. The warning mechanism
+(generatorNote) stays; GG uses it. Comments at Rules 41 and 60: Pedro's explanations of 16 Nov 2026
+(docs/SEMANTICS_DIFFERENCES.md, entry 6).
 
 16 Nov 2026, branch composite-states (Fang)
 Rule 60 (Behaviour): machineVarNames also takes the variables of the required interfaces (rInterfaces), as
@@ -195,6 +198,24 @@ toolkits excluded), with a warning on a name clash. II: the parameter type of a 
 parameters is one n-ary product (A x B x C), matching the flat tuple of a call; before, nested pairs ((A x B) x C)
 (printed so since 9faa957). Changes the output of models with an if without else, with calls of functions of
 imported packages, and with functions of three or more parameters.
+
+23 Nov 2026, branch composite-states (Fang)
+Records, enumerations and names (generator issues KK, LL, MM, NN; all four also on main 2976313;
+docs/COMPOSITE_RELEASE_TEST.md Section 15, docs/SEMANTICS_DIFFERENCES.md entries 10 and 19). KK: defaultValueAsZExpr
+gives the defaults of RoboTool's CSP-M (first literal of an enumeration, record of the field defaults, '''' for
+string, constant function for a function type, markers for unsupported types) instead of 0. LL: createExpr
+translates field access r.f (Selection) to (R.f r) and record literals to \<lparr>R.f = e, ...\<rparr> (_reclit_); an
+assignment r.f = e or x[i] = e also reads the root variable and the variables of the indices (usedVariables,
+Rule 50 vars, leftReadVariables); field names are qualified by the record in selection, update and literal. MM:
+enumeration literals keep their parameters (Branch.expr), a literal with arguments is (L (a) (b)) (_conapp_). NN:
+the variables of the generated definitions are x__a, y__a, n__id, value__v, b__a, Q__a, P__a (before x, y, n,
+value, b, Q, P, captured by a field, literal or function of that name); the templates print record field and
+constructor names quoted (a keyword such as value cannot be written bare) and declare char :: discrete_cpo (string
+variables). createTypeExpr gives markers for relation,
+vector and matrix types. The exit-action check of composite states (exitTriggerConflicts, 16 Nov 2026) was
+removed (entry above). Changes the output of every model (names n__id, value__v, x__a, y__a, b__a, Q__a, P__a),
+and of models with records, enumerations with parameters, uninitialised variables of enumeration, record or
+string type, and indexed or field assignments.
 ******************************/
 
 
@@ -532,6 +553,25 @@ operation createTypeDeclPara(pkg:RC!RCPackage){
 				literal_seq.add(l.name);
 			}
 			var freetype = createEnumType(tp.name, literal_seq);
+			//Fix of generator issue MM (23 Nov 2026, branch composite-states): a literal with parameters,
+			//e.g. Circle(real), keeps them: the types are put on the branch (Branch.expr, one n-ary ProdExpr of
+			//the parameter types) and the templates print the constructor with one argument per parameter,
+			//datatype Shape = Circle "real" | Square. Before, only the name was kept (Circle | Square), on
+			//main as well. As RoboTool's CSP-M (datatype Shape = Circle.core_real | Square).
+			var bi = 0;
+			for(l in tp.literals){
+				if(l.types.isDefined() and l.types.size() > 0){
+					var ptypes = new Sequence;
+					for(pt in l.types){
+						ptypes.add(pt.createTypeExpr());
+					}
+					var pexpr = new Z!ProdExpr;
+					pexpr.exprList = new Z!ZExprList;
+					pexpr.exprList.exprs = ptypes;
+					freetype.branchList.branches.at(bi).expr = pexpr;
+				}
+				bi = bi + 1;
+			}
 			
 			var freetypePara =  freetype.createEnumTypePara();		
 		}
@@ -3083,10 +3123,11 @@ here we need ParamAction  */
 operation IndividualVarMemory(v: RC!Variable, v_FQN: String): Z!ParamAction{
 	
 	
-	var commu1  = createOutputCommunicationFromString("get_" + v_FQN, "value", "OUTPUT");
+	//the parameter is value__v (23 Nov 2026, issue NN; before value, captured by a constant value of the model)
+	var commu1  = createOutputCommunicationFromString("get_" + v_FQN, "value__v", "OUTPUT");
 	var choice1 = createPrefixingAction(
 						commu1, 
-						("Memory_"+ v_FQN).createCallAction(Sequence{"value".createRefExpr(false, false)})
+						("Memory_"+ v_FQN).createCallAction(Sequence{"value__v".createRefExpr(false, false)})
 						); 
 	
 	
@@ -3106,7 +3147,7 @@ operation IndividualVarMemory(v: RC!Variable, v_FQN: String): Z!ParamAction{
 	action.circusAction = memory;
 	
 	var value = new RC!Variable;
-	value.name = "value";
+	value.name = "value__v";
 //	("line 1745,  v.type = " + v.type).println();
 //	("line 1746,  v.type.type() = " + v.type.type()).println();
 //	("line 1738,  v.type.type = " + v.type.type).println();
@@ -3131,32 +3172,57 @@ as Isabelle can handle infinite scopes.
 operation RC!Type defaultValueAsZExpr(): Z!Expr{
 ("line 1807, self.type().name = " + self.type().name).println();
 
+	//Fix of generator issue KK (23 Nov 2026, branch composite-states). The default value of a variable without
+	//initial value is that of RoboTool's CSP-M (robochart-csp-gen a6412b4, untimed/GeneratorUtils.xtend 285-326,
+	//typeDefaultValue; the same in comp/untimed/CGeneratorUtils.xtend 368): int, nat, real 0; boolean true;
+	//string ""; an enumeration its first literal, applied to the defaults of the literal's parameters (MM); a
+	//record the record of the defaults of its fields, in the order of the declaration (LL); a sequence <>, a
+	//set {}, a tuple the tuple of the defaults (below). DIFFERENT FROM THE MANUAL: Rule 35 (memory) leaves the
+	//value of a variable without initial value arbitrary (docs/SEMANTICS_DIFFERENCES.md). Before, every type
+	//other than int and boolean got 0 (also on main), a type error in Isabelle for enumerations, records and
+	//strings. A primitive type declared in the model (type T, declared as type_synonym T = nat) gets 0, as
+	//in the CSP-M; a function type A -> B the constant function with the default of B (CSP-M: funcToSet(\ x_ @ d,
+	//A)). Types this generator does not support (relation, vector, matrix, and anything else) get the marker
+	//GENERATOR_ERROR_default_value_<type> (generatorErrors.eol); the CSP-M gives {} and tuples for them.
 	if(self.type().name = "TypeRef"){
-		"self.type = TypeRef" .println();
-		self.ref.name.println();
-		if(self.ref.name = "int"){
+		var r = self.ref;
+		if(r.isKindOf(RC!Enumeration)){
+			var lit = r.literals.first();
+			if(lit.types.isDefined() and lit.types.size() > 0){
+				var cargs = Sequence{lit.name.createRefExpr(false,false)};
+				for(pt in lit.types){
+					cargs.add(pt.defaultValueAsZExpr());
+				}
+				return createOperatorApplExpr("_conapp_", cargs);
+			}
+			return lit.name.createRefExpr(false,false);
+		}
+		if(r.isKindOf(RC!RecordType)){
+			var rargs = new Sequence;
+			for(f in r.fields){
+				rargs.add(f.qualifiedFieldName().createRefExpr(false,false));
+				rargs.add(f.type.defaultValueAsZExpr());
+			}
+			return createOperatorApplExpr("_reclit_", rargs);
+		}
+		if(r.isKindOf(RC!NameType)){
+			return r.type.defaultValueAsZExpr();
+		}
+		if(r.isKindOf(RC!PrimitiveType)){
+			var pn = r.name.toLowerCase();
+			//RoboChart writes the type as "boolean"; the old comparison with "Boolean" never matched, so bool
+			//variables got the default 0 (issue L). The default true is the one of the RoboChart CSP-M generator.
+			if(pn = "boolean"){
+				return createBooleanExpr(true);
+			}
+			if(pn = "string"){
+				return "''''".createRefExpr(false,false); //the empty string of Isabelle
+			}
+			//int, nat, real, and a primitive type declared in the model (type T), which the templates declare
+			//as type_synonym T = nat: 0, as the CSP-M (typeDefaultValue: "0" for every other primitive type)
 			return createNumExpr(0);
 		}
-//		if(self.ref.name = "float"){
-//			return createNumExpr(0);//TO DO
-//		}
-//		if(self.ref.name = "String"){
-//			return createNumExpr(0);//TO DO
-//		}
-		//RoboChart writes the type as "boolean"; the old comparison with "Boolean" never matched, so bool variables
-		//got the default 0 (issue L). The default true is the one of the RoboChart CSP-M generator.
-		if(self.ref.name.toLowerCase() = "boolean"){
-			return createBooleanExpr(true);
-		} 
-		
-		if(self.ref.name.toLowerCase() != "boolean" and self.ref.name != "int") {
-			return createNumExpr(0);
-		}
-		
-		
-		else {//TO DO
-		
-		}
+		return generatorErrorMarker("default_value", r.name).createRefExpr(false,false);
 	}
 	
 	if(self.type().name = "SeqType"){
@@ -3186,6 +3252,13 @@ operation RC!Type defaultValueAsZExpr(): Z!Expr{
 		return typeSeq.createTupleExpr();
 		
 	}
+	//a total function A -> B: the constant function with the default of B, as the CSP-M
+	//(funcToSet(\ x_ @ d, A)); printed (\<lambda>_. d) (_constfun_) (KK, 23 Nov 2026)
+	if(self.type().name = "FunctionType"){
+		return createOperatorApplExpr("_constfun_", Sequence{self.range.defaultValueAsZExpr()});
+	}
+	//relation, vector, matrix and any other type: not supported by this generator (KK, 23 Nov 2026)
+	return generatorErrorMarker("default_value", self.type().name).createRefExpr(false,false);
 	/*
 	if(self.type().name = "RelationType"){
 	
@@ -3244,10 +3317,10 @@ operation sharedMemory(v: RC!Variable): Z!ActionPara{
 operation IndividualSharedVarMemory(v: RC!Variable): Z!ParamAction{
 	
 	
-	var commu1  = createOutputCommunicationFromString("get_" + v.name, "value", "OUTPUT");
+	var commu1  = createOutputCommunicationFromString("get_" + v.name, "value__v", "OUTPUT");
 	var choice1 = createPrefixingAction(
 						commu1, 
-						("sharedMemory_"+v.name).createCallAction(Sequence{"value".createRefExpr(false, false)})
+						("sharedMemory_"+v.name).createCallAction(Sequence{"value__v".createRefExpr(false, false)})
 						); 
 	
 	
@@ -3273,7 +3346,7 @@ operation IndividualSharedVarMemory(v: RC!Variable): Z!ParamAction{
 	action.circusAction = sharedMemory;
 	
 	var value = new RC!Variable;
-	value.name = "value";
+	value.name = "value__v";
 //	("line 1745,  v.type = " + v.type).println();
 //	("line 1746,  v.type.type() = " + v.type.type()).println();
 //	("line 1738,  v.type.type = " + v.type.type).println();
@@ -3511,6 +3584,13 @@ operation usedVariablesInExprModel(expr:RC!Expression, container: Any): Set<Vari
 			set = set.includingAll(usedVariablesInExprModel(d.value,container));
 		}
 		set = set.includingAll(usedVariablesInExprModel(expr.expression,container));
+	} else
+	//record literal (23 Nov 2026, LL): the values are held in FieldDefinitions, which are not Expressions, so the
+	//generic case below would not reach them (the same problem as the let of issue X)
+	if(expr.instanceOf(RC!RecordExp)){
+		for(d in expr.definitions){
+			set = set.includingAll(usedVariablesInExprModel(d.value,container));
+		}
 	} else
 	{
 		"line814".println();
@@ -4351,9 +4431,13 @@ operation RC!Type createTypeExpr(): Z!Expr{
 	}
 
 	//TO DO: a general relation A <-> B (not a function) has no printer in the EGLs yet
-	if(self.isTypeOf(RelationType)){
-		("createTypeExpr: relation types are not supported yet: " + self).println();
-//		return ??
+	//Since 23 Nov 2026 (with KK): relation, vector and matrix types are the marker GENERATOR_ERROR_type_<kind>
+	//(generatorErrors.eol), so that the generation goes on and Isabelle stops at the declaration that uses the
+	//type; before, createTypeExpr returned nothing and the generation stopped ("Called method 'createRefExpr' on
+	//undefined object"). Set types (issue BB) are not changed here.
+	if(self.isTypeOf(RelationType) or self.isTypeOf(VectorType) or self.isTypeOf(MatrixType)){
+		("createTypeExpr: type not supported: " + self).println();
+		return generatorErrorMarker("type", self.type().name).createRefExpr(false,false);
 	}
 	
 	if(self.isTypeOf(SeqType)){  
@@ -4809,6 +4893,8 @@ operation vars(stmt: RC!Statement):Set<String>{
 		//rootVarName: the variable of the left-hand side, also for an indexed one (x[i] = e), where
 		//stmt.left.name does not exist (met on Adaptation_Plan through a composite state)
 		varset = Set{stmt.left.rootVarName() }.includingAll(usedVariablesInExpr(stmt.right, nc(stmt)));
+		//23 Nov 2026 (LL): and the variables of the index expressions of the left-hand side, x[i] = e
+		varset = varset.includingAll(stmt.left.leftReadVariables(nc(stmt)));
 		//stmt.left is an Assignable, stmt.left.name is a Variable
 		//nc(stmt.left.name) returns the basiccontext that defines this variable
 		// we use the nc(stmt) as scope or nc(stmt.left.name) as scope? e.g., in module stm0, var is a local and to be renamed using EXT
@@ -5393,6 +5479,11 @@ operation usedVariables(stmt:RC!Statement):Set<String>{
 	
 	if(stmt.instanceOf(RC!Assignment)){
 		varSet = usedVariablesInExpr(stmt.right,container);
+		//23 Nov 2026 (generator issue LL): an assignment to a field or an element, r.f = e or x[i] = e, also
+		//reads the root variable (the value written is r with f updated, x with element i updated) and the
+		//variables of the index expressions. Before, only the right-hand side was read, and the root variable
+		//was free in the generated equation unless it was read for another reason.
+		varSet = varSet.includingAll(stmt.left.leftReadVariables(container));
 	} else
 	if(stmt.instanceOf(RC!Call)){
 		for(arg in stmt.args){
@@ -5461,6 +5552,13 @@ operation usedVariablesInExpr(expr:RC!Expression, container: Any): Set<String>{
 			set = set.includingAll(usedVariablesInExpr(d.value,container));
 		}
 		set = set.includingAll(usedVariablesInExpr(expr.expression,container));
+	} else
+	//record literal (23 Nov 2026, LL): the values are held in FieldDefinitions, which are not Expressions, so the
+	//generic case below would not reach them (the same problem as the let of issue X)
+	if(expr.instanceOf(RC!RecordExp)){
+		for(d in expr.definitions){
+			set = set.includingAll(usedVariablesInExpr(d.value,container));
+		}
 	} else
 	{
 		"line814".println();
@@ -5798,7 +5896,7 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 	}
 
 	//share -> Trans(n)
-	var choice1_action1_right = createPrefixingAction(createSynchCommunication("share"), ("Trans_"+self.FQN()).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+	var choice1_action1_right = createPrefixingAction(createSynchCommunication("share"), ("Trans_"+self.FQN()).createCallAction(Sequence{"n__id"}.createRefExprSeq(false,false)));
 	
  	var choice1_action1 = createAction2("ExtChoiceAction", choice1_action1_left, choice1_action1_right);
 
@@ -5837,7 +5935,7 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 	var else_pred = createFalsePred();
 	
 	//elseif false then aviol -> Trans(n)
-	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Trans_" + self.FQN()).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Trans_" + self.FQN()).createCallAction(Sequence{"n__id"}.createRefExprSeq(false,false)));
 	elseAction = createGuardedAction(else_pred, elseAction);
 	
 	var actions = Sequence{ifAction, elseAction};
@@ -5864,7 +5962,8 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 	Trans.isParamCommand = true;
 	Trans.circusAction = readStateA(vguards, trans_action);
 	Trans.declList = new Z!ZDeclList;
-	Trans.declList.decls.add(createVarDeclfromString("n", "NIDS_"+self.FQN()));
+	//the node parameter is n__id (23 Nov 2026, issue NN; before n, captured by a constant n of the model)
+	Trans.declList.decls.add(createVarDeclfromString("n__id", "NIDS_"+self.FQN()));
 	
 
 	return Trans.createActionPara("Trans_" + self.FQN());
@@ -5945,7 +6044,7 @@ operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
 	("Line 5374: final_name" + final_name).println();
 	
 	//Step 2: to create the guard: n = final
-	var src_grd_pred = createMemPredEquality("n", "NID_" + final_name);
+	var src_grd_pred = createMemPredEquality("n__id", "NID_" + final_name);
 	
 	//Step 3: (n = final) & (terminate -> Skip)
 	var final_terminiate = createPrefixingAction(createSynchCommunication("terminate"), createSkipAction());
@@ -5993,7 +6092,7 @@ operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
 	var else_pred = createFalsePred();
 	
 	//elseif false then aviol -> Trans(n)
-	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Transc_" + self.FQN()).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Transc_" + self.FQN()).createCallAction(Sequence{"n__id"}.createRefExprSeq(false,false)));
 	elseAction = createGuardedAction(else_pred, elseAction);
 	
 	var actions = Sequence{ifAction, elseAction};
@@ -6018,7 +6117,8 @@ operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
 	Trans.isParamCommand = true;
 	Trans.circusAction = readStateA(vguards, trans_action);
 	Trans.declList = new Z!ZDeclList;
-	Trans.declList.decls.add(createVarDeclfromString("n", "NIDS_"+self.FQN()));
+	//the node parameter is n__id (23 Nov 2026, issue NN; before n, captured by a constant n of the model)
+	Trans.declList.decls.add(createVarDeclfromString("n__id", "NIDS_"+self.FQN()));
 
 	return Trans.createActionPara("Transc_" + self.FQN());	
 }
@@ -6038,7 +6138,7 @@ operation RC!Transition createTransitionAsCircusAction(): Z!CircusAction{
 	var circusAction;
 	
 	//"n = src"
-	var src_grd_pred = createMemPredEquality("n", "NID_" + self.source.FQN());
+	var src_grd_pred = createMemPredEquality("n__id", "NID_" + self.source.FQN());
 	
 	if(self.source.type().name = "State"){
 					
@@ -6117,7 +6217,7 @@ operation RC!Transition createTransitionAsCircusAction4TransCore(): Z!CircusActi
 	var circusAction;
 	
 	//"n = src"
-	var src_grd_pred = createMemPredEquality("n", "NID_" + self.source.FQN());
+	var src_grd_pred = createMemPredEquality("n__id", "NID_" + self.source.FQN());
 	
 	if(self.source.type().name = "State"){
 					
@@ -6538,15 +6638,8 @@ operation RC!State createCompositeStateAsActionParas(){
 											machineVarNames(self));
 	Behaviour = Behaviour.createHideAction(enteredSS(self).includingAll(Sequence{"terminate"}));
 	var BehaviourPara = Behaviour.createActionPara("Behaviour_" + self.FQN());
-	//Exit actions of the inner states and input triggers (16 Nov 2026, exitTriggerConflicts): a warning, the
-	//generation goes on. It is put on the paragraph Behaviour_<state> (attribute generatorNote, a deviation
-	//from CZT marked in circus_metamodel.ecore); the templates print it at the composite state, the plugin
-	//and dev-tools report it.
-	var exitNotes = self.exitTriggerConflicts();
-	if(exitNotes.size() > 0){
-		BehaviourPara.generatorNote = exitNotes.concat(" ");
-		for(n in exitNotes){ ("GENERATOR WARNING: " + n).println(); }
-	}
+	//The check of exit actions of inner states against input triggers (exitTriggerConflicts, 16 Nov 2026) was
+	//removed on 23 Nov 2026: the same as the manual and RoboTool's CSP-M, no hint there (header of this file).
 	
 	
 	/*******************************
@@ -6628,57 +6721,6 @@ operation RC!State createCompositeStateAsActionParas(){
 
 }
 
-
-//Precondition check for a composite state (16 Nov 2026, Fang; docs/SEMANTICS_DIFFERENCES.md, item
-//"Exit actions of inner states and the assignment of an input trigger"). Not a rule of the manual; a
-//warning only, the translation is unchanged.
-//The problem (known, Pedro, 16 Nov 2026): a transition t from the composite state S with an input trigger
-//e?x does, in Trans of S's container (Rule 54 with Rule 55, p. 50-51), e?x and then set_x!x before exit.
-//The same event e, renamed to interrupt_S (Rule 40), interrupts S, and the inner states of S, at any
-//depth, run their exit actions inside Behaviour_S (Rules 59, 60) while Trans of the container goes on to
-//set_x!x; the write of x and these exit actions are not ordered (both are under SStop and synchronise only
-//on share). An exit action of an inner state that reads x may see the old or the new value, one that
-//writes x may be overwritten or not. The exit action of S itself comes after exit, i.e. after set_x!x, and
-//is ordered. Here: for every transition from S whose trigger has a parameter x, every state inside S (all
-//levels) whose exit action reads or writes x (vars of Rule 50) gives one message. Not covered: x read or
-//written in an operation called by the exit action (vars of a call contains only its arguments and the
-//parameters of the operation, see the hazard at Rule 41).
-operation RC!State exitTriggerConflicts(): Sequence<String>{
-	var msgs = new Sequence<String>;
-	var container = self.eContainer();
-	var outgoing = container.transitions.select(t | t.source = self and t.trigger.isDefined()
-		and t.trigger.parameter.isDefined());
-	if(outgoing.isEmpty()){
-		return msgs;
-	}
-	for(s in self.innerStatesAllLevels()){
-		for(a in s.actions.select(a | a.type().name = "ExitAction")){
-			var vs = vars(a.action);
-			for(t in outgoing){
-				var x = t.trigger.parameter.name;
-				if(vs.includes(x)){
-					msgs.add("Composite state " + self.name + ": the exit action of its inner state " + s.name
-						+ " reads or writes " + x + ", the variable bound by the input trigger of transition "
-						+ t.name + " leaving " + self.name + ". The assignment of the trigger value to " + x
-						+ " and the exit actions of the inner states are not ordered (Rules 55, 59, 60), so the value"
-						+ " of " + x + " seen or left by that exit action depends on the interleaving (known"
-						+ " problem, Pedro, 16 Nov 2026). The theory is generated unchanged.");
-				}
-			}
-		}
-	}
-	return msgs;
-}
-
-//the states inside a composite state, at every depth (final states included; junctions have no actions)
-operation RC!State innerStatesAllLevels(): Sequence{
-	var result = new Sequence;
-	for(n in self.nodes.select(n | n.isKindOf(RC!State))){
-		result.add(n);
-		result.addAll(n.innerStatesAllLevels());
-	}
-	return result;
-}
 
 //Auxiliary of Rule 60 (generator convention, not a rule of the manual).
 //The machine (state machine or operation) that a node container belongs to: the container itself, or the
@@ -7278,6 +7320,43 @@ RoboChart Assignable = VarRef | ArrayAssignable | VarSelection
 The update is built recursively from the innermost Assignable outwards.
 ***********************************************/
 
+//The name of a record field qualified by its record type, R.f (23 Nov 2026, generator issues NN and LL). In
+//Isabelle the fields of a record R are the constants R.f; with two records that have a field of the same name
+//the unqualified f refers to the one declared last (checked: Point.x and Pixel.x, x p0 is a type error for
+//p0 :: Point), and an unqualified f also clashes with any other constant f of the theory.
+operation Any qualifiedFieldName(): String{
+	var c = self.eContainer();
+	if(c.isDefined() and c.isKindOf(RC!RecordType)){
+		return c.name + "." + self.name;
+	}
+	return self.name;
+}
+
+//The variables an assignment reads through its left-hand side (23 Nov 2026, generator issue LL): none for x = e;
+//for r.f = e and x[i] = e the root variable (its old value is updated) and the variables of the index
+//expressions, at every level.
+operation RC!Assignable leftReadVariables(container: Any): Set<String>{
+	var s = new Set<String>;
+	if(self.isTypeOf(RC!VarRef)){
+		return s;
+	}
+	s.add(self.rootVarName());
+	var a = self;
+	while(not a.isTypeOf(RC!VarRef)){
+		if(a.isTypeOf(RC!ArrayAssignable)){
+			for(ix in a.parameters){
+				s = s.includingAll(usedVariablesInExpr(ix, container));
+			}
+			a = a.value;
+		} else if(a.isTypeOf(RC!VarSelection)){
+			a = a.receiver;
+		} else {
+			return s;
+		}
+	}
+	return s;
+}
+
 //name of the variable at the root of an Assignable, e.g. modelScore for modelScore[model]
 operation RC!Assignable rootVarName(): String{
 	if(self.isTypeOf(RC!VarRef)){
@@ -7311,7 +7390,7 @@ operation RC!Assignable createReadExpr(): Z!Expr{
 	if(self.isTypeOf(RC!VarSelection)){
 		var expr = new Z!BindSelExpr;
 		expr.expr = self.receiver.createReadExpr();
-		expr.name = self.member.name.createZName();
+		expr.name = self.member.qualifiedFieldName().createZName(); //qualified since 23 Nov 2026 (NN, LL)
 		return expr;
 	}
 	("createReadExpr: unsupported Assignable " + self).println();
@@ -7331,8 +7410,9 @@ operation RC!Assignable createUpdatedValueExpr(new_value: Z!Expr): Z!Expr{
 		return self.value.createUpdatedValueExpr(upd);
 	}
 	if(self.isTypeOf(RC!VarSelection)){
+		//the field name qualified by the record type since 23 Nov 2026 (NN, LL): r\<lparr>R.f := e\<rparr>
 		var upd = createOperatorApplExpr("_recupd_",
-			Sequence{self.receiver.createReadExpr(), self.member.name.createRefExpr(false,false), new_value});
+			Sequence{self.receiver.createReadExpr(), self.member.qualifiedFieldName().createRefExpr(false,false), new_value});
 		return self.receiver.createUpdatedValueExpr(upd);
 	}
 	("createUpdatedValueExpr: unsupported Assignable " + self).println();
@@ -7433,7 +7513,7 @@ operation RC!Statement createStmtInContextAsAction(): Z!CircusAction{
 		*/
 //		var id = "tbd";
 //		var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Trans_" + id).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
-		var elseAction = createPrefixingAction(createSynchCommunication("aviol"), stmt_container.createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+		var elseAction = createPrefixingAction(createSynchCommunication("aviol"), stmt_container.createCallAction(Sequence{"n__id"}.createRefExprSeq(false,false)));
 		elseAction = createGuardedAction(else_pred, elseAction);
 	
 	
@@ -8826,9 +8906,53 @@ operation RC!Expression createExpr():Z!Expr{
 		return self.createEnumExpr();
 	} //else
 	
+	//Fix of generator issue MM (23 Nov 2026): a literal with arguments, Shape::Circle(1.0), is a CallExp whose
+	//function is the EnumExp; translated to the constructor application (Circle 1.0) (_conapp_, printed by the
+	//templates as the application of the constructor to its arguments). Before, the generation stopped.
+	if(self.isTypeOf(RC!CallExp) and self.`function`.isTypeOf(RC!EnumExp)){
+		var cargs = Sequence{self.`function`.literal.name.createRefExpr(false,false)};
+		for(arg in self.args){
+			cargs.add(arg.createExpr());
+		}
+		return createOperatorApplExpr("_conapp_", cargs);
+	} //else
+
 	if(self.isTypeOf(RC!CallExp)){
 		"line 7080 executed".println();
 		return self.createCallExpr();
+	} //else
+
+	//Fix of generator issue LL (23 Nov 2026, branch composite-states): field access r.f (RC!Selection) is the
+	//field selection of Isabelle, printed (R.f r) by the templates (BindSelExpr) with the field name QUALIFIED
+	//by the record type (two records may have a field of the same name, NN); a record literal R(| f = e, ... |)
+	//(RC!RecordExp) is the record construction \<lparr>R.f = e, ...\<rparr> (_reclit_), the fields in the order
+	//of the declaration (Isabelle requires it). Before, both stopped the generation (createExpr returned
+	//nothing: "The 'no null' constraint is violated"), on main as well.
+	if(self.isTypeOf(RC!Selection)){
+		if(self.member.isKindOf(RC!Field)){
+			var sel = new Z!BindSelExpr;
+			sel.expr = self.receiver.createExpr();
+			sel.name = self.member.qualifiedFieldName().createZName();
+			return sel;
+		}
+		return generatorErrorMarker("unsupported_selection", self.member.name).createRefExpr(false,false);
+	} //else
+	if(self.isTypeOf(RC!RecordExp)){
+		var rargs = new Sequence;
+		for(f in self.record.fields){
+			var d = self.definitions.selectOne(x | x.field = f);
+			rargs.add(f.qualifiedFieldName().createRefExpr(false,false));
+			if(d.isDefined()){
+				rargs.add(d.value.createExpr());
+			} else {
+				rargs.add(generatorErrorMarker("missing_field", f.name).createRefExpr(false,false));
+			}
+		}
+		return createOperatorApplExpr("_reclit_", rargs);
+	} //else
+	//a string literal "abc" is the Isabelle string ''abc'' (needed with KK: strings get a default)
+	if(self.isTypeOf(RC!StringExp)){
+		return ("''" + self.value + "''").createRefExpr(false,false);
 	} //else
 	
 	if(self.isTypeOf(RC!SeqExp)){
@@ -8999,6 +9123,9 @@ operation RC!Expression rcType(): RC!Type{
 	}
 	if(self.isTypeOf(RC!LetExpression)){
 		return self.expression.rcType();
+	}
+	if(self.isTypeOf(RC!Selection) and self.member.isKindOf(RC!Field)){ //23 Nov 2026 (LL): r.f has the type of f
+		return self.member.type.resolveType();
 	}
 	if(self.isTypeOf(RC!IfExpression)){
 		return self.ifexp.rcType();
