@@ -183,6 +183,18 @@ also for toolkit functions (second guard besides AA). The guards are provisional
 2026, for the release of composite-states): as the CSP-M; the manual does not treat preconditions as guards
 (Ana and Alvaro, January 2026); removed when preconditions become definedness proof obligations. Changes the
 output of models with x = f(args) for a function with preconditions (toy models d1, d2; test model c9).
+
+22 Nov 2026, branch composite-states (Fang)
+Three issues present since the rules of the ITP 2026 paper or since 9 Oct 2026 (docs/COMPOSITE_RELEASE_TEST.md,
+Sections 11 and 13). FF: Rule 50 (vars of an if statement) no longer calls vars on a missing else (stack
+overflow for an if without else in a state action); Rule 68 (createIfStmtAsAction) gives an if without else the
+else branch Skip, as the CSP-M (before, "if b then P" without else, not parsed by Isabelle); the templates print
+" else " with spaces. GG: createFunctionDefsAsAxParas also declares the functions of imported packages that the
+model calls, transitively through the pre- and postconditions of the functions called (importedFunctionsToTranslate;
+toolkits excluded), with a warning on a name clash. II: the parameter type of a function with three or more
+parameters is one n-ary product (A x B x C), matching the flat tuple of a call; before, nested pairs ((A x B) x C)
+(printed so since 9faa957). Changes the output of models with an if without else, with calls of functions of
+imported packages, and with functions of three or more parameters.
 ******************************/
 
 
@@ -314,7 +326,8 @@ replaceRef();
 createTypeDeclPara(pkg);
 
 //to transform functions
-createFunctionDefsAsAxParas(pkg);
+//returns the warnings about name clashes of imported functions (generator issue GG, 22 Nov 2026)
+var functionNotes = createFunctionDefsAsAxParas(pkg);
 
 //to create termination channel: terminate
 var terminate_chanpara = Sequence{"terminate"}.createChannelPara("terminate_channel");
@@ -357,6 +370,20 @@ if(RC!StateMachineDef.all().size()>0){
 	"line 177, createStateMachineDefAsActionPara(stm) is run".println();
 	for(stm in RC!StateMachineDef.all()){
 		createStateMachineDefAsActionPara(stm);
+	}
+}
+
+//Generator issue GG (22 Nov 2026): the warnings of createFunctionDefsAsAxParas (name clashes of imported
+//functions) on the first action paragraph (attribute generatorNote, read by the plugin and dev-tools; printed as
+//a comment by circusM2T.egl), as no paragraph exists when the functions are declared
+if(functionNotes.size() > 0){
+	var notePara = Z!ActionPara.all().first();
+	if(notePara.isDefined()){
+		if(notePara.generatorNote.isDefined() and notePara.generatorNote <> ""){
+			notePara.generatorNote = notePara.generatorNote + " " + functionNotes.concat(" ");
+		} else {
+			notePara.generatorNote = functionNotes.concat(" ");
+		}
 	}
 }
 
@@ -650,9 +677,75 @@ operation createVarDeclfromString(var_name:String, type_name: String): Z!VarDecl
 	return varDecl;
 }
 
-operation createFunctionDefsAsAxParas(pkg:RC!RCPackage){
+//Declarations of the functions (consts in the HOL-CSP theory). The functions of pkg as before (all of them,
+//except one named card). Fix of generator issue GG (22 Nov 2026, branch composite-states; present since the
+//rules of the ITP 2026 paper): also the functions of imported packages that the model actually calls
+//(importedFunctionsToTranslate); before, a call of such a function was printed but the function was not
+//declared, and Isabelle stopped with "Extra variables on rhs". Generator convention, as W for types: names are not
+//qualified. Returns the warnings about name clashes (attached to a paragraph at the end of the main program).
+operation createFunctionDefsAsAxParas(pkg:RC!RCPackage): Sequence{
+	var notes = new Sequence;
+	var declared = new Map;
 	for(f in pkg.functions.select(f|f.name != "card")){
 		createAxParaForFunc(f);
+		declared.put(f.name, f);
+	}
+	for(f in importedFunctionsToTranslate(pkg)){
+		if(declared.containsKey(f.name)){
+			notes.add("Function " + f.name + " of package " + packageOf(f).name + " is not declared: a function of "
+				+ "the same name of package " + packageOf(declared.get(f.name)).name + " is declared, and calls of both "
+				+ "are printed with the same name (generator issue GG; names of imported functions are not qualified).");
+		} else {
+			createAxParaForFunc(f);
+			declared.put(f.name, f);
+		}
+	}
+	return notes;
+}
+
+//Generator issue GG (22 Nov 2026). The functions of other packages (not the toolkits core, set_toolkit,
+//sequence_toolkit, function_toolkit, relation_toolkit, which AA translates) that the model calls: the transitive
+//closure of the calls (CallExp of a Function) in the selected file (state machines, operations, functions),
+//continued through the preconditions and postconditions of the functions reached (and, through eAllContents, any
+//other expression a function contains). The functions of pkg are not included (they are all declared anyway), but
+//the calls in them are followed. Order: a function after the functions its contents call (dependencies first, as
+//typeDeclsToTranslate), otherwise in the order reached. A function named card is skipped, as in pkg.
+operation importedFunctionsToTranslate(pkg: RC!RCPackage): Sequence{
+	var ordered = new Sequence;
+	var started = new Set;
+	for(o in RC.allContents()){
+		if(o.isKindOf(RC!CallExp)){
+			addCalledFunction(o, pkg, ordered, started);
+		}
+	}
+	return ordered;
+}
+
+//auxiliary of importedFunctionsToTranslate: the function called by c, after the functions its contents call
+operation addCalledFunction(c: Any, pkg: RC!RCPackage, ordered: Sequence, started: Set){
+	var f = c.`function`;
+	if(not (f.isTypeOf(RC!RefExp) and f.ref.isKindOf(RC!Function))){
+		return;
+	}
+	var fn = f.ref;
+	var fp = packageOf(fn);
+	if(fp.isDefined() and toolkitPackages().includes(fp.name)){
+		return;
+	}
+	if(fp.isDefined() and fp.name = "core"){
+		return;
+	}
+	if(started.includes(fn)){
+		return;
+	}
+	started.add(fn);
+	for(x in fn.eAllContents()){
+		if(x.isKindOf(RC!CallExp)){
+			addCalledFunction(x, pkg, ordered, started);
+		}
+	}
+	if(fp <> pkg and fn.name <> "card"){
+		ordered.add(fn);
 	}
 }
 
@@ -1009,17 +1102,22 @@ operation createGenOpApplForFuncDecl(
 		refExpr.exprList.exprs.add(f.type.createTypeExpr());
 	} else if(f.parameters.size()>1){//multiple parameters, means the 1st expr for the parameter types is a Cartesian product expression
 
-		var prodExpr = Z!ProdExpr;
-		var size = f.parameters.size();
-		var i = 0;
-		prodExpr = createProdExpr(f.parameters.at(0).type.createTypeExpr(), f.parameters.at(1).type.createTypeExpr());
-		i = i + 2;
-		if(size > 2){
-			while(i<size){
-				prodExpr = createProdExpr(prodExpr,f.parameters.at(i).type.createTypeExpr());
-				i = i + 1;
-			}
-		}		
+		//Fix of generator issue II (22 Nov 2026, branch composite-states). The parameter types are ONE n-ary product
+		//(as RC!ProductType.createProdExpr), printed (A\<times>B\<times>C) by parseProdExpr, which Isabelle reads as
+		//A \<times> (B \<times> C): the type of the flat tuple (a, b, c) of a call (createCallExpr). Before, they were folded
+		//into nested pairs ((A, B), C); since 9faa957 (9 Oct 2026, which parenthesises every product so that
+		//"A\<times>B list" is no longer read as A \<times> (B list); that stays) this was printed ((A\<times>B)\<times>C) and every call of a
+		//function with three or more parameters failed with a type error (LRE: CDA); before 9faa957 the nesting
+		//was hidden but the components were not parenthesised (wrong as well for product or list components).
+		//Two parameters: unchanged. Not changed: the same fold for the parameters of operations (Rules for
+		//CALL__ channels, three places below), operation calls are not supported yet (issue R).
+		var paramTypes = new Sequence;
+		for(p in f.parameters){
+			paramTypes.add(p.type.createTypeExpr());
+		}
+		var prodExpr = new Z!ProdExpr;
+		prodExpr.exprList = new Z!ZExprList;
+		prodExpr.exprList.exprs = paramTypes;
 
 		refExpr.exprList.exprs.add(prodExpr);
 		refExpr.exprList.exprs.add(f.type.createTypeExpr());
@@ -4728,7 +4826,15 @@ operation vars(stmt: RC!Statement):Set<String>{
 	} else
 	
 	if(stmt.instanceOf(RC!IfStmt)){
-		varset = usedVariablesInExpr(stmt.expression, nc(stmt)).includingAll(vars(stmt.then)).includingAll(vars(stmt.`else`));
+		//Fix of generator issue FF (22 Nov 2026, branch composite-states; present since the rules of the ITP 2026
+		//paper). An if statement without else has stmt.else undefined; vars(undefined) was dispatched by EOL to the
+		//Rule 46 overload vars(nodeset), whose loop calls vars(n) on the undefined element again: StackOverflowError
+		//for every if without else in an entry, during or exit action (Rule 48 reaches this rule; transition
+		//actions do not). The else part is now taken only when it exists, as in createIfStmtAsAction.
+		varset = usedVariablesInExpr(stmt.expression, nc(stmt)).includingAll(vars(stmt.then));
+		if(stmt.`else`.isDefined()){
+			varset = varset.includingAll(vars(stmt.`else`));
+		}
 	} else
 	
 	if(stmt.instanceOf(RC!CommunicationStmt) and (stmt.communication._type=CommunicationType#SYNC or stmt.communication._type=CommunicationType#OUTPUT)){
@@ -7612,7 +7718,16 @@ operation RC!IfStmt createIfStmtAsAction(): Z!IfGuardedCommand{
 		
 		actions = Sequence{ifActionInContext, elseActionInContext};
 	} else {
-		actions = Sequence{ifActionInContext};
+		//Generator issue FF, second part (22 Nov 2026, branch composite-states; present since the rules of the ITP
+		//2026 paper). Without else the command had one branch and was printed "if b then P" without else, which
+		//Isabelle does not parse (transition actions as well as state actions). As RoboTool's CSP-M
+		//(CStatementGenerator.xtend 274, "else SKIP") and the meaning of "if e then s end" in RoboChart: the
+		//missing else is Skip. Same construction of the negated condition as for an else above.
+		var no_else_expr = new RC!Not;
+		no_else_expr.exp = clone(if_expr);
+		var pred_no_else = no_else_expr.createExpr().createMemPredEquality();
+		var skipActionInContext = createGuardedAction(pred_no_else, createSkipAction());
+		actions = Sequence{ifActionInContext, skipActionInContext};
 	}
 	
 	var action = createIFGuardedCommand(actions);

@@ -265,6 +265,9 @@ the repository give the history:
 
 ### 11.2 Regression with the new generator (d364c8c), the ITP invariants and the ITP scripts
 
+SUPERSEDED by Section 12: these runs omitted the declarations that belong to the ITP proof scripts and did not
+apply the ITP hand edits; with both, the running example, GasAnalysis and LRE are proved.
+
 | Example | Model | Result |
 |---|---|---|
 | TurtleBot ddlf, ag_true, ddl | as Section 3 | proved / counterexamples found (Section 3) |
@@ -367,3 +370,76 @@ EOL `type()` by `eClass().name` in RC2Z (45 uses).
   but then the variable of the interface is declared twice (DD).
 - The `Skip ;` / sequential composition after an assume (11.2) is the generator's form since the ITP rules;
   the deadlock-freedom scripts of the ITP need it moved under the assume by hand.
+
+## 12. Baseline of the ITP 2026 examples with the hand edits of the paper (22-23 Nov 2026)
+
+Read-only experiment in the scratchpad; the generated text is that of composite-states d364c8c (Trans-core
+theories); the invariants and proof scripts are those of 59b534a; library RC_HOL-CSP of AG-dev.
+
+### 12.1 Running example model
+
+`Abstract_examples/example_robot.rct` of RoboChart2Circus c0e67a0 (controller `robot_ctrl`) is NOT the model of
+`example_robot.model` (XMI): the `.rct` has machine `ObsDetect`, states `Detect`, `Stop`, `Move`, `dest` and
+`pos` of type `real`, the controller's `obs` initialised to 0; the XMI has machine `stm0`, states `detect`,
+`stop`, `move`, `dest` and `pos` of type `nat` (core type 0), no initial value. The transitions are the same.
+The ITP theory (`dest :: nat`, `NID_detect`, `internal_stm0`) follows the XMI. The regression therefore keeps
+the textual equivalent of the XMI (Section 11.1), in the variant without controller and with `dest` a constant
+of the machine (DD, JJ).
+
+### 12.2 Hand edits of the ITP theories against the generation of their time
+
+Generation of the time: running example, the ITP rules (RoboChart2Circus `Test1/` at 5e58d63) on the textual
+equivalent of the XMI; GasAnalysis, the stored `Test1/GasAnalysis/circus_gen/hol-csp_gen/HOLCSP_GasAnalysis.thy`;
+LRE, the stored `LRE_2D_coordToPair/Circus-gen/hol-csp_gen/HOLCSP_LRE_2D.thy`. Common to all three (not
+listed again): the Trans core written by hand from the full Trans (share, interrupt and the final state's
+branches removed; the generator has a Trans-core template since 8a019bf, 18 Jun 2026); the assume fallback
+`Trans_tbd` (running example) or a copy of the body (GasAnalysis, LRE) replaced by `Trans⋅n`; names without
+the container suffix; the invariants in the assumes and guarantees.
+
+| | Edit | Still needed on d364c8c? |
+|---|---|---|
+| E1 | running example, t2 (`move` to `detect`): `(... (guar ... (set_pos!(pos + 1) → Skip)))) ❙; (enter_detect → Trans⋅NID_detect)` written `... (set_pos!(pos + 1) → (enter_detect → Trans⋅NID_detect))`: the rest of the transition moved under the assume and the guarantee, `→ Skip ❙;` removed | YES: without it `deadlock_free'` leaves two goals `DFI ⊑ Trans⋅NID_move ❙; enter_detect → ...` (the fallback of the inner assume followed by the rest) and the script fails |
+| G1 | GasAnalysis, initial transition: `set_gs![]` written `set_gs![⦇c=0,i=0⦈]` | NO (proved without it) |
+| G2 | GasAnalysis, trigger `gas__in.NID_Reading?gs` written as a channel of its own `gas__in_NID_Reading?gs` (declared by hand); the ITP comment: HOL-CSP did not accept the generated form | NO: the generator prints `(gas__in NID_Reading)?gs` (curried channel, 4104fb4) and the proof goes through |
+| G3 | GasAnalysis, after the trigger: an assume `size(gs) > 0` (with `guar` on `set_gs`) added, and the rest of the transition (exit, exited, enter) moved under it | YES |
+| G4 | GasAnalysis, `anl = location(gs); turn!anl`: invariant at the read of gs, and the rest of the action and `❙; enter_Reading → ...` moved under that assume | YES |
+| G5 | GasAnalysis, final state written `terminate → Skip` | done by the Trans-core template |
+| L1 | LRE, trigger `reqVel__in.NID_OCM?reqV` written as a channel of its own `reqVel__in_NID_OCM?reqV` (declared by hand) | NO (proved without it; curried channel) |
+| L3 | LRE, `consts CDA` with the parameter type right-nested | YES on d364c8c (issue II); fixed in Section 13 |
+
+Part of the PROOF SCRIPTS, not edits of the generated text, and needed: the declarations before the lemma
+(running example `declare GlobalDet_Guard [normalisation]`; LRE `declare Det_Guard_to_GlobalDet
+[normalisation] and Guard_Det_to_GlobalDet [normalisation]`). Section 11.2 had run the scripts WITHOUT them; the
+timeouts reported there for the running example and LRE come from that omission (with E1 alone, the three
+coverage goals left for the running example made `blast+` run until the timeout), and the statement there that
+the scripts fail on the new output is withdrawn.
+
+### 12.3 Results (d364c8c, the edits marked "still needed", the ITP invariants, declarations and scripts)
+
+| Example | Edits applied | Result |
+|---|---|---|
+| TurtleBot ddlf | none | PROVED (Section 3) |
+| TurtleBot ag_true, ddl | none | counterexample found, as the baseline (Section 3) |
+| running example `Trans_enriched_ddlf` | E1 | PROVED (0:34) |
+| running example `Trans_ag_true_findcounterexample` | E1 (none needed) | counterexample found (nitpick, genuine), as the baseline |
+| GasAnalysis `Trans_stm4_core_ddlf_auto` (closest model, `Test1/GasAnalysis/GasAnalysis.rct` of c0e67a0) | G3, G4 (also proved with G1-G4) | PROVED (1:33) |
+| LRE `Trans_ddlf` (`lre_beh_complete.rct` of c0e67a0) | L3 (also proved with L1 and L3) | PROVED (1:17) |
+
+### 12.4 Differences of the new output from the ITP output, and their effect
+
+- LRE reads `reqV` once more (an outer read before the two statements of the OCM action, each of which also reads
+  it). The outer read is that of the action as a whole (Rule 62, readState of usedVariables); the ITP output
+  lacked it because it was generated from the EMF model, whose statements still referred to the interface
+  variables (RC2Z comment "rct Vs EMF (1)"). A correct change; no effect on the proof.
+- LRE reads `vel` before `pos` at the head of Trans (ITP: `pos` before `vel`). The order of the elements of a
+  generated set; no meaning; no effect on the proof.
+- GasAnalysis reads `gs` and `anl` once for the action `anl = location(gs); turn!anl` and again in each
+  statement. Already so in the ITP rules (generation of 5 Dec 2025); no effect on the proof once G4 puts the
+  invariant at the inner read.
+- Triggers are curried channels `(e__in NID_X)?x` (4104fb4, 4 Nov 2026); the ITP needed G2, L1 by hand. A
+  correct change (a fix); the hand edits are no longer needed.
+- The sequential composition after an assume (E1, G3, G4): the generator's form since the ITP rules; NOT a
+  regression. Moving it under the assume is the remaining manual step (to-do after the release: generate that
+  form, CLAUDE.md).
+- CDA (L3): issue II, a regression of 9faa957 against the (also wrong) form of the ITP rules; fixed below.
+No difference is a regression of the proofs except II.

@@ -57,6 +57,18 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
   the formal parameters, and toolkit functions got a second guard. Consequence for released output: the
   chemical detector's `anl = location(gs)` was guarded by `size(gs) > 0` with the formal `gs`, a free
   variable since variables are printed with the suffix of their container (`gs_GasAnalysis`).
+- FF. An `if` statement without `else` in an entry, during or exit action no longer stops the
+  model-to-model step with a stack overflow, and an `if` without `else` anywhere is translated with the else
+  branch `Skip`, as RoboTool's CSP-M (before, the theory contained `if b then P` without else, which Isabelle does
+  not parse). Both present since the generator of the ITP 2026 paper.
+- GG. Functions of imported packages that the model calls (directly, or through the pre- and postconditions of
+  the functions it calls) are declared in the HOL-CSP theory; before, Isabelle reported them as extra variables.
+  Toolkit functions are not affected (see AA). Names are not qualified: if a called function of an imported
+  package has the name of a function of the model's own package, only the latter is declared and a warning is
+  shown (dialog, `~/.isacircus/compile.log`, comment in the IsaCircus theory).
+- II. A function with three or more parameters gets the parameter type `(A×B×C) ⇒ R`, matching its calls
+  `f(a, b, c)`; before, the type was nested to the left (since 9 Oct 2026) or not parenthesised (before), and
+  Isabelle reported a type error at the first call.
 - Partial output. When a template fails, the theory is still written up to the last complete command,
   with `(* INCOMPLETE: ... *)` at the top and `(* GENERATOR ERROR: ... *)` and an `ML` error command at
   the end, so that Isabelle stops there; the other theories are still written. Known unsupported input is
@@ -77,17 +89,21 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
   `GENERATOR_ERROR_size_of_set`. Supported functions and their translation: `erules/toolkitFunctions.eol`.
 - Quantifiers (`exists`, `forall`) are not translated in any position; in a precondition of a function
   called as `x = f(args)` they give the guard marker `GENERATOR_ERROR_untranslated_precondition_<f>`.
-- Found while testing this release, not fixed, all present since the generator of the ITP 2026 paper and NOT
-  introduced by this release (docs/COMPOSITE_RELEASE_TEST.md, Section 11):
-  - an `if` without `else` in an entry, during or exit action stops the model-to-model step with a stack
-    overflow (FF);
-  - functions of an imported package are not declared in the HOL-CSP theory; Isabelle reports them as extra
-    variables (GG);
-  - a required interface declared in another file whose variables have no initial value stops the
-    model-to-model step ("Called feature 'name' on undefined object") (HH);
-  - a function with three or more parameters gets a parameter type that does not match its calls; Isabelle
-    reports a type error (II);
-  - a state machine without controller does not declare the constants of the interfaces it requires (JJ).
+- A required interface declared in ANOTHER FILE whose variables have no initial value stops the model-to-model
+  step ("Called feature 'name' on undefined object") (HH). Cause: the loader gives the transformation a copy of
+  the selected file in a resource of its own, so the objects of the other files are not part of the transformed
+  model and the transformation cannot ask for their types. Workarounds: give the variables an initial value, or
+  declare the interface in the same file as the state machine. Present since the dependency loading of
+  5 Nov 2026; before it, such references were not resolved at all.
+- A variable of an enumeration or record type without an initial value gets the default value `0`; Isabelle
+  reports a type error (KK). Workaround: give the variable an initial value.
+- A state machine without controller does not declare the constants of the interfaces it requires; Isabelle
+  reports them as extra variables (JJ). Workaround: declare the constant in the state machine. With a
+  controller, the variables of the interface are declared twice (controllers are not supported, DD).
+- Deadlock-freedom proofs of the Trans core (the lemma in `HOLCSP_trans_core_*.thy`): where an `assume` is
+  followed by the rest of a transition in a sequential composition, its fallback `aviol → Trans⋅n` is followed
+  by that rest, and the proof method leaves goals it cannot close. The proofs of the ITP 2026 paper moved the
+  sequential composition into the scope of the `assume` by hand (docs/COMPOSITE_RELEASE_TEST.md, Section 12).
 - Guards for preconditions are PROVISIONAL. A function applied outside its precondition makes the statement
   block, so it shows up as a DEADLOCK in the HOL-CSP (as in RoboTool's CSP-M), not as an error. The
   reference manual does not treat preconditions as guards; this will change to definedness proof

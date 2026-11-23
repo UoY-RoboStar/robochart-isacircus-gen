@@ -447,3 +447,15 @@ the generator).
   (`laila-fangyan/robochart-reference`, branch `csp-m-differences`, shown with the notes switched on), with
   the tables of declarations and of correspondence, and a note at the start of Chapter 4.
 - Status: recorded.
+
+## 18. If statement without else (22 Nov 2026)
+
+- Manual: Chapter 4 Rule 68 translates an if statement with its then and else statements; the case of a statement
+  `if e then s end` without else is not written as a rule here (not checked further against the manual's
+  grammar section).
+- CSP-M: [CStatementGenerator.xtend 272-274](https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CStatementGenerator.xtend#L272-L274):
+  `if e then (s) else SKIP` when there is no else.
+- This generator: until 22 Nov 2026 a one-branch guarded command, printed `if b then P` without else, which
+  Isabelle does not parse (and, in a state action, a stack overflow before that: generator issue FF). Since
+  22 Nov 2026 (`createIfStmtAsAction`, RC2Z.eol): the missing else is `Skip`, as the CSP-M.
+- Kind: form (now the same meaning as the CSP-M). Status: adopted (fix of issue FF, Fang's task of 22 Nov 2026).

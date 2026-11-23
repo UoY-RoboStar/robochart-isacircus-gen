@@ -559,7 +559,9 @@ operation parseActionOrMarker(a: Any, owner: Any): String{
 	else {
 		string = "(if " + guarded_actions.at(0).pred.parseMemPred() + "then " + parseActionOrMarker(guarded_actions.at(0).circusAction, guarded_actions.at(0)) ;
 		if(size = 2){
-			string = string + "else" + parseActionOrMarker(guarded_actions.at(1).circusAction, guarded_actions.at(1));
+			//" else " (22 Nov 2026, generator issue FF): with an if without else the else branch is Skip, and "elseSkip"
+			//would be one identifier; before, every else branch began with a parenthesis
+			string = string + " else " + parseActionOrMarker(guarded_actions.at(1).circusAction, guarded_actions.at(1));
 		}
 		return string + ")";
 			
