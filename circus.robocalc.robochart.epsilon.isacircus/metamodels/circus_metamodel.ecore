@@ -263,6 +263,14 @@
         containment="true"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="name" eType="#//ZName"
         containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="generatorNote" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="A warning of the generator about this paragraph, or unset. Added on 16 Nov 2026 by Fang (exit actions of the inner states of a composite state that read or write the variable of an input trigger of a transition leaving the state, docs/SEMANTICS_DIFFERENCES.md). RC2Z sets it on the paragraph Behaviour_&lt;state&gt;; the HOL-CSP and IsaCircus templates print it as a comment at the composite state, and the plugin and dev-tools report it after the model-to-model step. It does not change the meaning of the paragraph."/>
+      </eAnnotations>
+      <eAnnotations source="http://www.robocalc.circus/Circus/deviation">
+        <details key="czt" value="Deviation from CZT: CZT has no generator annotations on paragraphs. This metamodel carries one optional string on an action paragraph, so that a warning found in the model-to-model step can be printed next to the paragraph it concerns and read by the caller from the Z model; it has no meaning in Circus."/>
+      </eAnnotations>
+    </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="ChannelPara" eSuperTypes="#//Para">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -999,6 +1007,15 @@
   <eClassifiers xsi:type="ecore:EClass" name="TupleSelExpr" eSuperTypes="#//Expr1">
     <eStructuralFeatures xsi:type="ecore:EReference" name="numeral" eType="#//ZNumeral"
         containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="arity" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
+        defaultValueLiteral="0">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="Number of components of the tuple that is selected from (the arity of its product type); 0 means unknown. Added on 15 Nov 2026 by Fang (generator issue Y). Needed because the HOL-CSP and IsaCircus templates print the projection of an n-tuple as a combination of fst and snd on right-nested pairs, which depends on n: component k is fst (snd^(k-1) t) for k &lt; n and snd^(n-1) t for k = n. RC2Z sets it where it creates the selection; when it is 0 the templates print as before."/>
+      </eAnnotations>
+      <eAnnotations source="http://www.robocalc.circus/Circus/deviation">
+        <details key="czt" value="Deviation from CZT: in CZT a TupleSelExpr has only the expression and the numeral; the arity of the tuple is in its product type (ProdExpr / ProdType). This metamodel carries it on the selection as well, because the templates print expressions without type information and RC2Z already knows the RoboChart product type at the point where it creates the selection."/>
+      </eAnnotations>
+    </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="Expr2" abstract="true" eSuperTypes="#//Expr">
     <eStructuralFeatures xsi:type="ecore:EReference" name="leftExpr" eType="#//Expr"

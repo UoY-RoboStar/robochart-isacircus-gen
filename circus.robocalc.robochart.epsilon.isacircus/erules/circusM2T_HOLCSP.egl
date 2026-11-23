@@ -1,7 +1,61 @@
 [*14052025
 parseIfGuardedCommand udpated to (1) process assumption-guarantee (2) properly parse nested IFStmt
 *]
-theory HOLCSP_[%=baseName%]_[%=ts%]
+[*16 Nov 2026, branch composite-states (Fang). A warning of RC2Z about a paragraph (attribute generatorNote
+of ActionPara; at present only the name clash of GG, on the first action paragraph; the exit-action check
+of composite states that set it on Behaviour_<state> was removed on 23 Nov 2026) is printed as the comment
+(* GENERATOR WARNING: ... *) by
+generatorNoteComment of generatorErrors.eol: in circusM2T_HOLCSP.egl before the paragraphs of the composite
+state, in circusM2T.egl before the paragraph. circusM2T_HOLCSP_trans_core.egl prints no node paragraphs.
+*]
+[*16 Nov 2026, branch m2t-partial-output (Fang). Generator convention, not a rule of the manual: an action
+that is missing in the Z model is printed as the marker GENERATOR_ERROR_missing_action_<paragraph>
+(parseActionOrMarker, missingActionMarker of generatorErrors.eol, imported with the other shared modules)
+instead of stopping with "Called method 'parseAction' on undefined object"; Isabelle stops at the command
+that contains the marker and names it. Found with test model c7 (controller with an operation: the memory
+paragraph of the controller has an external choice without left action). Any other exception of the
+template is caught by the plugin and dev-tools (PartialOutput.java), which write the text generated so far
+with INCOMPLETE at the beginning and GENERATOR ERROR at the end. Shared by circusM2T.egl,
+circusM2T_HOLCSP.egl and circusM2T_HOLCSP_trans_core.egl.
+*]
+[*16 Nov 2026, branch composite-states (Fang). Generator issue AA: calls of toolkit functions (qualified
+names <package>_<function> from RC2Z) and the guards for their preconditions (pre_<package>_<function>) are
+printed by toolkitFunctionTable of toolkitFunctions.eol (imported at the first line), shared by
+circusM2T.egl, circusM2T_HOLCSP.egl and circusM2T_HOLCSP_trans_core.egl.
+*]
+[*15 Nov 2026, branch composite-states (Fang). Generator issue Y: tuple selections are printed by the
+shared operation tupleSelString of tupleSelection.eol (imported at the theory line), from the numeral and
+the new attribute arity of TupleSelExpr; with arity 0 (unknown) as before. Shared by circusM2T.egl,
+circusM2T_HOLCSP.egl and circusM2T_HOLCSP_trans_core.egl.
+*]
+[*15 Nov 2026, branch datatype-plugins-threshold, merged into composite-states (Fang). Threshold 80 decided by
+Fang on 15 Nov 2026 (first written as an experiment).
+Generator convention, not a rule of the manual: CHAN_EVENT_PLUGIN_THRESHOLD (at the theory line) is the
+largest number of constructors of chan_event for which the datatype is printed with all plugins. Above it
+the plugins code, transfer and the five quickcheck plugins are switched off for chan_event only, and a
+comment saying so is printed before the datatype. Measured on the 117 constructors of the full
+Adaptation_Plan: with all plugins the definition did not finish (more than 10 GB); without these 1:04.
+All models up to now have at most 72 constructors and are printed as before. The proofs use only
+chan_event.distinct and chan_event.inject, which remain.
+*]
+[*14-15 Nov 2026, branch trigger-fqn-naming (Fang)
+Generator conventions for printing the HOL-CSP theory, not rules of the manual:
+(1) the type of the parameter n of a Trans / Transc paragraph is printed from its declaration (paramType);
+    the single variable NID_name is removed (one NIDS type per node container);
+(2) the paragraphs of a node are selected by exact match <kind>_<node FQN> (isParaOfNode) instead of
+    name.contains(nd);
+(3) the event of a trigger channel <e>_<FQN of the container>__in (RC2Z.eol, triggerChan) is found from the
+    declaration of the channel (triggerChanBases, eventBase), for the filter of issue P.
+*]
+[*15 Nov 2026, branch composite-states (Fang)
+Composite states (RC2Z.eol, Rules 52 and 60). Generator conventions for printing, not rules of the manual:
+(1) the action paragraphs are printed container by container, innermost first (containerDepth), because the
+    node of a composite state refers to ncBehaviour of its inner level (Rule 40 with the state as container);
+(2) RunEntered, During and Behaviour of a composite state are printed as separate fixrecs before the fixrec
+    of the node (isCompositePart), so that fixrec has no continuity obligation for Behaviour;
+(3) interleaving is printed as ||| (the notation of HOL-CSP).
+*]
+[%import "tupleSelection.eol";%][%import "toolkitFunctions.eol";%][%import "generatorErrors.eol";%][%var CHAN_EVENT_PLUGIN_THRESHOLD = 80;%]theory HOLCSP_[%=baseName%]_[%=ts%]
 	imports "RC_HOL-CSP.RoboChart_Library" HOL.Real
 begin
 
@@ -16,31 +70,35 @@ if(givenParas.size()>0){
 type_synonym [%=gp.nameList.names.at(0).word%] = nat
 [%} }%]
 
+[*23 Nov 2026 (generator issue NN): record field names and the names of datatype constructors (enumeration
+  literals, node identifiers) are printed quoted ("value" :: "int"), since a name that is an Isabelle keyword, e.g.
+  value or where, cannot be written bare there; the variables of the definitions written by the templates are x__a, y__a
+  (discrete_cpo), n__id (parameter of Trans), b__a, Q__a, P__a (assume, guar); RC2Z.eol names the parameter of
+  the Memory processes value__v. Before: x, y, n, b, Q, P, value, which a record field, an enumeration literal or a
+  function of the model with the same name captured (a constant, not a variable). Names ending in _ are not
+  allowed by Isabelle ("Bad name"), hence the letters after __.*]
 [*enumType declaration*]
 [%
 var freeparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!FreePara));
 
-//var NID_name is to record the name of the node id type of the stm.
-var NID_name = new String;
+//The type of node identifiers of a Trans paragraph is printed from its own parameter declaration (paramType),
+//not from a single variable NID_name: with composite states there is one NIDS type per node container.
 for(freepara in freeparas){
 	var enumType = freepara.freetypeList.freeTypes.at(0);
 //	var chans = chandecl.channelNameList.names;
-	if (enumType.name.word.startsWith("NIDS_")){
-	NID_name = enumType.name.word;
-	}
 	%]
 	
 	
 datatype [%=enumType.name.word%] = 
 	[%for(bran in enumType.branchList.branches){%]
-	[%=bran.name.word%] [%if(hasMore){%] | 
+	"[%=bran.name.word%]"[%=bran.branchArgs()%] [%if(hasMore){%] | 
  [%}}%]
  
 instantiation [%=enumType.name.word%] :: discrete_cpo
 begin
 
 definition below_[%=enumType.name.word%]_def:
-  "(x::[%=enumType.name.word%]) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::[%=enumType.name.word%]) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance proof
 qed (rule below_[%=enumType.name.word%]_def)
@@ -54,7 +112,7 @@ instantiation int :: discrete_cpo
 begin
 
 definition below_int_def [simp]:
-  "(x::int) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::int) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -64,7 +122,7 @@ instantiation nat :: discrete_cpo
 begin
 
 definition below_nat_def [simp]:
-  "(x::nat) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::nat) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -74,7 +132,7 @@ instantiation bool :: discrete_cpo
 begin
 
 definition below_bool_def [simp]:
-  "(x::bool) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::bool) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -84,7 +142,19 @@ instantiation real :: discrete_cpo
 begin
 
 definition below_real_def [simp]:
-  "(x::real) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::real) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
+
+instance
+  by standard (simp)
+end
+
+[*23 Nov 2026 (generator issue KK): char, so that string = char list (HOLCF-Library.List_Cpo) can be the parameter
+  type of a Memory fixrec (a variable of type string; its default value is the empty string).*]
+instantiation char :: discrete_cpo
+begin
+
+definition below_char_def [simp]:
+  "(x__a::char) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -98,7 +168,7 @@ if(axParas.select(p|p.box = Z!Box#SchBox).size()>0){
 	for(ap in axParas.select(p|p.box = Z!Box#SchBox)){%]
 record [%=ap.zSchText.declList.decls.at(0).name.word%] =
 [%for(vardecl in ap.zSchText.declList.decls.at(0).expr.schText.declList.decls){%]
-	[%=vardecl.nameList.names.at(0).word%] :: "[%=vardecl.expr.parseExpr()%]"
+	"[%=vardecl.nameList.names.at(0).word%]" :: "[%=vardecl.expr.parseExpr()%]"
 [%}%]
 
 [*Issue K' (5 Nov 2026): discrete cpo instance for the record type constructor 'a R_ext (R = unit R_ext), needed
@@ -108,7 +178,7 @@ instantiation [%=ap.zSchText.declList.decls.at(0).name.word%]_ext :: (type) disc
 begin
 
 definition below_[%=ap.zSchText.declList.decls.at(0).name.word%]_ext_def [simp]:
-  "(x::'a [%=ap.zSchText.declList.decls.at(0).name.word%]_ext) \<sqsubseteq> y \<longleftrightarrow> x = y"
+  "(x__a::'a [%=ap.zSchText.declList.decls.at(0).name.word%]_ext) \<sqsubseteq> y__a \<longleftrightarrow> x__a = y__a"
 
 instance
   by standard (simp)
@@ -132,10 +202,13 @@ consts [%=ap.zSchText.declList.decls.at(0).nameList.names.at(0).word%] :: "[%=ap
 [%}%]
 
 \<comment> \<open>Channel Declaration\<close>
-datatype chan_event  = 
+[%var channelparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara));
+var nChanEventCons = 1;
+for(cp in channelparas){ for(d in cp.declList.decls){ nChanEventCons = nChanEventCons + d.keptChans().size(); } }
+var chanEventPluginsOff = nChanEventCons > CHAN_EVENT_PLUGIN_THRESHOLD;%][%if(chanEventPluginsOff){%]\<comment> \<open>chan_event has [%=nChanEventCons%] constructors, more than the threshold [%=CHAN_EVENT_PLUGIN_THRESHOLD%] of the generator: the datatype plugins code, transfer and quickcheck (quickcheck_random, quickcheck_exhaustive, quickcheck_bounded_forall, quickcheck_full_exhaustive, quickcheck_narrowing) are switched off, because with them the definition of the datatype exhausts the memory. Therefore quickcheck on goals over values of chan_event and code generation for chan_event are not available.\<close>
+[%}%]datatype [%if(chanEventPluginsOff){%](plugins del: code transfer quickcheck_random quickcheck_exhaustive quickcheck_bounded_forall quickcheck_full_exhaustive quickcheck_narrowing) [%}%]chan_event  = 
 "share"|
 [%z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara)).println();
-var channelparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara));
 
 for(chanpara in channelparas.select(cp|cp.declList.decls.exists(d|d.keptChans().size()>0))){%]
 \<comment> \<open>[%=chanpara.name.word%]\<close>
@@ -161,8 +234,8 @@ for(chansetpara in channelsetparas){
 definition [%= chansetpara.name.word%] :: "chan_event set" where "[%= chansetpara.name.word%] = [%=chansetpara.channelSet.expr.parseExpr()%]"
 [%}%]
       
-abbreviation "assume b Q P \<equiv> (if b then P else aviol \<rightarrow> Q)"
-abbreviation "guar b P \<equiv> (if b then P else gviol \<rightarrow> STOP)"
+abbreviation "assume b__a Q__a P__a \<equiv> (if b__a then P__a else aviol \<rightarrow> Q__a)"
+abbreviation "guar b__a P__a \<equiv> (if b__a then P__a else gviol \<rightarrow> STOP)"
 abbreviation "SSTOP \<equiv> SSTOP_aux share"  
 
           
@@ -182,7 +255,7 @@ actions  is "(mychan, unit) action" where
 
 \<comment> \<open>Main action of the process\<close>
 [%if(procpara.circusProcess.instanceOf(Z!BasicProcess)){%]
-definition "ProcDef = cProcess [%= procpara.circusProcess.mainAction.parseAction()%]"
+definition "ProcDef = cProcess [%= parseActionOrMarker(procpara.circusProcess.mainAction, procpara.circusProcess)%]"
 	[%} else {%]
 definition "ProcDef = cProcess [%= procpara.name.word%].ProcDef"
 	[%}%]
@@ -198,35 +271,85 @@ locale actions
 begin
 [*Trans*]
 [%for(actpara in actparas.select(ap|ap.name.word.startsWith("Trans_"))){%]
-fixrec [%= actpara.name.word%] :: "[%=NID_name%] \<rightarrow> chan_event process"
+fixrec [%= actpara.name.word%] :: "[%=actpara.paramType()%] \<rightarrow> chan_event process"
 where
-[simp del] :\<open>[%= actpara.name.word%]\<cdot>n = 
-	[%=actpara.circusAction.parseAction()%] \<close>
+[simp del] :\<open>[%= actpara.name.word%]\<cdot>n__id = 
+	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close>
 [%}%]
 
-[%//to collect the nodes into nodeSet
-var nodeSet = new Set<String>;
-for(actpara in actparas.select(ap|ap.name.word.startsWith("Inactive_") 
-or ap.name.word.startsWith("InactiveJct_")
-or ap.name.word.startsWith("InactiveFn_"))){
-	var namestring = actpara.name.word;
-	var node = namestring.substring(namestring.indexOf("_") + 1);
-    nodeSet.add(node);
+[%//Generator convention, not a rule of the manual (15 Nov 2026): the order in which the paragraphs of
+//Rules 40, 41, 52 and 56 to 60 are printed. Isabelle needs a constant to be defined before it is used.
+//Node containers and their nodes, from the NIDS free types: NIDS_<container FQN> has one constructor
+//NID_<node FQN> per node of the container. A composite state is a node of its container and a container
+//itself. The paragraphs are printed container by container, innermost first, because the node of a
+//composite state refers to the behaviour of its inner level (ncBehaviour_<state>).
+var nidsMap = new Map;
+var containerOrder = new Sequence;
+for(freepara in freeparas){
+	var ft = freepara.freetypeList.freeTypes.at(0);
+	if(ft.name.word.startsWith("NIDS_")){
+		var nodes = new Sequence;
+		for(bran in ft.branchList.branches){
+			nodes.add(bran.name.word.substring(4));
+		}
+		nidsMap.put(ft.name.word.substring(5), nodes);
+		containerOrder.add(ft.name.word.substring(5));
+	}
 }
-("line 175: nodeSet = " + nodeSet).println();%]
+var containersInnermostFirst = containerOrder.sortBy(c | 0 - c.containerDepth(nidsMap));
+//the paragraphs of the inner levels, printed after the nodes of their container
+var innerParaNames = new Set;
+for(c in containerOrder.select(c | c.containerDepth(nidsMap) > 0)){
+	innerParaNames.add("composeNodes_" + c);
+	innerParaNames.add("ncCoreBehaviour_" + c);
+	innerParaNames.add("ncBehaviour_" + c);
+}%]
 
 [*nodes*]
-[%for(nd in nodeSet){%]
+[%for(cont in containersInnermostFirst){%]
+[%for(nd in nidsMap.get(cont)){%]
+[%if(nidsMap.containsKey(nd)){
+	//16 Nov 2026: a warning of RC2Z about this composite state (generatorNote of Behaviour_<state>,
+	//generatorErrors.eol), printed as a comment before its paragraphs. No RC2Z rule sets it since the
+	//exit-action check was removed (23 Nov 2026); kept for warnings about composite states.
+	for(np in actparas.select(ap|ap.name.word = "Behaviour_" + nd)){
+		out.print(generatorNoteComment(np));
+	}
+	//composite state: RunEntered, During and Behaviour are not recursive with the frame of the node; they are
+	//printed before it, each on its own, so that fixrec has no continuity obligation for the hiding, the
+	//renamings and the parallel composition of Behaviour
+	for(kind in Sequence{"RunEntered_", "During_", "Behaviour_"}){
+		for(actpara in actparas.select(ap|ap.name.word = kind + nd)){%]
+
+fixrec [%= actpara.name.word%] :: "chan_event process"
+where 
+[simp del] :\<open>[%= actpara.name.word%] = 
+	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close> 
+[%		}
+	}
+}%]
 fixrec
-	[%for(actpara_nd in actparas.select(ap|ap.name.word.contains(nd))){%]
+	[%for(actpara_nd in actparas.select(ap|ap.name.word.isParaOfNode(nd) and not ap.name.word.isCompositePart(nd, nidsMap))){%]
 [%= actpara_nd.name.word%] :: "chan_event process"[%if(hasMore){%] and [%}%]	
 	[%}%]
 where
-	[%for(actpara_nd in actparas.select(ap|ap.name.word.contains(nd))){%]
+	[%for(actpara_nd in actparas.select(ap|ap.name.word.isParaOfNode(nd) and not ap.name.word.isCompositePart(nd, nidsMap))){%]
 [simp del] :\<open>[%= actpara_nd.name.word%] = 
-	[%=actpara_nd.circusAction.parseAction()%] \<close> [%if(hasMore){%] | [%}%]
+	[%=parseActionOrMarker(actpara_nd.circusAction, actpara_nd)%] \<close> [%if(hasMore){%] | [%}%]
 	
 	[%}%]	
+[%}%]
+[%if(cont.containerDepth(nidsMap) > 0){
+	for(kind in Sequence{"composeNodes_", "ncCoreBehaviour_", "ncBehaviour_"}){
+		for(actpara in actparas.select(ap|ap.name.word = kind + cont)){%]
+
+fixrec [%= actpara.name.word%] :: "chan_event process"
+where 
+[simp del] :\<open>[%= actpara.name.word%] = 
+	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close> 
+[%		}
+	}
+}%]
 [%}%]
 
 
@@ -244,12 +367,14 @@ or ap.name.word.startsWith("Entering_")
 or ap.name.word.startsWith("Interrupted_")
 or ap.name.word.startsWith("Trans_") 
 or ap.name.word.startsWith("Transc_") 
+or ap.name.word.startsWith("RunEntered_")
+or innerParaNames.includes(ap.name.word)
 ))){%]
 
 fixrec [%= actpara.name.word%] :: "[%= actpara.actionWithSig()%]chan_event process"
 where 
 [simp del] :\<open>[%= actpara.nameWithSig()%] = 
-	[%=actpara.circusAction.parseAction()%] \<close> 
+	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close> 
 [%}%]
 
 [*end of locale actions; the end below closes the theory (issue M: before, only one end was printed)*]
@@ -266,7 +391,14 @@ end
 	if(self.circusAction.instanceOf(Z!ParamAction)){
 		for(decl in self.circusAction.declList.decls){
 			for(n in decl.nameList.names){
-				str = str + decl.expr.parseExpr() + "\\<rightarrow>";
+				//a function type A \<Rightarrow> B is parenthesised: \<Rightarrow> binds weaker than the continuous function
+				//space \<rightarrow>, so "int \<Rightarrow> int\<rightarrow>chan_event process" would be int \<Rightarrow> (int \<rightarrow> ...)
+				//(23 Nov 2026, with KK: a variable of a function type)
+				var pt = decl.expr.parseExpr();
+				if(decl.expr.isTypeOf(Z!RefExpr) and decl.expr.name.word = "_->_"){
+					pt = "(" + pt + ")";
+				}
+				str = str + pt + "\\<rightarrow>";
 			}
 		}
 	}
@@ -330,7 +462,7 @@ end
 		("line 177, actpara = " + actpara.name).println();
 		
 		("line 177, actpara.circusAction = " + actpara.circusAction).println();
-		str = str + "\"" + actpara.nameWithSig() + " = " + actpara.circusAction.parseAction() + "\"";
+		str = str + "\"" + actpara.nameWithSig() + " = " + parseActionOrMarker(actpara.circusAction, actpara) + "\"";
 		if(hasMore){
 
 			str = str +  " | "  + "\r\n" + "\r\n";
@@ -355,7 +487,14 @@ end
 }%]
 
 
-[%operation Z!CircusAction parseAction(){
+[%//16 Nov 2026 (generatorErrors.eol): the action a, or the marker GENERATOR_ERROR_missing_action_<paragraph>
+//if a is missing; owner is the element that should contain a (for the name of the enclosing paragraph).
+operation parseActionOrMarker(a: Any, owner: Any): String{
+	if(a.isUndefined()){
+		return missingActionMarker(owner);
+	}
+	return a.parseAction();
+}%][%operation Z!CircusAction parseAction(){
 	if(self.instanceOf(Z!PrefixingAction)){
 		return self.parsePrefixingAction();
 	} //else
@@ -427,10 +566,10 @@ end
 	   if(guarded_actions.at(1).circusAction.communication.channelExpr.name.word = "aviol"){
 	   		// assume inv Trans(n) (...)
 	   		//guarded_actions.at(0).pred = TruePred, so print out True directly instead of parsePred
-	   		return "(assume True (" + guarded_actions.at(1).circusAction.circusAction.parseAction() + ") " + guarded_actions.at(0).circusAction.parseAction() + ")";
+	   		return "(assume True (" + parseActionOrMarker(guarded_actions.at(1).circusAction.circusAction, guarded_actions.at(1).circusAction) + ") " + parseActionOrMarker(guarded_actions.at(0).circusAction, guarded_actions.at(0)) + ")";
 	   } else if(guarded_actions.at(1).circusAction.communication.channelExpr.name.word = "gviol"){
 	   		// guar inv (set_v!3 -> Skip)
-	   		return "(guar True " + guarded_actions.at(0).circusAction.parseAction() + ")";
+	   		return "(guar True " + parseActionOrMarker(guarded_actions.at(0).circusAction, guarded_actions.at(0)) + ")";
 	   }
 	} 
 	
@@ -446,9 +585,11 @@ end
 //        action if true then a else (if bl then b else c end) end, or
 //        action if true then if bl then b else c end  end }
 	else {
-		string = "(if " + guarded_actions.at(0).pred.parseMemPred() + "then " + guarded_actions.at(0).circusAction.parseAction() ;
+		string = "(if " + guarded_actions.at(0).pred.parseMemPred() + "then " + parseActionOrMarker(guarded_actions.at(0).circusAction, guarded_actions.at(0)) ;
 		if(size = 2){
-			string = string + "else" + guarded_actions.at(1).circusAction.parseAction();
+			//" else " (22 Nov 2026, generator issue FF): with an if without else the else branch is Skip, and "elseSkip"
+			//would be one identifier; before, every else branch began with a parenthesis
+			string = string + " else " + parseActionOrMarker(guarded_actions.at(1).circusAction, guarded_actions.at(1));
 		}
 		return string + ")";
 			
@@ -458,15 +599,15 @@ end
 
 
 [%operation Z!PrefixingAction parsePrefixingAction(): String{
-	return  "(" + self.communication.parseCommu() + " \\<rightarrow> " + self.circusAction.parseAction() + ")";
+	return  "(" + self.communication.parseCommu() + " \\<rightarrow> " + parseActionOrMarker(self.circusAction, self) + ")";
 }%]
 
 [%operation Z!InterruptAction parseInterruptAction(): String{
-	return  "(" + self.leftAction.parseAction() + " \\<triangle> " + self.rightAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.leftAction, self) + " \\<triangle> " + parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 [%operation Z!ExtChoiceAction parseExtChoiceAction(): String{
-	return  "(" + self.leftAction.parseAction() + "\r\n" + "		\\<box>" + "\r\n" + "		" + self.rightAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.leftAction, self) + "\r\n" + "		\\<box>" + "\r\n" + "		" + parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 
@@ -479,16 +620,16 @@ end
 }%]
 
 [%operation Z!SeqAction parseSeqAction(): String{
-	return  "(" + self.leftAction.parseAction() + "\\<^bold>;  " + self.rightAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.leftAction, self) + "\\<^bold>;  " + parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 [%operation Z!SeqActionIte parseSeqActionIte(): String{
-	return  "( \\<^bold>; "  +  self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet>  " + self.circusAction.parseAction() + " )";
+	return  "( \\<^bold>; "  +  self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet>  " + parseActionOrMarker(self.circusAction, self) + " )";
 }%]
 
 [%operation Z!GuardedAction parseGuardedAction(): String{
 
-	return  "(" + self.pred.parseMemPred() + " \\<^bold>& " + "(" + self.circusAction.parseAction() + ")" + ")";
+	return  "(" + self.pred.parseMemPred() + " \\<^bold>& " + "(" + parseActionOrMarker(self.circusAction, self) + ")" + ")";
 	//The type of self.pred is MemPred, so self.pred.parse() points to "operation Z!MemPred parseMemPred()"
 }%]
 
@@ -499,7 +640,7 @@ end
 
 [%operation Z!HideAction parseHideAction(): String{
 	//space after \ : the channel set may be a name (e.g. enteredSS_in_stmbd_<stm>), not only {...} or (...)
-	return  "(" + self.circusAction.parseAction() + " \\ " + self.channelSet.parseChannelSet() + ")";
+	return  "(" + parseActionOrMarker(self.circusAction, self) + " \\ " + self.channelSet.parseChannelSet() + ")";
 }%]
 
 [*
@@ -519,41 +660,43 @@ end
 		}
 	}
 
-	return  "\"" + param + " \\<zspot> " + self.circusAction.parseAction() + ")";
+	return  "\"" + param + " \\<zspot> " + parseActionOrMarker(self.circusAction, self) + ")";
 }%]
 *]
 
 [%operation Z!ParamAction parseParamAction(): String{
 	
-	return  "(" + self.circusAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.circusAction, self) + ")";
 }%]
 
 [%operation Z!ParallelAction parseParallelAction(): String{
-	return  "(" + self.leftAction.parseAction() + "\r\n" + "		\\<lbrakk> " + self.channelSet.parseChannelSet() + " \\<rbrakk> " + "\r\n" + "		" + self.rightAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.leftAction, self) + "\r\n" + "		\\<lbrakk> " + self.channelSet.parseChannelSet() + " \\<rbrakk> " + "\r\n" + "		" + parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 
 [%operation Z!ParallelActionIte parseParallelActionIte(): String{
-	return  "(" + " \\<lbrakk> " + self.channelSet.parseChannelSet() + " \\<rbrakk> " + self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet> " + self.circusAction.parseAction() + ")";
+	return  "(" + " \\<lbrakk> " + self.channelSet.parseChannelSet() + " \\<rbrakk> " + self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet> " + parseActionOrMarker(self.circusAction, self) + ")";
 }%]
 [*suppose there is only one parameter for iteration*]
 
 
 [%operation Z!InterleaveActionIte parseInterleaveActionIte(): String{
-	return  "( \\<interleave> "  +  self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet>  " + self.circusAction.parseAction() + " )";
+	return  "( \\<interleave> "  +  self.declList.decls.at(0).parseVarDeclInIteAct() + " \\<bullet>  " + parseActionOrMarker(self.circusAction, self) + " )";
 }%]
 [*suppose there is only one parameter for iteration*]
 
 [%operation Z!InterleaveAction parseInterleaveAction(): String{
-	return  "(" + self.leftAction.parseAction() + " \\<interleave> " +	self.rightAction.parseAction() + ")";
+	//Rule 60 (During) is the first rule that produces an interleaving of actions. 15 Nov 2026:
+	//HOL-CSP writes interleaving P ||| Q (Inter_syntax in Synchronization_Product.thy); \<interleave> is not its notation
+	return  "(" + parseActionOrMarker(self.leftAction, self) + " ||| " +	parseActionOrMarker(self.rightAction, self) + ")";
 }%]
 
 
 [%operation Z!RenameAction parseRenameAction(): String{
 	if(self.assignmentPairs.isDefined() and self.assignmentPairs.hasRenamePairs()){
-	return  "(" + self.circusAction.parseAction() + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenaming() + "\\<rbrakk>\\<rbrakk>)";}
+	return  "(" + parseActionOrMarker(self.circusAction, self) + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenaming() + "\\<rbrakk>\\<rbrakk>)";}
 	else {
-	return  "(" + self.circusAction.parseAction() + ")";
+	return  "(" + parseActionOrMarker(self.circusAction, self) + ")";
 	}
 }%]
 
@@ -713,7 +856,80 @@ operation usedEventBases(): Set{
 	}
 	return used;
 }%]
+[*Generator convention, not a rule of the manual (14 Nov 2026).
+  Trigger channels are named <e>_<FQN of the node container>__in (RC2Z.eol, triggerChan). The event e of such a
+  channel cannot be found from the name alone (with nested containers both S_M_P and M_P are suffixes), so it is
+  computed from the declaration: the channel is typed with NIDS_<FQN of the container>.*]
+[%operation Z!ChannelDecl nidsContainer(): String{
+	var t = null;
+	if(self.expr.isNidsProduct()){
+		t = self.expr.exprList.exprs.at(0).parseExpr();
+	} else if(self.expr.isTypeOf(Z!RefExpr)){
+		t = self.expr.parseExpr();
+	}
+	if(t.isDefined() and t.startsWith("NIDS_")){
+		return t.substring(5);
+	}
+	return null;
+}%]
+[%@cached
+operation triggerChanBases(): Map{
+	var m = new Map;
+	for(d in Z!ChannelDecl.all()){
+		var fq = d.nidsContainer();
+		if(fq.isDefined()){
+			var suffix = "_" + fq + "__in";
+			for(c in d.channelNameList.names){
+				if(c.word.endsWith(suffix)){
+					m.put(c.word, c.word.substring(0, c.word.length() - suffix.length()));
+				}
+			}
+		}
+	}
+	return m;
+}%]
+[*Generator convention, not a rule of the manual (14 Nov 2026): Trans is parameterised by the current node
+  (Rule 53, modified), and its fixrec needs the type of that parameter.
+  The type of the parameter n of a Trans / Transc paragraph, from its declaration (n : NIDS_<FQN of the container>).*]
+[%operation Z!ActionPara paramType(): String{
+	return self.circusAction.declList.decls.at(0).expr.parseExpr();
+}%]
+[*Generator convention, not a rule of the manual (14 Nov 2026): the paragraphs of one node (Rules 56 to 60)
+  are mutually recursive and are printed as one fixrec.
+  The paragraphs of the node with FQN nd: exactly <kind>_<nd> for the kinds of node paragraphs. Before
+  14 Nov 2026 the test was name.contains(nd), which also selected the paragraphs of a node whose name ends with
+  the name of another node (Inactive_LongWait_M_P contains Wait_M_P), and would select everything inside a
+  composite state.*]
+[*Generator convention, not a rule of the manual (15 Nov 2026).
+  Depth of a node container: 0 for the machine, 1 for a composite state of the machine, ... A container is a
+  node of its parent container (its FQN is a constructor of the parent's NIDS type).*]
+[%operation String containerDepth(nidsMap: Map): Integer{
+	for(p in nidsMap.keySet()){
+		if(nidsMap.get(p).includes(self)){
+			return 1 + p.containerDepth(nidsMap);
+		}
+	}
+	return 0;
+}%]
+[*Generator convention, not a rule of the manual (15 Nov 2026): Rule 60 gives Behaviour and During as
+  paragraphs of the node; they are not recursive with its frame.
+  Behaviour_<nd> and During_<nd> of a composite state nd are printed apart from the fixrec group of the node.*]
+[%operation String isCompositePart(nd: String, nidsMap: Map): Boolean{
+	return nidsMap.containsKey(nd) and (self = "Behaviour_" + nd or self = "During_" + nd);
+}%]
+[%operation String isParaOfNode(nd: String): Boolean{
+	for(k in Sequence{"Inactive_", "InactiveJct_", "InactiveFn_", "Activation_", "Termination_", "Active_",
+			"Behaviour_", "During_", "Exiting_", "Entering_", "Interrupted_"}){
+		if(self = k + nd){
+			return true;
+		}
+	}
+	return false;
+}%]
 [%operation String eventBase(): String{
+	if(triggerChanBases().containsKey(self)){
+		return triggerChanBases().get(self);
+	}
 	if(self.endsWith("__in")){
 		return self.substring(0, self.length() - 4);
 	}
@@ -1058,6 +1274,19 @@ operation channelArities(): Map{
 		return self.parseRecordUpdate();
 	} //else
 
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_reclit_"){
+		return self.parseRecordLiteral();
+	} //else
+
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_conapp_"){
+		return self.parseConstructorApp();
+	} //else
+
+	//the default value of a variable of a function type A -> B: the constant function (KK, 23 Nov 2026)
+	if(self.isTypeOf(Z!ApplExpr) and self.leftExpr.name.word = "_constfun_"){
+		return "(\\<lambda>_. " + self.rightExpr.exprList.exprs.at(0).parseExpr() + ")";
+	} //else
+
 	if(self.isTypeOf(Z!ApplExpr) and self.mixFix = false){
 		if(self.rightExpr.isTypeOf(Z!TupleExpr)){//this is a RC!CallExpr, arguments are always a TupleExpr
 			return self.parseApplExprAsCallExpr();}
@@ -1167,6 +1396,14 @@ operation channelArities(): Map{
 
 
 [%operation Z!ApplExpr parseApplExprAsCallExpr(): String{
+	//A call of a toolkit function (16 Nov 2026, generator issue AA): RC2Z writes it with the qualified name
+	//<package>_<function>, and also the guards pre_<package>_<function>; printed by toolkitFunctionTable
+	//(toolkitFunctions.eol, shared by circusM2T.egl, circusM2T_HOLCSP.egl, circusM2T_HOLCSP_trans_core.egl).
+	if(self.leftExpr.isTypeOf(Z!RefExpr) and toolkitFunctionTable().containsKey(self.leftExpr.parseExpr())){
+		var tkArgs = new Sequence;
+		for(a in self.rightExpr.exprList.exprs){ tkArgs.add(a.parseExpr()); }
+		return toolkitCallString(self.leftExpr.parseExpr(), tkArgs);
+	}
 	var call_str : String;
 
 	call_str = self.leftExpr.parseExpr() + "(";
@@ -1222,6 +1459,46 @@ operation channelArities(): Map{
 	return "(" + es.at(0).parseExpr() + "\\<lparr>" + es.at(1).parseExpr() + " := " + es.at(2).parseExpr() + "\\<rparr>)";
 }%]
 
+[*R(| f = e, ... |), and the default value of a record:  \<lparr>R.f = e, ...\<rparr>, the fields qualified by the
+  record and in the order of its declaration (23 Nov 2026, generator issues LL and KK; RC2Z.eol _reclit_)*]
+[%operation Z!ApplExpr parseRecordLiteral(): String{
+	var es = self.rightExpr.exprList.exprs;
+	var parts = new Sequence;
+	var i = 0;
+	while(i + 1 < es.size()){
+		parts.add(es.at(i).parseExpr() + " = " + es.at(i + 1).parseExpr());
+		i = i + 2;
+	}
+	return "\\<lparr>" + parts.concat(", ") + "\\<rparr>";
+}%]
+
+[*E::L(a, b), and the default value of an enumeration whose first literal has parameters:  (L (a) (b)), the
+  application of the datatype constructor to its arguments (23 Nov 2026, generator issues MM and KK; RC2Z.eol
+  _conapp_)*]
+[%operation Z!ApplExpr parseConstructorApp(): String{
+	var es = self.rightExpr.exprList.exprs;
+	var s = es.at(0).parseExpr();
+	var i = 1;
+	while(i < es.size()){
+		s = s + " (" + es.at(i).parseExpr() + ")";
+		i = i + 1;
+	}
+	return "(" + s + ")";
+}%]
+
+[*The parameters of a literal of an enumeration (Branch.expr, an n-ary product of the parameter types, set by
+  RC2Z.eol createTypeDeclPara) as the argument types of the datatype constructor, e.g. Circle "real"; "" for a
+  literal without parameters (23 Nov 2026, generator issue MM)*]
+[%operation Z!Branch branchArgs(): String{
+	var s = "";
+	if(self.expr.isDefined()){
+		for(pt in self.expr.exprList.exprs){
+			s = s + " \"" + pt.parseExpr() + "\"";
+		}
+	}
+	return s;
+}%]
+
 [*let x == e1; y == e2 @ b  ->  (let x = e1; y = e2 in b)*]
 [%operation Z!LetExpr parseLetExpr(): String{
 	var decls_str : String;
@@ -1259,31 +1536,16 @@ operation channelArities(): Map{
 *]
 [*self.expr may be any expression, e.g. (IDEAL_LIGHTING(model))[1] -> (fst (IDEAL_LIGHTING((model)))).
   Isabelle tuples are right-nested pairs, (a, b, c) = (a, (b, c)), so component k of an n-tuple is
-  fst (snd^(k-1) t) for k < n and snd^(n-1) t for k = n. The Z model does not carry n, so only
-  pairs are handled exactly; for k > 2 the component is assumed NOT to be the last one.*]
+  fst (snd^(k-1) t) for k < n and snd^(n-1) t for k = n. Since 15 Nov 2026 n is carried by the attribute
+  arity of TupleSelExpr (set by RC2Z); the printing is in tupleSelection.eol, shared by the three templates
+  circusM2T.egl, circusM2T_HOLCSP.egl, circusM2T_HOLCSP_trans_core.egl.*]
 [%operation Z!TupleSelExpr parseTupleSelExpr(): String{
-	var  str : String;
+	//15 Nov 2026 (generator issue Y): printed by the shared operation tupleSelString (tupleSelection.eol,
+	//imported at the top of this template) from the numeral and the arity of the selection; with arity 0
+	//(unknown) as before.
 	//parenthesise: "fst f(x)" would parse as "(fst f) x"
 	var t = "(" + self.expr.parseExpr() + ")";
-
-	if(self.numeral.value = 1){
-		str = "fst " + t;
-	}
-	if(self.numeral.value = 2){
-		str = "snd " + t;
-	}
-	if(self.numeral.value > 2){
-		("parseTupleSelExpr: component " + self.numeral.value + " of a tuple with more than 2 members, check by hand").println();
-		str = t;
-		var i = 1;
-		while(i < self.numeral.value){
-			str = "snd (" + str + ")";
-			i++;
-		}
-		str = "fst (" + str + ")";
-	}
-
-	return "(" + str + ")";
+	return "(" + tupleSelString(t, self.numeral.value, self.arity) + ")";
 }%]
 
 [%operation Z!ApplExpr parseLessThan(): String{

@@ -1,0 +1,146 @@
+/****************************
+Functions of the RoboChart toolkits (generator issue AA, 16 Nov 2026, Fang).
+Imported by RC2Z.eol and by the three templates circusM2T.egl, circusM2T_HOLCSP.egl and
+circusM2T_HOLCSP_trans_core.egl (as tupleSelection.eol).
+
+Generator convention, not a rule of the manual. The manual (Appendix D, pp. 167-171 of the August 2022 PDF)
+shows the four toolkits (set, relation, function, sequence; the same functions as the .rct files below) but
+defines no translation of their functions. (Corrected 17 Nov 2026: this comment said that the manual does not
+contain the sequence toolkit; it is on p. 171.) RoboTool's CSP-M generator
+(https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/
+circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/ExpressionGenerator.xtend#L190-L237)
+writes a call with the qualified name <package>_<function> (e.g. sequence_toolkit_head) and defines these
+names in lib/semantics/<package>.csp (copied into csp-gen/defs/<package>_defs.csp); size is written as
+length (sequences) or card (sets).
+
+Here RC2Z writes a toolkit call with the same qualified name (createCallExpr), and the templates print it by
+the table toolkitFunctionTable below. Each entry gives the definition in the toolkit (.rct files in
+lib/robochart/ of circus.robocalc.robochart.textual, RoboTool 1.3) and the Isabelle term. $1, $2 are the
+arguments, each printed in parentheses. A toolkit function that is not in the table is printed as a call of
+the marker GENERATOR_ERROR_unsupported_toolkit_<package>_<function> (RC2Z, toolkitCallName; generatorErrors.eol;
+16 Nov 2026, before it stopped the generation), at which Isabelle stops.
+
+Preconditions: as the CSP-M generator (CStatementGenerator.xtend, guards and guard, lines 447-562 of the
+commit above), a statement whose expressions call a function with a precondition is guarded by pre_<name>
+(args). The guards are built in RC2Z (toolkitGuards); their Isabelle terms are the entries pre_<name> below,
+taken from the precondition in the .rct file. A function whose precondition is trivially true for the
+arguments allowed here has the entry "" (no guard).
+******************************/
+
+operation toolkitPackages(): Set{
+	return Set{"sequence_toolkit", "set_toolkit", "relation_toolkit", "function_toolkit"};
+}
+
+//$i is replaced by the i-th argument in parentheses
+operation toolkitFunctionTable(): Map{
+	return Map{
+		//sequence_toolkit: size(a:Set(?X)): nat, pre isFinite(a). Supported for sequences only (RC2Z checks the
+		//type; size of a set is printed as the marker GENERATOR_ERROR_size_of_set). Isabelle size on lists = length; printed exactly as before
+		//(size((s))).
+		"sequence_toolkit_size" = "size($1)",
+		//sequence_toolkit: hasMin(a:Set(int)): boolean, result iff exists m in a forall n in a: m <= n
+		"sequence_toolkit_hasMin" = "(\\<exists>rc_m\\<in>$1. \\<forall>rc_k\\<in>$1. rc_m \\<le> rc_k)",
+		//sequence_toolkit: hasMax(a:Set(int)): boolean, result iff exists m in a forall n in a: m >= n
+		"sequence_toolkit_hasMax" = "(\\<exists>rc_m\\<in>$1. \\<forall>rc_k\\<in>$1. rc_k \\<le> rc_m)",
+		//sequence_toolkit: min(a:Set(int)): int, pre hasMin(a). Isabelle Min (defined for finite non-empty sets;
+		//the precondition of RoboChart also admits infinite sets bounded below: different from RoboChart there)
+		"sequence_toolkit_min" = "(Min $1)",
+		//sequence_toolkit: max(a:Set(int)): int, pre hasMax(a). Isabelle Max (same remark as min)
+		"sequence_toolkit_max" = "(Max $1)",
+		//sequence_toolkit: isNonEmpty(s:Seq(?X)): boolean, result iff size(s) > 0
+		"sequence_toolkit_isNonEmpty" = "($1 \\<noteq> [])",
+		//sequence_toolkit: isInjectiveSequence(s:Seq(?X)): boolean, result iff isInjection(s)
+		"sequence_toolkit_isInjectiveSequence" = "(distinct $1)",
+		//sequence_toolkit: concat(s,t:Seq(?X)): Seq(?X) (s followed by t). NOT Isabelle concat (that is dconcat)
+		"sequence_toolkit_concat" = "($1 @ $2)",
+		//sequence_toolkit: reverse(s:Seq(?X)): Seq(?X)
+		"sequence_toolkit_reverse" = "(rev $1)",
+		//sequence_toolkit: head(s:Seq(?X)): ?X, pre isNonEmpty(s), s[1]. Isabelle hd; hd [] is an unspecified
+		//value, but calls in statements are guarded by pre_ (below), as in the CSP-M
+		"sequence_toolkit_head" = "(hd $1)",
+		//sequence_toolkit: last(s:Seq(?X)): ?X, pre isNonEmpty(s), s[size(s)]. Isabelle last (same remark)
+		"sequence_toolkit_last" = "(last $1)",
+		//sequence_toolkit: tail(s:Seq(?X)): Seq(?X), no precondition, tail(<>) = <> by its definition.
+		//Isabelle tl, tl [] = []. Different from CSP-M: sequence_toolkit_tail(<x>^xs) = xs has no case for <>,
+		//so FDR stops with an error when it evaluates tail(<>); no pre_ guard there either.
+		"sequence_toolkit_tail" = "(tl $1)",
+		//sequence_toolkit: front(s:Seq(?X)): Seq(?X), no precondition, front(<>) = <> by its definition.
+		//Isabelle butlast, butlast [] = []. Different from CSP-M: sequence_toolkit_front(xs^<x>) = xs has no
+		//case for <> (as tail).
+		"sequence_toolkit_front" = "(butlast $1)",
+		//sequence_toolkit: filter(s:Seq(?X), a:Set(?X)): Seq(?X), the members of s in a, in order.
+		//Isabelle filter takes the predicate first
+		"sequence_toolkit_filter" = "(filter (\\<lambda>rc_x. rc_x \\<in> $2) $1)",
+		//sequence_toolkit: prefix(s,t:Seq(?X)): boolean, s is a prefix of t (HOL-Library Sublist)
+		"sequence_toolkit_prefix" = "(prefix $1 $2)",
+		//sequence_toolkit: suffix(s,t:Seq(?X)): boolean, exists u: concat(u,s) = t (HOL-Library Sublist)
+		"sequence_toolkit_suffix" = "(suffix $1 $2)",
+		//sequence_toolkit: infix(s,t:Seq(?X)): boolean, exists u,v: concat(u,concat(s,v)) = t (Sublist: sublist)
+		"sequence_toolkit_infix" = "(sublist $1 $2)",
+		//sequence_toolkit: dconcat(s:Seq(Seq(?X))): Seq(?X), distributed concatenation. Isabelle concat
+		"sequence_toolkit_dconcat" = "(concat $1)",
+		//NOT SUPPORTED (printed as the marker GENERATOR_ERROR_unsupported_toolkit_<package>_<function>): range (Isabelle [x..y] exists for int only, [x..<Suc y] for nat:
+		//needs the argument type), iter (powers of a relation), squash (finite functions), extract (index set
+		//of type int or nat: needs the type).
+
+		//set_toolkit: notin(m:?X, s:Set(?X)): boolean, result iff not m in s
+		"set_toolkit_notin" = "($1 \\<notin> $2)",
+		//set_toolkit: subseteq(ss,s:Set(?X)): boolean. The .rct definition, forall x @ x in s, does not
+		//mention ss (an error in the toolkit); translated as intended and as in the CSP-M (every member of ss
+		//is in s)
+		"set_toolkit_subseteq" = "($1 \\<subseteq> $2)",
+		//set_toolkit: subset(ss,s:Set(?X)): boolean, result iff subseteq(ss,s) /\ ss != s
+		"set_toolkit_subset" = "($1 \\<subset> $2)",
+		//set_toolkit: union(s1,s2:Set(?X)): Set(?X)
+		"set_toolkit_union" = "($1 \\<union> $2)",
+		//set_toolkit: inter(s1,s2:Set(?X)): Set(?X)
+		"set_toolkit_inter" = "($1 \\<inter> $2)",
+		//set_toolkit: diff(s1,s2:Set(?X)): Set(?X), the members of s1 not in s2
+		"set_toolkit_diff" = "($1 - $2)",
+		//set_toolkit: symetric_diff(s1,s2:Set(?X)): Set(?X), result == {x | not (x in s1 iff x in s2)}
+		"set_toolkit_symetric_diff" = "(($1 - $2) \\<union> ($2 - $1))",
+		//set_toolkit: Union(A:Set(Set(?X))): Set(?X)
+		"set_toolkit_Union" = "(\\<Union> $1)",
+		//set_toolkit: Inter(A:Set(Set(?X))): Set(?X). Inter({}) is the whole type, in the toolkit definition
+		//and in Isabelle
+		"set_toolkit_Inter" = "(\\<Inter> $1)",
+
+		//Preconditions, as guards of the statements that call the function (see toolkitGuards in RC2Z.eol).
+		//head, last: pre isNonEmpty(s)
+		"pre_sequence_toolkit_head" = "($1 \\<noteq> [])",
+		"pre_sequence_toolkit_last" = "($1 \\<noteq> [])",
+		//min: pre hasMin(a); max: pre hasMax(a)
+		"pre_sequence_toolkit_min" = "(\\<exists>rc_m\\<in>$1. \\<forall>rc_k\\<in>$1. rc_m \\<le> rc_k)",
+		"pre_sequence_toolkit_max" = "(\\<exists>rc_m\\<in>$1. \\<forall>rc_k\\<in>$1. rc_k \\<le> rc_m)",
+		//size: pre isFinite(a); always true for a sequence, the only case supported: no guard. The CSP-M
+		//generator writes pre_sequence_toolkit_size(s) here, which is function_toolkit_isFinite(s), true.
+		"pre_sequence_toolkit_size" = ""
+	};
+}
+
+//The Isabelle term of a toolkit call: the table entry of name with $1, $2, ... replaced by the arguments, each
+//in parentheses. args are the printed arguments.
+operation toolkitCallString(name: String, args: Sequence): String{
+	var s = toolkitFunctionTable().get(name);
+	var i = args.size();
+	//replace from the highest index, so that $1 does not match the beginning of $10
+	while(i >= 1){
+		s = replaceLiteral(s, "$" + i, "(" + args.at(i - 1) + ")");
+		i = i - 1;
+	}
+	return s;
+}
+
+//every occurrence of from in s replaced by to, literally (String.replace of EOL takes a regular expression,
+//and the printed arguments contain backslashes)
+operation replaceLiteral(s: String, from: String, to: String): String{
+	var result = "";
+	var rest = s;
+	var k = rest.indexOf(from);
+	while(k >= 0){
+		result = result + rest.substring(0, k) + to;
+		rest = rest.substring(k + from.length());
+		k = rest.indexOf(from);
+	}
+	return result + rest;
+}

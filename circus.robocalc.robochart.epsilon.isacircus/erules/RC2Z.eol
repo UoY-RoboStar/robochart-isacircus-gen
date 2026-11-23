@@ -1,3 +1,5 @@
+import "toolkitFunctions.eol";
+import "generatorErrors.eol";
 /****************************
 Due to Rule 60 Semantics of composite states,
 we have to transform most of the RoboChart components into actions instead of processes
@@ -74,6 +76,146 @@ option 1: to create Exception action/process in Circus metamodel.
 option 2: to remove Exception by pushing end event into the process
 
 06.Sep.2024
+******************************/
+
+
+/****************************
+Change record (most recent last). Each entry: date, branch, summary, rules concerned.
+
+14-15 Nov 2026, branch trigger-fqn-naming (Fang)
+Trigger channels are named with the fully qualified name of their node container:
+<e>_<FQN of the container>__in instead of <e>__in (operation triggerChan).
+Generator convention, not a rule of the manual: the manual (Rules 42, 43, 55) writes the event
+eventId(e).id(source) and does not say how the channel is declared; RoboTool's CSP-M names the channel e__
+and declares it in the module of each container. In one Isabelle theory the path of the container has to
+be part of the name.
+The event channels <e>_in / <e>_out are deliberately not qualified (connections match them by name).
+Rules concerned: channel declarations (createchanParaNC, not covered by the manual), Rule 41 (tidsR and
+transSync, through tevent_str), Rule 42 (renameTriggerEventsPairL), Rule 43 (tevent_str, tevent),
+Rule 55 (trigger).
+Templates (circusM2T_HOLCSP.egl, circusM2T_HOLCSP_trans_core.egl): the paragraphs of a node are selected by
+exact match instead of contains(nd); eventBase() finds the event of a trigger channel from the declaration
+of the channel; NID_name removed, the type of Trans is printed from its parameter declaration.
+
+15 Nov 2026, branch composite-states (Fang)
+Composite states. Implemented as RoboTool's CSP-M writes them (CSP generator 3.1.0.202608041330; read from
+the CSP-M of the test models c1 to c6 and of Adaptation_Plan), where this differs from the manual it is
+said at the rule.
+Rule 52 (composeNodes): the composite node is added to the composition.
+Rule 60 (createCompositeStateAsActionParas): Behaviour (Rule 40 with the state as node container, During,
+the two-sided write synchronisation over all variables of the machine, hiding of enteredSS and terminate),
+During, RunEntered; the interrupt of the state instead of the interrupt of its container. Checked against
+Rule 60 of the manual: four differences, all following the CSP-M, listed at the rule.
+Channel declarations (createchanParaNC, not covered by the manual): split into the part of a node container
+and the part of the machine. Generator convention.
+Rules 47, 49, 50 (vars; called through Rule 48 for a composite state, never reached before): three
+corrections (result set not instantiated; guard of a transition; left-hand side of an indexed assignment).
+Templates: paragraphs printed container by container, innermost first; interleaving as |||; Trans core:
+lemma names with the container when there are several.
+
+15 Nov 2026, branch composite-states (Fang)
+Rule 45 (usedVariables of an expression; usedVariablesInExpr, usedVariablesInExprModel): a LetExpression is
+treated explicitly, the variables of the values of its declarations and of its body (generator issue X).
+Before, a variable occurring only in the value of a let was not read before the action (Rule 62, readState)
+and was free in the generated equation. Changes the output of models with let (flat MakePlan).
+
+15 Nov 2026, branch composite-states (Fang)
+User-defined types of imported packages (generator issue W; completes issue C, 25e7662): createTypeDeclPara
+translates the types of the selected file's package and the types of other non-toolkit packages reachable
+from the selected file (typeDeclsToTranslate), dependencies first. Names are not qualified; a clash of two
+type names stops the generation with an error. Changes the output of models that use types of an imported
+package (dti/enriched: Legitimate, Adaptation_Plan).
+
+15 Nov 2026, branch composite-states (Fang)
+Tuple selection (generator issue Y): createTupleSelExprGeneral sets the new optional attribute arity of
+TupleSelExpr (circus_metamodel.ecore; a deviation from CZT, marked there by an annotation) to the number of
+components of the RoboChart product type. The templates print the projection of an n-tuple from it
+(tupleSelection.eol); before, component 2 was always printed as snd, which is wrong for n > 2.
+
+16 Nov 2026, branch composite-states (Fang)
+Toolkit functions (generator issue AA). The manual has no rule for them (Chapter 4 Rule 45 omits usedVariables
+of expressions; Appendix D, pp. 167-171 of the August 2022 PDF, shows the four toolkits, the sequence toolkit
+on p. 171, but no translation; corrected 17 Nov 2026, this comment said that Appendix D lacks the sequence
+toolkit). createCallExpr writes a call of a
+function of a toolkit with its qualified name <package>_<function> (toolkitCallName), as RoboTool's CSP-M
+generator; the templates print it by toolkitFunctions.eol (imported here as well). Supported: the sequence and
+set toolkits except range, iter, squash, extract; size for sequences only. Any other toolkit function stops
+the generation with an error naming it. Preconditions: an assignment, a call, a communication and an if
+statement are guarded by the preconditions of the toolkit functions they call (toolkitGuards,
+withToolkitGuards in createStmtAsAction), placed and collected as in the CSP-M generator
+(CStatementGenerator.xtend, robochart-csp-gen a6412b40c8); the guards for division and indexing of the
+CSP-M generator are not generated.
+
+16 Nov 2026, branch composite-states (Fang)
+Rule 60 (Behaviour): machineVarNames follows allVariables(stm) of the CSP-M generator: also the parameters of
+an operation definition and the variables of provided interfaces (empty for every model the RoboChart
+validator accepts). No change for state machines.
+
+16 Nov 2026, branch m2t-partial-output (Fang)
+Markers instead of stopping (generatorErrors.eol, imported here and by the templates). An unsupported toolkit
+function and size of a set (toolkitCallName) are written as calls of GENERATOR_ERROR_unsupported_toolkit_
+<package>_<function> and GENERATOR_ERROR_size_of_set, a missing pre_ entry (toolkitGuardsOf) as the guard
+GENERATOR_ERROR_no_precondition_guard_<function>; before, each stopped the generation. Isabelle stops at the
+command containing the marker. The type name clash of issue W still stops the generation here (M2M): a
+declaration under a marker name would be a valid declaration, and every reference to the type is printed by
+its unqualified name, so no marker can make Isabelle stop at the right place (generator CLAUDE.md, "M2T
+errors and output").
+
+16 Nov 2026, branch composite-states (Fang); check REMOVED 23 Nov 2026
+Exit actions of inner states and input triggers: from 16 to 23 Nov 2026 a check exitTriggerConflicts (at
+Rule 60) warned when an exit action of an inner state (any depth) of a composite state read or wrote the
+variable bound by the input trigger of a transition leaving it. Removed on 23 Nov 2026 (Fang): RoboTool's
+CSP-M has the same unordered structure (CTransitionGenerator compileTransition/compileTriggerForMemory,
+CStateGenerator Node_rule and tidsR) and RoboTool gives no hint (validator, CSP generator); it is a known
+problem of the semantics itself (Pedro, 16 Nov 2026), no longer reported. The warning mechanism
+(generatorNote) stays; GG uses it. Comments at Rules 41 and 60: Pedro's explanations of 16 Nov 2026
+(docs/SEMANTICS_DIFFERENCES.md, entry 6).
+
+16 Nov 2026, branch composite-states (Fang)
+Rule 60 (Behaviour): machineVarNames also takes the variables of the required interfaces (rInterfaces), as
+allVariables of the CSP-M generator (generator issue EE). No change for the models generated so far.
+
+22 Nov 2026, branch composite-states (Fang)
+Preconditions of user-defined functions (generator issue CC; createAssignmentStmtAsAction, Rule 66;
+userPreconditionGuard, substitutedPrecondition). For x = f(args) with f user-defined, the guard is the
+conjunction of the preconditions of f with the arguments in place of the formal parameters (by position, on a
+copy; bound names of the precondition that occur in an argument renamed first). Toolkit functions are skipped
+there (AA guards them). A precondition that createExpr cannot translate (quantifiers) is printed as the guard
+GENERATOR_ERROR_untranslated_precondition_<f>. Before, the preconditions were copied with the formal parameters,
+also for toolkit functions (second guard besides AA). The guards are provisional (decision of Fang, 22 Nov
+2026, for the release of composite-states): as the CSP-M; the manual does not treat preconditions as guards
+(Ana and Alvaro, January 2026); removed when preconditions become definedness proof obligations. Changes the
+output of models with x = f(args) for a function with preconditions (toy models d1, d2; test model c9).
+
+22 Nov 2026, branch composite-states (Fang)
+Three issues present since the rules of the ITP 2026 paper or since 9 Oct 2026 (docs/COMPOSITE_RELEASE_TEST.md,
+Sections 11 and 13). FF: Rule 50 (vars of an if statement) no longer calls vars on a missing else (stack
+overflow for an if without else in a state action); Rule 68 (createIfStmtAsAction) gives an if without else the
+else branch Skip, as the CSP-M (before, "if b then P" without else, not parsed by Isabelle); the templates print
+" else " with spaces. GG: createFunctionDefsAsAxParas also declares the functions of imported packages that the
+model calls, transitively through the pre- and postconditions of the functions called (importedFunctionsToTranslate;
+toolkits excluded), with a warning on a name clash. II: the parameter type of a function with three or more
+parameters is one n-ary product (A x B x C), matching the flat tuple of a call; before, nested pairs ((A x B) x C)
+(printed so since 9faa957). Changes the output of models with an if without else, with calls of functions of
+imported packages, and with functions of three or more parameters.
+
+23 Nov 2026, branch composite-states (Fang)
+Records, enumerations and names (generator issues KK, LL, MM, NN; all four also on main 2976313;
+docs/COMPOSITE_RELEASE_TEST.md Section 15, docs/SEMANTICS_DIFFERENCES.md entries 10 and 19). KK: defaultValueAsZExpr
+gives the defaults of RoboTool's CSP-M (first literal of an enumeration, record of the field defaults, '''' for
+string, constant function for a function type, markers for unsupported types) instead of 0. LL: createExpr
+translates field access r.f (Selection) to (R.f r) and record literals to \<lparr>R.f = e, ...\<rparr> (_reclit_); an
+assignment r.f = e or x[i] = e also reads the root variable and the variables of the indices (usedVariables,
+Rule 50 vars, leftReadVariables); field names are qualified by the record in selection, update and literal. MM:
+enumeration literals keep their parameters (Branch.expr), a literal with arguments is (L (a) (b)) (_conapp_). NN:
+the variables of the generated definitions are x__a, y__a, n__id, value__v, b__a, Q__a, P__a (before x, y, n,
+value, b, Q, P, captured by a field, literal or function of that name); the templates print record field and
+constructor names quoted (a keyword such as value cannot be written bare) and declare char :: discrete_cpo (string
+variables). createTypeExpr gives markers for relation,
+vector and matrix types. The exit-action check of composite states (exitTriggerConflicts, 16 Nov 2026) was
+removed (entry above). Changes the output of every model (names n__id, value__v, x__a, y__a, b__a, Q__a, P__a),
+and of models with records, enumerations with parameters, uninitialised variables of enumeration, record or
+string type, and indexed or field assignments.
 ******************************/
 
 
@@ -205,7 +347,8 @@ replaceRef();
 createTypeDeclPara(pkg);
 
 //to transform functions
-createFunctionDefsAsAxParas(pkg);
+//returns the warnings about name clashes of imported functions (generator issue GG, 22 Nov 2026)
+var functionNotes = createFunctionDefsAsAxParas(pkg);
 
 //to create termination channel: terminate
 var terminate_chanpara = Sequence{"terminate"}.createChannelPara("terminate_channel");
@@ -248,6 +391,20 @@ if(RC!StateMachineDef.all().size()>0){
 	"line 177, createStateMachineDefAsActionPara(stm) is run".println();
 	for(stm in RC!StateMachineDef.all()){
 		createStateMachineDefAsActionPara(stm);
+	}
+}
+
+//Generator issue GG (22 Nov 2026): the warnings of createFunctionDefsAsAxParas (name clashes of imported
+//functions) on the first action paragraph (attribute generatorNote, read by the plugin and dev-tools; printed as
+//a comment by circusM2T.egl), as no paragraph exists when the functions are declared
+if(functionNotes.size() > 0){
+	var notePara = Z!ActionPara.all().first();
+	if(notePara.isDefined()){
+		if(notePara.generatorNote.isDefined() and notePara.generatorNote <> ""){
+			notePara.generatorNote = notePara.generatorNote + " " + functionNotes.concat(" ");
+		} else {
+			notePara.generatorNote = functionNotes.concat(" ");
+		}
 	}
 }
 
@@ -363,9 +520,14 @@ datatype GasSensor {
 }
 enumeration Angle { Left Right Back Front }
 */
+//Translation of the user-defined types (records, enumerations, primitive types).
+//15 Nov 2026 (generator issue W): not only pkg.types (the package of the selected file) but also the types
+//of imported packages that the selected file reaches (typeDeclsToTranslate). This completes issue C
+//(25e7662, RctLoader): since then the files of the imported packages are loaded and their references
+//resolve, but RC!X.all() still sees only the selected file, so these types were never translated.
 operation createTypeDeclPara(pkg:RC!RCPackage){
 
-	for(tp in pkg.types){
+	for(tp in typeDeclsToTranslate(pkg)){
 	
 		if(tp.instanceOf(RC!PrimitiveType)){
 			var givenPara = new Z!GivenPara;
@@ -391,6 +553,25 @@ operation createTypeDeclPara(pkg:RC!RCPackage){
 				literal_seq.add(l.name);
 			}
 			var freetype = createEnumType(tp.name, literal_seq);
+			//Fix of generator issue MM (23 Nov 2026, branch composite-states): a literal with parameters,
+			//e.g. Circle(real), keeps them: the types are put on the branch (Branch.expr, one n-ary ProdExpr of
+			//the parameter types) and the templates print the constructor with one argument per parameter,
+			//datatype Shape = Circle "real" | Square. Before, only the name was kept (Circle | Square), on
+			//main as well. As RoboTool's CSP-M (datatype Shape = Circle.core_real | Square).
+			var bi = 0;
+			for(l in tp.literals){
+				if(l.types.isDefined() and l.types.size() > 0){
+					var ptypes = new Sequence;
+					for(pt in l.types){
+						ptypes.add(pt.createTypeExpr());
+					}
+					var pexpr = new Z!ProdExpr;
+					pexpr.exprList = new Z!ZExprList;
+					pexpr.exprList.exprs = ptypes;
+					freetype.branchList.branches.at(bi).expr = pexpr;
+				}
+				bi = bi + 1;
+			}
 			
 			var freetypePara =  freetype.createEnumTypePara();		
 		}
@@ -398,6 +579,97 @@ operation createTypeDeclPara(pkg:RC!RCPackage){
 	}
 }
 
+
+//Generator convention, not a rule of the manual (15 Nov 2026, generator issue W). The type declarations to
+//translate: the types of pkg and the types of other packages (not the toolkits) that are reachable from the
+//selected file, i.e. reached by following the references of its objects and of the objects reached
+//(an interface it uses, the events of that interface, the record types of their types, the field types of
+//those records, ...). Order: dependencies first (Isabelle needs a record declared before a record that uses
+//it); otherwise the order of pkg.types, then the order in which the imported types were reached. With no
+//imported type the result is pkg.types in its own order, so models without imported types are unchanged.
+//The names of imported types are NOT qualified (to keep the existing output); two translated types with
+//the same name stop the generation with an error naming both packages.
+operation typeDeclsToTranslate(pkg: RC!RCPackage): Sequence{
+	var toolkits = Set{"relation_toolkit", "function_toolkit", "sequence_toolkit", "set_toolkit", "core"};
+	var imported = new Sequence;
+	var visited = new Set;
+	var queue = new Sequence;
+	for(o in RC.allContents()){ visited.add(o); queue.add(o); }
+	var i = 0;
+	while(i < queue.size()){
+		var o = queue.at(i);
+		i = i + 1;
+		var op = packageOf(o);
+		if(op.isDefined() and toolkits.includes(op.name)){
+			continue;
+		}
+		if(o.isKindOf(RC!TypeDecl) and op.isDefined() and op <> pkg and not imported.includes(o)){
+			imported.add(o);
+		}
+		var next = new Sequence;
+		next.addAll(o.eContents());
+		for(ref in o.eClass().getEAllReferences()){
+			if(not ref.isContainment() and not ref.isContainer() and not ref.isDerived() and not ref.isTransient()){
+				var v = o.eGet(ref);
+				if(ref.isMany()){
+					next.addAll(v);
+				} else if(v.isDefined()){
+					next.add(v);
+				}
+			}
+		}
+		for(t in next){
+			if(not visited.includes(t)){
+				visited.add(t);
+				queue.add(t);
+			}
+		}
+	}
+	var candidates = new Sequence;
+	candidates.addAll(pkg.types);
+	candidates.addAll(imported);
+	//name clash: imported type names are not qualified
+	var byName = new Map;
+	for(t in candidates){
+		if(byName.containsKey(t.name) and byName.get(t.name) <> t){
+			throw "Type name clash (generator issue W): type " + t.name + " is declared in package "
+				+ packageOf(byName.get(t.name)).name + " and in package " + packageOf(t).name
+				+ "; types of imported packages are not qualified, so the theory would declare it twice. "
+				+ "No theory is generated.";
+		}
+		byName.put(t.name, t);
+	}
+	//dependencies first, otherwise the order of candidates
+	var ordered = new Sequence;
+	var started = new Set;
+	for(t in candidates){
+		addTypeDeclWithDependencies(t, candidates, ordered, started);
+	}
+	return ordered;
+}
+
+//auxiliary of typeDeclsToTranslate: t after the types of candidates that its contents refer to
+operation addTypeDeclWithDependencies(t: Any, candidates: Sequence, ordered: Sequence, started: Set){
+	if(started.includes(t)){
+		return;
+	}
+	started.add(t);
+	for(c in t.eAllContents()){
+		if(c.isKindOf(RC!TypeRef) and candidates.includes(c.ref)){
+			addTypeDeclWithDependencies(c.ref, candidates, ordered, started);
+		}
+	}
+	ordered.add(t);
+}
+
+//auxiliary of typeDeclsToTranslate: the package that contains o (null if none)
+operation packageOf(o: Any): Any{
+	var c = o;
+	while(c.isDefined() and not c.isKindOf(RC!RCPackage)){
+		c = c.eContainer();
+	}
+	return c;
+}
 
 operation RC!RecordType createConstDecl(): Z!ConstDecl{
 	var constDecl = new Z!ConstDecl;
@@ -445,9 +717,75 @@ operation createVarDeclfromString(var_name:String, type_name: String): Z!VarDecl
 	return varDecl;
 }
 
-operation createFunctionDefsAsAxParas(pkg:RC!RCPackage){
+//Declarations of the functions (consts in the HOL-CSP theory). The functions of pkg as before (all of them,
+//except one named card). Fix of generator issue GG (22 Nov 2026, branch composite-states; present since the
+//rules of the ITP 2026 paper): also the functions of imported packages that the model actually calls
+//(importedFunctionsToTranslate); before, a call of such a function was printed but the function was not
+//declared, and Isabelle stopped with "Extra variables on rhs". Generator convention, as W for types: names are not
+//qualified. Returns the warnings about name clashes (attached to a paragraph at the end of the main program).
+operation createFunctionDefsAsAxParas(pkg:RC!RCPackage): Sequence{
+	var notes = new Sequence;
+	var declared = new Map;
 	for(f in pkg.functions.select(f|f.name != "card")){
 		createAxParaForFunc(f);
+		declared.put(f.name, f);
+	}
+	for(f in importedFunctionsToTranslate(pkg)){
+		if(declared.containsKey(f.name)){
+			notes.add("Function " + f.name + " of package " + packageOf(f).name + " is not declared: a function of "
+				+ "the same name of package " + packageOf(declared.get(f.name)).name + " is declared, and calls of both "
+				+ "are printed with the same name (generator issue GG; names of imported functions are not qualified).");
+		} else {
+			createAxParaForFunc(f);
+			declared.put(f.name, f);
+		}
+	}
+	return notes;
+}
+
+//Generator issue GG (22 Nov 2026). The functions of other packages (not the toolkits core, set_toolkit,
+//sequence_toolkit, function_toolkit, relation_toolkit, which AA translates) that the model calls: the transitive
+//closure of the calls (CallExp of a Function) in the selected file (state machines, operations, functions),
+//continued through the preconditions and postconditions of the functions reached (and, through eAllContents, any
+//other expression a function contains). The functions of pkg are not included (they are all declared anyway), but
+//the calls in them are followed. Order: a function after the functions its contents call (dependencies first, as
+//typeDeclsToTranslate), otherwise in the order reached. A function named card is skipped, as in pkg.
+operation importedFunctionsToTranslate(pkg: RC!RCPackage): Sequence{
+	var ordered = new Sequence;
+	var started = new Set;
+	for(o in RC.allContents()){
+		if(o.isKindOf(RC!CallExp)){
+			addCalledFunction(o, pkg, ordered, started);
+		}
+	}
+	return ordered;
+}
+
+//auxiliary of importedFunctionsToTranslate: the function called by c, after the functions its contents call
+operation addCalledFunction(c: Any, pkg: RC!RCPackage, ordered: Sequence, started: Set){
+	var f = c.`function`;
+	if(not (f.isTypeOf(RC!RefExp) and f.ref.isKindOf(RC!Function))){
+		return;
+	}
+	var fn = f.ref;
+	var fp = packageOf(fn);
+	if(fp.isDefined() and toolkitPackages().includes(fp.name)){
+		return;
+	}
+	if(fp.isDefined() and fp.name = "core"){
+		return;
+	}
+	if(started.includes(fn)){
+		return;
+	}
+	started.add(fn);
+	for(x in fn.eAllContents()){
+		if(x.isKindOf(RC!CallExp)){
+			addCalledFunction(x, pkg, ordered, started);
+		}
+	}
+	if(fp <> pkg and fn.name <> "card"){
+		ordered.add(fn);
 	}
 }
 
@@ -804,17 +1142,22 @@ operation createGenOpApplForFuncDecl(
 		refExpr.exprList.exprs.add(f.type.createTypeExpr());
 	} else if(f.parameters.size()>1){//multiple parameters, means the 1st expr for the parameter types is a Cartesian product expression
 
-		var prodExpr = Z!ProdExpr;
-		var size = f.parameters.size();
-		var i = 0;
-		prodExpr = createProdExpr(f.parameters.at(0).type.createTypeExpr(), f.parameters.at(1).type.createTypeExpr());
-		i = i + 2;
-		if(size > 2){
-			while(i<size){
-				prodExpr = createProdExpr(prodExpr,f.parameters.at(i).type.createTypeExpr());
-				i = i + 1;
-			}
-		}		
+		//Fix of generator issue II (22 Nov 2026, branch composite-states). The parameter types are ONE n-ary product
+		//(as RC!ProductType.createProdExpr), printed (A\<times>B\<times>C) by parseProdExpr, which Isabelle reads as
+		//A \<times> (B \<times> C): the type of the flat tuple (a, b, c) of a call (createCallExpr). Before, they were folded
+		//into nested pairs ((A, B), C); since 9faa957 (9 Oct 2026, which parenthesises every product so that
+		//"A\<times>B list" is no longer read as A \<times> (B list); that stays) this was printed ((A\<times>B)\<times>C) and every call of a
+		//function with three or more parameters failed with a type error (LRE: CDA); before 9faa957 the nesting
+		//was hidden but the components were not parenthesised (wrong as well for product or list components).
+		//Two parameters: unchanged. Not changed: the same fold for the parameters of operations (Rules for
+		//CALL__ channels, three places below), operation calls are not supported yet (issue R).
+		var paramTypes = new Sequence;
+		for(p in f.parameters){
+			paramTypes.add(p.type.createTypeExpr());
+		}
+		var prodExpr = new Z!ProdExpr;
+		prodExpr.exprList = new Z!ZExprList;
+		prodExpr.exprList.exprs = paramTypes;
 
 		refExpr.exprList.exprs.add(prodExpr);
 		refExpr.exprList.exprs.add(f.type.createTypeExpr());
@@ -2780,10 +3123,11 @@ here we need ParamAction  */
 operation IndividualVarMemory(v: RC!Variable, v_FQN: String): Z!ParamAction{
 	
 	
-	var commu1  = createOutputCommunicationFromString("get_" + v_FQN, "value", "OUTPUT");
+	//the parameter is value__v (23 Nov 2026, issue NN; before value, captured by a constant value of the model)
+	var commu1  = createOutputCommunicationFromString("get_" + v_FQN, "value__v", "OUTPUT");
 	var choice1 = createPrefixingAction(
 						commu1, 
-						("Memory_"+ v_FQN).createCallAction(Sequence{"value".createRefExpr(false, false)})
+						("Memory_"+ v_FQN).createCallAction(Sequence{"value__v".createRefExpr(false, false)})
 						); 
 	
 	
@@ -2803,7 +3147,7 @@ operation IndividualVarMemory(v: RC!Variable, v_FQN: String): Z!ParamAction{
 	action.circusAction = memory;
 	
 	var value = new RC!Variable;
-	value.name = "value";
+	value.name = "value__v";
 //	("line 1745,  v.type = " + v.type).println();
 //	("line 1746,  v.type.type() = " + v.type.type()).println();
 //	("line 1738,  v.type.type = " + v.type.type).println();
@@ -2828,32 +3172,57 @@ as Isabelle can handle infinite scopes.
 operation RC!Type defaultValueAsZExpr(): Z!Expr{
 ("line 1807, self.type().name = " + self.type().name).println();
 
+	//Fix of generator issue KK (23 Nov 2026, branch composite-states). The default value of a variable without
+	//initial value is that of RoboTool's CSP-M (robochart-csp-gen a6412b4, untimed/GeneratorUtils.xtend 285-326,
+	//typeDefaultValue; the same in comp/untimed/CGeneratorUtils.xtend 368): int, nat, real 0; boolean true;
+	//string ""; an enumeration its first literal, applied to the defaults of the literal's parameters (MM); a
+	//record the record of the defaults of its fields, in the order of the declaration (LL); a sequence <>, a
+	//set {}, a tuple the tuple of the defaults (below). DIFFERENT FROM THE MANUAL: Rule 35 (memory) leaves the
+	//value of a variable without initial value arbitrary (docs/SEMANTICS_DIFFERENCES.md). Before, every type
+	//other than int and boolean got 0 (also on main), a type error in Isabelle for enumerations, records and
+	//strings. A primitive type declared in the model (type T, declared as type_synonym T = nat) gets 0, as
+	//in the CSP-M; a function type A -> B the constant function with the default of B (CSP-M: funcToSet(\ x_ @ d,
+	//A)). Types this generator does not support (relation, vector, matrix, and anything else) get the marker
+	//GENERATOR_ERROR_default_value_<type> (generatorErrors.eol); the CSP-M gives {} and tuples for them.
 	if(self.type().name = "TypeRef"){
-		"self.type = TypeRef" .println();
-		self.ref.name.println();
-		if(self.ref.name = "int"){
+		var r = self.ref;
+		if(r.isKindOf(RC!Enumeration)){
+			var lit = r.literals.first();
+			if(lit.types.isDefined() and lit.types.size() > 0){
+				var cargs = Sequence{lit.name.createRefExpr(false,false)};
+				for(pt in lit.types){
+					cargs.add(pt.defaultValueAsZExpr());
+				}
+				return createOperatorApplExpr("_conapp_", cargs);
+			}
+			return lit.name.createRefExpr(false,false);
+		}
+		if(r.isKindOf(RC!RecordType)){
+			var rargs = new Sequence;
+			for(f in r.fields){
+				rargs.add(f.qualifiedFieldName().createRefExpr(false,false));
+				rargs.add(f.type.defaultValueAsZExpr());
+			}
+			return createOperatorApplExpr("_reclit_", rargs);
+		}
+		if(r.isKindOf(RC!NameType)){
+			return r.type.defaultValueAsZExpr();
+		}
+		if(r.isKindOf(RC!PrimitiveType)){
+			var pn = r.name.toLowerCase();
+			//RoboChart writes the type as "boolean"; the old comparison with "Boolean" never matched, so bool
+			//variables got the default 0 (issue L). The default true is the one of the RoboChart CSP-M generator.
+			if(pn = "boolean"){
+				return createBooleanExpr(true);
+			}
+			if(pn = "string"){
+				return "''''".createRefExpr(false,false); //the empty string of Isabelle
+			}
+			//int, nat, real, and a primitive type declared in the model (type T), which the templates declare
+			//as type_synonym T = nat: 0, as the CSP-M (typeDefaultValue: "0" for every other primitive type)
 			return createNumExpr(0);
 		}
-//		if(self.ref.name = "float"){
-//			return createNumExpr(0);//TO DO
-//		}
-//		if(self.ref.name = "String"){
-//			return createNumExpr(0);//TO DO
-//		}
-		//RoboChart writes the type as "boolean"; the old comparison with "Boolean" never matched, so bool variables
-		//got the default 0 (issue L). The default true is the one of the RoboChart CSP-M generator.
-		if(self.ref.name.toLowerCase() = "boolean"){
-			return createBooleanExpr(true);
-		} 
-		
-		if(self.ref.name.toLowerCase() != "boolean" and self.ref.name != "int") {
-			return createNumExpr(0);
-		}
-		
-		
-		else {//TO DO
-		
-		}
+		return generatorErrorMarker("default_value", r.name).createRefExpr(false,false);
 	}
 	
 	if(self.type().name = "SeqType"){
@@ -2883,6 +3252,13 @@ operation RC!Type defaultValueAsZExpr(): Z!Expr{
 		return typeSeq.createTupleExpr();
 		
 	}
+	//a total function A -> B: the constant function with the default of B, as the CSP-M
+	//(funcToSet(\ x_ @ d, A)); printed (\<lambda>_. d) (_constfun_) (KK, 23 Nov 2026)
+	if(self.type().name = "FunctionType"){
+		return createOperatorApplExpr("_constfun_", Sequence{self.range.defaultValueAsZExpr()});
+	}
+	//relation, vector, matrix and any other type: not supported by this generator (KK, 23 Nov 2026)
+	return generatorErrorMarker("default_value", self.type().name).createRefExpr(false,false);
 	/*
 	if(self.type().name = "RelationType"){
 	
@@ -2941,10 +3317,10 @@ operation sharedMemory(v: RC!Variable): Z!ActionPara{
 operation IndividualSharedVarMemory(v: RC!Variable): Z!ParamAction{
 	
 	
-	var commu1  = createOutputCommunicationFromString("get_" + v.name, "value", "OUTPUT");
+	var commu1  = createOutputCommunicationFromString("get_" + v.name, "value__v", "OUTPUT");
 	var choice1 = createPrefixingAction(
 						commu1, 
-						("sharedMemory_"+v.name).createCallAction(Sequence{"value".createRefExpr(false, false)})
+						("sharedMemory_"+v.name).createCallAction(Sequence{"value__v".createRefExpr(false, false)})
 						); 
 	
 	
@@ -2970,7 +3346,7 @@ operation IndividualSharedVarMemory(v: RC!Variable): Z!ParamAction{
 	action.circusAction = sharedMemory;
 	
 	var value = new RC!Variable;
-	value.name = "value";
+	value.name = "value__v";
 //	("line 1745,  v.type = " + v.type).println();
 //	("line 1746,  v.type.type() = " + v.type.type()).println();
 //	("line 1738,  v.type.type = " + v.type.type).println();
@@ -3195,6 +3571,26 @@ operation usedVariablesInExprModel(expr:RC!Expression, container: Any): Set<Vari
 //			set.add(value.name + "_" + container.FQN());
 		}
 
+	} else
+	//LetExpression (15 Nov 2026, branch composite-states; generator issue X). Rule 45 (usedVariables of an
+	//expression) is "standard and omitted" in the manual; the variables read by let x == e1, ... @ e are those
+	//of the values e1, ... and of the body e. The values are held in declarations : Declaration, and a
+	//Declaration is not an Expression, so the generic case below never reached them: a variable that occurs
+	//only in the value of a let was not read (no get_v?v before the action, Rule 62 readState), and it was
+	//free in the generated equation. A reference to the bound name x is a RefExp to the Declaration, not to
+	//a Variable, so it is not collected.
+	if(expr.instanceOf(RC!LetExpression)){
+		for(d in expr.declarations){
+			set = set.includingAll(usedVariablesInExprModel(d.value,container));
+		}
+		set = set.includingAll(usedVariablesInExprModel(expr.expression,container));
+	} else
+	//record literal (23 Nov 2026, LL): the values are held in FieldDefinitions, which are not Expressions, so the
+	//generic case below would not reach them (the same problem as the let of issue X)
+	if(expr.instanceOf(RC!RecordExp)){
+		for(d in expr.definitions){
+			set = set.includingAll(usedVariablesInExprModel(d.value,container));
+		}
 	} else
 	{
 		"line814".println();
@@ -3536,6 +3932,15 @@ operation RC!RCModule FQN(): String{
 
 //channel decleration and channelset declaration for node container (NC)
 operation RC!NodeContainer createchanParaNC()  {
+
+	//Generator convention, not a rule of the manual (15 Nov 2026): the manual does not cover channel
+	//declarations; RoboTool's CSP-M declares the channels of a node container in the module of that container.
+	//A node container is the state machine (or operation) itself or a composite state. The container part
+	//(NIDS, internal__, flow channels, trigger channels, node channels, the enter/entered channel sets) is
+	//declared for every container; the machine part (variables, shared variables, event channels, operation
+	//channels, the semantic event set, aviol/gviol) only for the machine: a composite state declares no
+	//variables and no events.
+	var isMachine = not self.instanceOf(RC!State);
 	
 	//1. channel internal__: NIDS
 	
@@ -3563,13 +3968,22 @@ operation RC!NodeContainer createchanParaNC()  {
 
 	
 	//2. Flow channel: interrupt, exited, exit, terminate
-	var flow_chanpara = Sequence{"interrupt_"+self.FQN(), "exited_"+self.FQN(), "exit_"+self.FQN()//, "terminate"
-	}.createChannelPara("flowchannel_stmbd_" + self.FQN());
+	//As RoboTool's CSP-M (S::interrupt is the interrupt of the node S and of the level inside S; Rule 41 with
+	//nc = S renames the inner node interrupts to it, Rule 53 uses it in the interrupt branch of Trans).
+	//For a composite state the container interrupt interrupt_<state> is the same event as the interrupt of the
+	//state as a node of its own container, which the parent container declares with the node channels
+	//(enter_, entered_, interrupt_); it is not declared a second time here.
+	var flow_names = Sequence{"interrupt_"+self.FQN(), "exited_"+self.FQN(), "exit_"+self.FQN()};//, "terminate"
+	if(not isMachine){
+		flow_names = Sequence{"exited_"+self.FQN(), "exit_"+self.FQN()};
+	}
+	var flow_chanpara = flow_names.createChannelPara("flowchannel_stmbd_" + self.FQN());
 
 
 
 	//3. variable channels, each var has a channel declaration, as vars can have different types, while the channels in the chandecl.list should have the same type.
 	
+	if(isMachine){
 	var var_chanpara = createChannelPara("var_channel_stmbd_" + self.FQN());
 	//Case 1: vars declared in the stm directly
 	for(vl in self.variableList){
@@ -3675,6 +4089,8 @@ operation RC!NodeContainer createchanParaNC()  {
 	}
 	*/
 	
+	}//end of isMachine (variables)
+
 	//6. Declaring state machine events as channels
 
 	var evt_chanpara = createChannelPara("event_channel_stmbd_" + self.FQN());
@@ -3683,13 +4099,27 @@ operation RC!NodeContainer createchanParaNC()  {
 	//e.g., CSPM: trigger1:InOut.core_int;   the state nodes id NIDS is not involved.
 	//Circus: trigger1_in ::int, trigger1_out ::int
 	
-	var stm_events = self.events;
-	//to collect all the events that are defined in the defined interfaces
-	for(defined_interface in self.interfaces){
-		stm_events = stm_events.includingAll(defined_interface.events);
+	var stm_events;
+	if(isMachine){
+		stm_events = self.events;
+		//to collect all the events that are defined in the defined interfaces
+		for(defined_interface in self.interfaces){
+			stm_events = stm_events.includingAll(defined_interface.events);
+		}
+	} else {
+		//composite state: only trigger channels, for the events that its own transitions use as triggers.
+		//Generator convention: the CSP-M redeclares e__ for ALL events in the module of every container;
+		//channels that no transition of the container uses cannot occur (as issue P for the machine)
+		stm_events = new Sequence;
+		for(t in self.transitions.select(l|l.trigger.isDefined())){
+			if(not stm_events.includes(t.trigger.event)){
+				stm_events.add(t.trigger.event);
+			}
+		}
 	}
 	
 	
+	if(isMachine){
 	for(e in stm_events){
 				
 //		var evt_seq = Sequence{e.FQN() + "_in", //CSPM InOut enumtype is removed for Circus, so becomes 2 channels
@@ -3706,6 +4136,8 @@ operation RC!NodeContainer createchanParaNC()  {
 		}
 	}
 	
+	}//end of isMachine (event channels)
+
 	//Case 2: to generate channels for the events to be used as transition triggers
 	//e.g., CSPM: trigger1__:NIDS.InOut.core_int
 	//Circus: trigger1_stm0_pkg0__in :: NIDS x int
@@ -3714,7 +4146,8 @@ operation RC!NodeContainer createchanParaNC()  {
 //							 //e.FQN() + "__out" , this is removed because the out channel is not necessary, as e.NIDS channel is only used for transition triggers, and a trigger can only be an input.
 //							   };	
 
-		var evt_seq = Sequence{e.name + "__in"//,
+		//name by triggerChan: <e>_<FQN of this container>__in (generator convention, not a rule of the manual)
+		var evt_seq = Sequence{triggerChan(e, self)//,
 							 //e.name + "__out" , this is removed because the out channel is not necessary, as e.NIDS channel is only used for transition triggers, and a trigger can only be an input.
 							   };	
 							   							   	
@@ -3732,7 +4165,7 @@ operation RC!NodeContainer createchanParaNC()  {
 	
 	//7. Declaring call and ret events for undefined operations as channels
 	
-	if(self.hasRequiredOps()){//TBC with Pedro: is hasRequiredOps enough?
+	if(isMachine and self.hasRequiredOps()){//TBC with Pedro: is hasRequiredOps enough?
 		var undefined_ops_chanpara = createChannelPara("undefined_op_channel_stmbd_" + self.FQN());
 		for(ri in self.rInterfaces){
 			for(op in ri.operations){
@@ -3798,6 +4231,7 @@ operation RC!NodeContainer createchanParaNC()  {
 	var internal_events_channelsetPara = internal_events_channelset.createChanSetPara("internal_events_in_stmbd_"+self.FQN());
 	
 	
+	if(isMachine){
 	//shared_variable_events
 	var shared_var_events_channelset = createChannelSet(createBasicChannelSetExpr(sharedVarSet(self)));
 	var shared_variable_events_channelsetPara = shared_var_events_channelset.createChanSetPara("shared_variable_events_in_stmbd_"+self.FQN());
@@ -3833,6 +4267,7 @@ operation RC!NodeContainer createchanParaNC()  {
 	
 	//11. assumption-guarantee violation channel: aviol for assumption violation, gviol for guarantee violation
 	var ag_chanpara = Sequence{"aviol", "gviol"	}.createChannelPara("assumption-guarantee_viol_" + self.FQN());
+	}//end of isMachine (shared variable events, semantic events, aviol/gviol)
 	
 }
 
@@ -3996,9 +4431,13 @@ operation RC!Type createTypeExpr(): Z!Expr{
 	}
 
 	//TO DO: a general relation A <-> B (not a function) has no printer in the EGLs yet
-	if(self.isTypeOf(RelationType)){
-		("createTypeExpr: relation types are not supported yet: " + self).println();
-//		return ??
+	//Since 23 Nov 2026 (with KK): relation, vector and matrix types are the marker GENERATOR_ERROR_type_<kind>
+	//(generatorErrors.eol), so that the generation goes on and Isabelle stops at the declaration that uses the
+	//type; before, createTypeExpr returned nothing and the generation stopped ("Called method 'createRefExpr' on
+	//undefined object"). Set types (issue BB) are not changed here.
+	if(self.isTypeOf(RelationType) or self.isTypeOf(VectorType) or self.isTypeOf(MatrixType)){
+		("createTypeExpr: type not supported: " + self).println();
+		return generatorErrorMarker("type", self.type().name).createRefExpr(false,false);
 	}
 	
 	if(self.isTypeOf(SeqType)){  
@@ -4323,6 +4762,29 @@ operation ncCoreBehaviour(nc: RC!NodeContainer): Z!ActionPara{
 	
 	/***************begin of C.2.2 metanotatin************************/
 	
+	//Rule 41 with Definition C.2.2, AS THE MANUAL (p. 47): |[vars(nc.nodes) | flowevts, transSync(nc), end |
+	//vtguards(nc) : {}]|, i.e. pr = pw = vars(nc.nodes), qr = vtguards(nc), qw = {} (the manual explains
+	//why the transitions are taken to write nothing in parallel). So setL_v is used for the variables of
+	//vars(nc.nodes) that the guards read (pw /\ qr), and there is no setR.
+	//DIFFERENT FROM RoboTool's CSP-M (difference D2, docs/SEMANTICS_DIFFERENCES.md), kept, also when nc is a
+	//composite state: the CSP-M (CStateGenerator.xtend NCCoreBehaviour_rule 80-108, nodeVars 446-451,
+	//CTransitionGenerator.xtend 281-305, robochart-csp-gen a6412b40c8) uses on the node side every variable
+	//of the machine (allVariables), on the Trans side the variables read by the guards (qr) and the variables
+	//bound by trigger parameters (qw); hence setL_v for every variable read by a guard (also one that no node
+	//writes, e.g. v1 of ex10) and setR_v for a variable bound by a trigger. Checked with FDR on Legitimate
+	//(flat): no effect on the behaviour.
+	//Reason (Pedro, 16 Nov 2026): the empty write set of the Trans side is right: the behaviour of a state
+	//machine is sequential; while a transition action runs no state is active, and when a transition is
+	//triggered no action of any state (inner states included) is running. The extra variables of the CSP-M
+	//on the Trans side are not needed but harmless. D2 closed: the manual is followed.
+	//HAZARD (not handled, Fang's decision of 16 Nov 2026: keep the manual for now): vars(nc.nodes) (Rules 46,
+	//48, 50) contains for an operation call only the call's arguments and requiredVariables (the parameters
+	//of the operation), not the variables that the called operation's definition reads or writes. If an
+	//action of a node calls an operation that writes a variable occurring nowhere in the nodes, that write is
+	//not synchronised here (Pedro, 16 Nov 2026: vars(s.nodes) should include the variables of the called
+	//operations; the manual is incomplete there). No effect now: operation calls are not supported (generator
+	//issue R). When R is implemented, this side must include the variables of the called operations, or use
+	//all variables of the machine as the CSP-M does.
 	var ncCoreBehaviour = createMetaParallelAction(nc, 
 												  composedNodeActionTidsRenamed, 
 												  vars(nc.nodes), 
@@ -4352,7 +4814,7 @@ operation vtguards(nc: RC!NodeContainer):  Set<String>{
 //CSP Rule 46
 operation vars(nodeset:Set<RC!Node>): Set<String>{
 	"Rule 46 is called".println();
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	varset = Set{};
 
 	for(n in nodeset){
@@ -4365,7 +4827,10 @@ operation vars(nodeset:Set<RC!Node>): Set<String>{
 //CSP Rule 47
 operation vars(ts: Set<RC!Transition>):Set<String>{
 	"Rule 47 is called".println();
-	var varset = Set<String>;
+	//Rule 47, corrected 15 Nov 2026 (correction 1 of 3 in Rules 47, 49, 50; no change for flat machines).
+	//an instance, not the type: with the type, a container whose transitions use no variable returned a
+	//collection type instead of a set (met with composite states, where Rule 48 calls this rule)
+	var varset = new Set<String>;
 	for(t in ts){
 		varset = varset.includingAll(vars(t));//Rule 49
 	}
@@ -4376,7 +4841,7 @@ operation vars(ts: Set<RC!Transition>):Set<String>{
 //CSP Rule 48
 operation vars(node: RC!Node):Set<String>{
 	"Rule 48 is called".println();
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	varset = Set{};
 	if(node.instanceOf(RC!State)){
 		for(a in node.actions){
@@ -4394,15 +4859,21 @@ operation vars(node: RC!Node):Set<String>{
 //CSP Rule 49
 operation vars(t: RC!Transition):Set<String>{
 	"Rule 49 is called".println();
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	if(t.condition.isDefined()){
-		varset = varset.includingAll(vars(t.condition));//Rule 50
+		//Rule 49, corrected 15 Nov 2026 (correction 2 of 3).
+		//The manual writes vars(t.condition) u vars(t.action) u vars(t.deadline), but gives vars only for
+		//nodes, transitions and statements (Rules 46 to 51); for the condition, an expression, the function
+		//is usedVariables (Rule 45), as vtguards of Rule 41 uses it.
+		//the condition is an expression: there is no vars rule for expressions (Rule 50 is for statements);
+		//its variables are those of Rule 45. Reached only through a composite state (Rule 48).
+		varset = varset.includingAll(usedVariablesInExpr(t.condition, nc(t)));
 	}
 	if(t.action.isDefined()){
 		varset = varset.includingAll(vars(t.action));//Rule 50
 	}
 	if(t.deadline.isDefined()){
-		varset = varset.includingAll(vars(t.deadline));
+		varset = varset.includingAll(usedVariablesInExpr(t.deadline, nc(t)));
 	}
 	
 	return varset;
@@ -4410,14 +4881,20 @@ operation vars(t: RC!Transition):Set<String>{
 
 //CSP Rule 50
 operation vars(stmt: RC!Statement):Set<String>{
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	varset = Set{};
 	
 	if(stmt.instanceOf(RC!Assignment)){
 //		varset = usedVariables(stmt.left).includingAll(usedVariables(stmt.right));
 //		THIS line above nc(stmt.left.name) is commented out, because usedVariables (Rule 45) does not cover VarRef, a subclass of Assignable
 		
-		varset = Set{stmt.left.name.name }.includingAll(usedVariablesInExpr(stmt.right, nc(stmt)));
+		//Rule 50, corrected 15 Nov 2026 (correction 3 of 3). The manual has usedVariables(s.left) u
+		//usedVariables(s.right) for an assignment.
+		//rootVarName: the variable of the left-hand side, also for an indexed one (x[i] = e), where
+		//stmt.left.name does not exist (met on Adaptation_Plan through a composite state)
+		varset = Set{stmt.left.rootVarName() }.includingAll(usedVariablesInExpr(stmt.right, nc(stmt)));
+		//23 Nov 2026 (LL): and the variables of the index expressions of the left-hand side, x[i] = e
+		varset = varset.includingAll(stmt.left.leftReadVariables(nc(stmt)));
 		//stmt.left is an Assignable, stmt.left.name is a Variable
 		//nc(stmt.left.name) returns the basiccontext that defines this variable
 		// we use the nc(stmt) as scope or nc(stmt.left.name) as scope? e.g., in module stm0, var is a local and to be renamed using EXT
@@ -4435,7 +4912,15 @@ operation vars(stmt: RC!Statement):Set<String>{
 	} else
 	
 	if(stmt.instanceOf(RC!IfStmt)){
-		varset = usedVariablesInExpr(stmt.expression, nc(stmt)).includingAll(vars(stmt.then)).includingAll(vars(stmt.`else`));
+		//Fix of generator issue FF (22 Nov 2026, branch composite-states; present since the rules of the ITP 2026
+		//paper). An if statement without else has stmt.else undefined; vars(undefined) was dispatched by EOL to the
+		//Rule 46 overload vars(nodeset), whose loop calls vars(n) on the undefined element again: StackOverflowError
+		//for every if without else in an entry, during or exit action (Rule 48 reaches this rule; transition
+		//actions do not). The else part is now taken only when it exists, as in createIfStmtAsAction.
+		varset = usedVariablesInExpr(stmt.expression, nc(stmt)).includingAll(vars(stmt.then));
+		if(stmt.`else`.isDefined()){
+			varset = varset.includingAll(vars(stmt.`else`));
+		}
 	} else
 	
 	if(stmt.instanceOf(RC!CommunicationStmt) and (stmt.communication._type=CommunicationType#SYNC or stmt.communication._type=CommunicationType#OUTPUT)){
@@ -4484,7 +4969,7 @@ operation requiredVariables(op: RC!OperationSig): Set<String>{
 //CSP Rule 51
 operation vars(seq: Sequence<RC!Statement>):Set<String>{
 
-	var varset = Set<String>;
+	var varset = new Set<String>;
 	for(stmt in seq){
 		varset = varset.includingAll(vars(stmt));
 	}
@@ -4724,6 +5209,22 @@ operation setRC(nameset: Set<String>):Set<String>{
 }
 
 
+//Generator convention, not a rule of the manual (14 Nov 2026).
+//The manual (Rules 42, 43, 55) writes the trigger event eventId(e).id(source)[.in]; it does not name or
+//declare the channel. RoboTool's CSP-M names the channel e__ and declares it in the module of each node
+//container. Here all channels are constructors of one Isabelle datatype, so the path of the container is
+//part of the name.
+//Name of the trigger channel of event e in the node container nc: <e>_<FQN of nc>__in.
+//The channel is typed with the node identifiers of ONE container (NIDS_<FQN of nc>), so its name carries the
+//full path of that container, innermost first, as every other name built from an FQN. Before 14 Nov 2026 it
+//was e.name + "__in" (event name only). The suffix "__in" stays at the end: the HOL-CSP templates recognise
+//the channel by it (eventBase). The external event channels <e>_in / <e>_out are deliberately NOT qualified:
+//connections match them by name.
+//Every place that names a trigger channel must use this operation.
+operation triggerChan(e: RC!Event, nc: RC!NodeContainer): String{
+	return e.name + "_" + nc.FQN() + "__in";
+}
+
 //CSPM example:
 /****************************
 [[ stop__.x____ 	<- stop,
@@ -4742,7 +5243,8 @@ operation renameTriggerEventsPairL(nc:RC!NodeContainer): Sequence<String>{
 	for(t in nc.transitions.select(l|l.trigger.isDefined())){
 		//NOTE: the HOL-CSP templates (holEvent in circusM2T_HOLCSP*.egl) rely on this exact "\\<^bold>." marker
 		//to print the event as (c v); change both together. See the comment above holEvent for the background.
-		pairL.add(t.trigger.event.name +"__in" +"\\<^bold>.x" ); //syntax for Isacircus
+		//Rule 42: the left-hand side is the trigger channel of THIS container (triggerChan), renamed to <e>_in
+		pairL.add(triggerChan(t.trigger.event, nc) +"\\<^bold>.x" ); //syntax for Isacircus
 //		pairL.add(t.trigger.event.name +"__in" +"\\<cdot>x" );
 //		pairL.add(t.trigger.event.FQN()+"__in" +"\\<cdot>x" );
 		//in Isabelle, event1\<cdot>x means the set of events that take all values of the first type of event1  when the tirgger's type is a product.
@@ -4913,7 +5415,8 @@ operation tevent_str(t: RC!Transition): String{
 //		tevent_string = t.trigger.event.name + "__in\\<cdot>NID_" + t.source.FQN();
 		//NOTE: the HOL-CSP templates (holEvent in circusM2T_HOLCSP*.egl) rely on this exact "\\<^bold>." marker
 		//to print the event as (c v); change both together. See the comment above holEvent for the background.
-		tevent_string = t.trigger.event.name + "__in\\<^bold>.NID_" + t.source.FQN(); //syntax for isacircus
+		//Rule 43: the trigger channel of the container of t (triggerChan), at the source node of t
+		tevent_string = triggerChan(t.trigger.event, nc(t)) + "\\<^bold>.NID_" + t.source.FQN(); //syntax for isacircus
 	}
 	
 	return tevent_string;
@@ -4933,7 +5436,8 @@ operation tevent(t: RC!Transition): Z!Communication{
 	} 
 	
 	else {
-		chan_name = t.trigger.event.name + "__in";
+		//Rule 43: the trigger channel of the container of t (triggerChan)
+		chan_name = triggerChan(t.trigger.event, nc(t));
 //		chan_name = t.trigger.event.FQN() + "__in";
 		commu = createOutputCommunicationFromString(chan_name, para_name, "SYNC");
 	}
@@ -4975,6 +5479,11 @@ operation usedVariables(stmt:RC!Statement):Set<String>{
 	
 	if(stmt.instanceOf(RC!Assignment)){
 		varSet = usedVariablesInExpr(stmt.right,container);
+		//23 Nov 2026 (generator issue LL): an assignment to a field or an element, r.f = e or x[i] = e, also
+		//reads the root variable (the value written is r with f updated, x with element i updated) and the
+		//variables of the index expressions. Before, only the right-hand side was read, and the root variable
+		//was free in the generated equation unless it was read for another reason.
+		varSet = varSet.includingAll(stmt.left.leftReadVariables(container));
 	} else
 	if(stmt.instanceOf(RC!Call)){
 		for(arg in stmt.args){
@@ -5030,6 +5539,26 @@ operation usedVariablesInExpr(expr:RC!Expression, container: Any): Set<String>{
 //			set.add(value.name + "_" + container.FQN());
 		}
 
+	} else
+	//LetExpression (15 Nov 2026, branch composite-states; generator issue X). Rule 45 (usedVariables of an
+	//expression) is "standard and omitted" in the manual; the variables read by let x == e1, ... @ e are those
+	//of the values e1, ... and of the body e. The values are held in declarations : Declaration, and a
+	//Declaration is not an Expression, so the generic case below never reached them: a variable that occurs
+	//only in the value of a let was not read (no get_v?v before the action, Rule 62 readState), and it was
+	//free in the generated equation. A reference to the bound name x is a RefExp to the Declaration, not to
+	//a Variable, so it is not collected.
+	if(expr.instanceOf(RC!LetExpression)){
+		for(d in expr.declarations){
+			set = set.includingAll(usedVariablesInExpr(d.value,container));
+		}
+		set = set.includingAll(usedVariablesInExpr(expr.expression,container));
+	} else
+	//record literal (23 Nov 2026, LL): the values are held in FieldDefinitions, which are not Expressions, so the
+	//generic case below would not reach them (the same problem as the let of issue X)
+	if(expr.instanceOf(RC!RecordExp)){
+		for(d in expr.definitions){
+			set = set.includingAll(usedVariablesInExpr(d.value,container));
+		}
 	} else
 	{
 		"line814".println();
@@ -5092,7 +5621,11 @@ operation composeNodes(nodes: Set<Node>, nc: RC!NodeContainer): Z!ActionPara{
 //					ndProcSet.add(nd.createSimpleStateAsBasicProcess());
 				} else{
 					nd.createCompositeStateAsActionParas();
-					//ndProcSet.add(nd.createCompositeStateAsBasicProcess()); 
+					//Rule 52: composeNodes composes ALL nodes of the container on {share, terminate}; the
+					//node of a composite state is its paragraph Inactive_<state> (Rule 60). Before 15 Nov 2026
+					//the name was not added, so the composite node was missing from the composition.
+					//the composite node takes part in the composition as every other node
+					ndActionNameSet.add("Inactive_"+nd.FQN());
 				}
 				
 			}
@@ -5363,7 +5896,7 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 	}
 
 	//share -> Trans(n)
-	var choice1_action1_right = createPrefixingAction(createSynchCommunication("share"), ("Trans_"+self.FQN()).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+	var choice1_action1_right = createPrefixingAction(createSynchCommunication("share"), ("Trans_"+self.FQN()).createCallAction(Sequence{"n__id"}.createRefExprSeq(false,false)));
 	
  	var choice1_action1 = createAction2("ExtChoiceAction", choice1_action1_left, choice1_action1_right);
 
@@ -5402,7 +5935,7 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 	var else_pred = createFalsePred();
 	
 	//elseif false then aviol -> Trans(n)
-	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Trans_" + self.FQN()).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Trans_" + self.FQN()).createCallAction(Sequence{"n__id"}.createRefExprSeq(false,false)));
 	elseAction = createGuardedAction(else_pred, elseAction);
 	
 	var actions = Sequence{ifAction, elseAction};
@@ -5429,7 +5962,8 @@ operation RC!NodeContainer createTransitionsAsActionPara(): Z!ActionPara{
 	Trans.isParamCommand = true;
 	Trans.circusAction = readStateA(vguards, trans_action);
 	Trans.declList = new Z!ZDeclList;
-	Trans.declList.decls.add(createVarDeclfromString("n", "NIDS_"+self.FQN()));
+	//the node parameter is n__id (23 Nov 2026, issue NN; before n, captured by a constant n of the model)
+	Trans.declList.decls.add(createVarDeclfromString("n__id", "NIDS_"+self.FQN()));
 	
 
 	return Trans.createActionPara("Trans_" + self.FQN());
@@ -5510,7 +6044,7 @@ operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
 	("Line 5374: final_name" + final_name).println();
 	
 	//Step 2: to create the guard: n = final
-	var src_grd_pred = createMemPredEquality("n", "NID_" + final_name);
+	var src_grd_pred = createMemPredEquality("n__id", "NID_" + final_name);
 	
 	//Step 3: (n = final) & (terminate -> Skip)
 	var final_terminiate = createPrefixingAction(createSynchCommunication("terminate"), createSkipAction());
@@ -5558,7 +6092,7 @@ operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
 	var else_pred = createFalsePred();
 	
 	//elseif false then aviol -> Trans(n)
-	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Transc_" + self.FQN()).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+	var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Transc_" + self.FQN()).createCallAction(Sequence{"n__id"}.createRefExprSeq(false,false)));
 	elseAction = createGuardedAction(else_pred, elseAction);
 	
 	var actions = Sequence{ifAction, elseAction};
@@ -5583,7 +6117,8 @@ operation RC!NodeContainer createTransitionsCoreAsActionPara(): Z!ActionPara{
 	Trans.isParamCommand = true;
 	Trans.circusAction = readStateA(vguards, trans_action);
 	Trans.declList = new Z!ZDeclList;
-	Trans.declList.decls.add(createVarDeclfromString("n", "NIDS_"+self.FQN()));
+	//the node parameter is n__id (23 Nov 2026, issue NN; before n, captured by a constant n of the model)
+	Trans.declList.decls.add(createVarDeclfromString("n__id", "NIDS_"+self.FQN()));
 
 	return Trans.createActionPara("Transc_" + self.FQN());	
 }
@@ -5603,7 +6138,7 @@ operation RC!Transition createTransitionAsCircusAction(): Z!CircusAction{
 	var circusAction;
 	
 	//"n = src"
-	var src_grd_pred = createMemPredEquality("n", "NID_" + self.source.FQN());
+	var src_grd_pred = createMemPredEquality("n__id", "NID_" + self.source.FQN());
 	
 	if(self.source.type().name = "State"){
 					
@@ -5682,7 +6217,7 @@ operation RC!Transition createTransitionAsCircusAction4TransCore(): Z!CircusActi
 	var circusAction;
 	
 	//"n = src"
-	var src_grd_pred = createMemPredEquality("n", "NID_" + self.source.FQN());
+	var src_grd_pred = createMemPredEquality("n__id", "NID_" + self.source.FQN());
 	
 	if(self.source.type().name = "State"){
 					
@@ -5852,7 +6387,8 @@ operation trigger(t: RC!Transition): Z!PrefixingAction{
 		CSPM example: trigger1__!NID_s0.in?a
 		Circus example: trigger1_stm0__in!NID_s0_stm0?a_stm0
 		****************************************/
-		channel_name = t.trigger.event.name + "__in";
+		//Rule 55: the trigger channel of the container of t (triggerChan); before 14 Nov 2026 e.name + "__in"
+		channel_name = triggerChan(t.trigger.event, nc(t));
 //		channel_name = t.trigger.event.FQN() + "__in";		
 		var dot_para = "NID_" + t.source.FQN();
 
@@ -5876,7 +6412,8 @@ operation trigger(t: RC!Transition): Z!PrefixingAction{
 	} else
 	
 	if(t.trigger._type = CommunicationType#SIMPLE){
-		channel_name = t.trigger.event.name + "__in" ;
+		//Rule 55: the trigger channel of the container of t (triggerChan); before 14 Nov 2026 e.name + "__in"
+		channel_name = triggerChan(t.trigger.event, nc(t));
 //		channel_name = t.trigger.event.FQN() + "__in" ;
 		var dot_para = "NID_"+ t.source.FQN();
 //		commu = createSynchCommunication(channel_name);
@@ -6028,7 +6565,25 @@ operation RC!State createSimpleStateAsActionParas() {
 }
 
 
-//Rule 60
+//Rule 60, implemented as RoboTool's CSP-M writes a composite state (15 Nov 2026; before, a draft that did
+//not run). Inactive, Activation, Termination, Active and Exiting are those of a simple state (Rule 59).
+//Checked against the manual (RoboChart Reference Manual, Rule 60) on 15 Nov 2026. As the manual: the
+//frame; During = (SStop /\ ([] e : enteredSS(s) . e -> Skip)) ; entered.id(s) -> ((RUN(enteredSS(s)) |||
+//[[s.during]] ; SStop) /\ interrupt.id(s) -> (SStop /\ end -> Skip)); Behaviour = ([[s]]NC in the meta
+//parallel with During) \ (enteredSS(s), end).
+//Differences from the manual, all following RoboTool's CSP-M:
+//(1) Exiting, as for Rule 59: the manual has (SStop /\ exit -> Skip) ; [[s.exit]] ; exited -> Inactive,
+//    exited NOT under SStop; here (SSTOP /\ (exited -> Skip)) ; Inactive (comment at Exiting). (The final
+//    state, Rule 58, is generated as the manual writes it: SStop /\ exit -> exited -> Inactive.)
+//(2) Behaviour: the manual writes |[vars(s.nodes) | enteredSS(s), end, interrupt | vars(s.during)]|, i.e.
+//    Definition C.2.2 with the variables of the inner nodes on one side and those of the during action on
+//    the other; here all variables of the machine on both sides (see createTwoSidedWriteSync).
+//(3) the synchronisation set of Behaviour: the manual has the whole channel interrupt; here the one event
+//    interrupt_<state>, the only interrupt event of the inner level that is left after the renaming tidsR
+//    of Rule 41.
+//(4) enteredSS(s): the manual takes entered.id(x) for all x in s.nodes; here, and in the CSP-M, for the
+//    states (and final states) only: a junction has no entered event (Rule 57).
+//RunEntered is RUN(enteredSS(s)) of the manual, written as a recursive paragraph (generator convention).
 operation RC!State createCompositeStateAsActionParas(){
 	
 	
@@ -6062,58 +6617,85 @@ operation RC!State createCompositeStateAsActionParas(){
 	
 	
 	/*******************************
-	Behaviour
+	Behaviour (15 Nov 2026; checked against RoboTool's CSP-M of the test models c1 to c6 and of
+	Adaptation_Plan, CSP generator 3.1.0.202608041330)
+
+	Behaviour_S = ( ncBehaviour_S [share -> share and every setR_v] [set_v -> setL_v]
+	                  [| enteredSS(S), interrupt_S, terminate, share, setL_v, setR_v |]
+	                During_S      [share -> share and every setL_v] [set_v -> setR_v]
+	              ) [setL_v -> set_v] [setR_v -> set_v]  \ (enteredSS(S), terminate)
+
+	ncBehaviour_S is Rule 40 with the state as node container: the inner nodes with the inner Trans (Rule 41),
+	the inner flow events hidden, the inner trigger channels renamed. v ranges over ALL variables declared in
+	the machine, on both sides, as in the CSP-M (not reduced by Definition C.2.2).
+	interrupt_S, the interrupt of this node, is also the container interrupt of the inner level.
 	*******************************/
-	var cs = enteredSS(self).asSet().includingAll(Set{"terminate", "interrupt_" + nc(self).FQN()});//TBC
-	var ns1 = vars(self.nodes);
-	var ns2 = vars(self.actions.selectOne(a|a.instanceOf(RC!DuringAction)).action); //Manual: vars(s.during) TBC: s.during.type = statement? 
-	var Beh_act1 = ncbehaviour(self);
-	var Behaviour = createParallelAction(cs,ns1,ns2,Beh_act1.name.word.createCallAction(),"During_"+self.FQN().createCallAction());
-	Behaviour.createActionPara("Behaviour_" + self.FQN());
+	var inner = ncBehaviour(self);
+	var cs = enteredSS(self).asSet().includingAll(Set{"terminate", "interrupt_" + self.FQN()});
+	var Behaviour = createTwoSidedWriteSync(inner.name.word.createCallAction(),
+											("During_"+self.FQN()).createCallAction(),
+											cs,
+											machineVarNames(self));
+	Behaviour = Behaviour.createHideAction(enteredSS(self).includingAll(Sequence{"terminate"}));
+	var BehaviourPara = Behaviour.createActionPara("Behaviour_" + self.FQN());
+	//The check of exit actions of inner states against input triggers (exitTriggerConflicts, 16 Nov 2026) was
+	//removed on 23 Nov 2026: the same as the manual and RoboTool's CSP-M, no hint there (header of this file).
 	
 	
 	/*******************************
-	During
+	RunEntered_S = [] e : enteredSS(S) . e -> RunEntered_S       (RUN(enteredSS(S)) of the CSP-M, as a
+	recursive paragraph: no RUN action is needed in the metamodel or in the templates)
+	*******************************/
+	var runSeq = new Sequence<Z!CircusAction>;
+	for(e in enteredSS(self)){
+		runSeq.add(createPrefixingAction(createSynchCommunication(e), ("RunEntered_"+self.FQN()).createCallAction()));
+	}
+	var runAction;
+	if(runSeq.size()>1){
+		runAction = runSeq.createSequenceAsExtchoiceAction();
+	} else {
+		runAction = runSeq.at(0);
+	}
+	runAction.createActionPara("RunEntered_" + self.FQN());
+	
+	
+	/*******************************
+	During_S = (SStop /\ ([] e : enteredSS(S) . e -> Skip)) ;
+	           entered_S -> ( (RunEntered_S ||| (during action ; SStop))
+	                          /\ (interrupt_S -> (SStop /\ (terminate -> Skip))) )
 	*******************************/
 	//step 1: [] e: enteredSS(s) . e -> Skip
 	var extchoiceSeq = new Sequence<Z!CircusAction>;
 	for(e in enteredSS(self)){
-		extchoiceSeq.add(createPrefixingAction(createSynchCommunication(e.name), createSkipAction()));
+		extchoiceSeq.add(createPrefixingAction(createSynchCommunication(e), createSkipAction()));
 	}
 	var ext_choice;
 	if(extchoiceSeq.size()>1){
 		ext_choice = extchoiceSeq.createSequenceAsExtchoiceAction();
-	} else if(extchoiceSeq.size()=1) {//lvars.size()=1
+	} else {
 		ext_choice = extchoiceSeq.at(0);
 	}
 	
 	//step 2: SStop /\ (step 1)
 	var During_act1 = createAction2("InterruptAction", "SSTOP".createCallAction(), ext_choice);
 	
-	
-	//step 3: RUN(enteredSS(s))
-	var run = createRunAction(enteredSS(self)); 
-	
-	//step 4 [s.during]action ; SStop
+	//step 3: [s.during]action ; SStop
 	var During_act2 = createAction2("SeqAction", self.createStateActionAsCircusAction("DuringAction"), "SSTOP".createCallAction());
 	
-	//step 5: RUN ||| (during;SStop)
-	var During_act3  = createAction2("InterleaveAction", run, During_act2);
+	//step 4: RunEntered ||| (during ; SStop)
+	var During_act3  = createAction2("InterleaveAction", ("RunEntered_"+self.FQN()).createCallAction(), During_act2);
 	
-	
-	//step 6: interrupt.id(s) -> (SStop /\ end -> Skip)
+	//step 5: interrupt.id(s) -> (SStop /\ end -> Skip)
 	var stopInterruptByEnd = createAction2("InterruptAction", "SSTOP".createCallAction(), createPrefixingAction(createSynchCommunication("terminate"), createSkipAction()));
 	var During_act4 = createPrefixingAction(createSynchCommunication("interrupt_" + self.FQN()), stopInterruptByEnd);
 	
-	
-	//step 7: interruption 
+	//step 6: interruption 
 	var During_act5 = createAction2("InterruptAction", During_act3, During_act4);
 	
+	//step 7: entered.id(s) -> ()
+	During_act5 = createPrefixingAction(createSynchCommunication("entered_"+self.FQN()), During_act5);
 	
-	//step 8: entered.id(s) -> ()
-	During_act5 = createPrefixingAction(createSynchCommunication("enter_"+self.FQN()), During_act5);
-	
-	//step 9: sequential
+	//step 8: sequential
 	var During = createAction2("SeqAction", During_act1, During_act5);
 	
 	During.createActionPara("During_" + self.FQN());
@@ -6139,6 +6721,108 @@ operation RC!State createCompositeStateAsActionParas(){
 
 }
 
+
+//Auxiliary of Rule 60 (generator convention, not a rule of the manual).
+//The machine (state machine or operation) that a node container belongs to: the container itself, or the
+//enclosing machine of a composite state.
+operation machineOf(nc: RC!NodeContainer): RC!NodeContainer{
+	var c = nc;
+	while(c.instanceOf(RC!State)){
+		c = c.eContainer();
+	}
+	return c;
+}
+
+//Auxiliary of Rule 60 (Behaviour).
+//The names of the variables of the machine of nc, as allVariables(stm) of RoboTool's CSP-M generator
+//(GeneratorUtils.xtend, allVariables, https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/GeneratorUtils.xtend#L483),
+//in its order: the parameters of an operation definition, the variables of the machine itself, of the
+//interfaces it provides and of the interfaces it uses (16 Nov 2026: parameters and provided interfaces
+//added). For a state machine there are no parameters, and the RoboChart validator forbids state machines and
+//operation definitions to provide interfaces ("... cannot provide interface"), so for every model accepted
+//by RoboTool the provided part is empty; it is kept to follow the source. After the FQN pre-processing
+//v.name is the qualified name of a variable of a state machine.
+//Required interfaces (stm.RInterfaces, the last loop of allVariables) added on 16 Nov 2026 (generator issue EE;
+//docs/SEMANTICS_DIFFERENCES.md entry 2): before, they were missing. All variables of the machine are a safe
+//superset (Pedro, 16 Nov 2026). No generated model changes (Adaptation_Plan has only defined interfaces; c7,
+//the only test model with requires, cannot be generated yet, issue DD). A required variable whose name is
+//already in the list is not added again (stmVars of the CSP-M collects allVariables in a set).
+operation machineVarNames(nc: RC!NodeContainer): Sequence<String>{
+	var m = machineOf(nc);
+	var names = new Sequence<String>;
+	if(m.isKindOf(RC!OperationDef)){
+		for(v in m.parameters){ names.add(v.name); }
+	}
+	for(vl in m.variableList){
+		if(vl.modifier = RC!VariableModifier#VAR){
+			for(v in vl.vars){ names.add(v.name); }
+		}
+	}
+	for(provided_interface in m.pInterfaces){
+		for(vl in provided_interface.variableList){
+			if(vl.modifier = RC!VariableModifier#VAR){
+				for(v in vl.vars){ names.add(v.name); }
+			}
+		}
+	}
+	for(defined_interface in m.interfaces){
+		for(vl in defined_interface.variableList){
+			if(vl.modifier = RC!VariableModifier#VAR){
+				for(v in vl.vars){ names.add(v.name); }
+			}
+		}
+	}
+	//required interfaces (16 Nov 2026, generator issue EE): the last loop of allVariables
+	for(required_interface in m.rInterfaces){
+		for(vl in required_interface.variableList){
+			if(vl.modifier = RC!VariableModifier#VAR){
+				for(v in vl.vars){ if(not names.includes(v.name)){ names.add(v.name); } }
+			}
+		}
+	}
+	return names;
+}
+
+//Rule 60 (Behaviour), Definition C.2.2 in its two-sided form. DIFFERENT FROM THE MANUAL (p. 53, difference
+//R60-vars of docs/SEMANTICS_DIFFERENCES.md): Rule 60 has |[vars(s.nodes) | cs | vars(s.during)]|, for which
+//Definition C.2.2 uses setL for the variables in vars(s.nodes) /\ vars(s.during) and setR likewise; here,
+//as in RoboTool's CSP-M (CStateGenerator.xtend compileCompositeStateBehaviour 340-356, stmVars 453-458,
+//GeneratorUtils.xtend allVariables 483-511, robochart-csp-gen a6412b40c8), ALL variables of the machine
+//are used on both sides (c5: also for a composite state that uses no variable).
+//Reasons: (1) ours: During is not under SStop at its prefix entered_<state>; with smaller sets a write of
+//the inner machine at that moment would not be synchronised with During. (2) Pedro, 16 Nov 2026: the
+//formula of the manual is right in intent but incomplete: vars(s.nodes) should also contain the variables
+//read and written by the definitions of the software operations called inside the composite state
+//(including the variables the machine provides and those required by the called operations); the CSP
+//semantics of the nodes alone, or of the operations alone, is not enough; the CSP-M uses all variables of
+//the machine for convenience, a superset, which guarantees the right behaviour. Decision (Fang, 16 Nov
+//2026): keep allVariables as the CSP-M.
+//The two-sided write synchronisation of Behaviour of a composite state (Rule 60), as RoboTool's CSP-M
+//writes it:
+//  ( P [share -> share, setR_v...] [set_v -> setL_v...]  [| cs, share, setL_v..., setR_v... |]
+//    Q [share -> share, setL_v...] [set_v -> setR_v...] ) [setL_v -> set_v...] [setR_v -> set_v...]
+//for all v in vs. createMetaParallelAction (Rule 41) is not used: its part for the right-hand writes adds
+//the pairs to the renaming of P after P has been renamed.
+operation createTwoSidedWriteSync(P: Z!CircusAction, Q: Z!CircusAction, cs: Set<String>, vs: Sequence<String>): Z!CircusAction{
+	var PpairR = Sequence{"share"}; var PpairL = Sequence{"share"};
+	var QpairR = Sequence{"share"}; var QpairL = Sequence{"share"};
+	for(v in vs){ PpairR.add("share"); PpairL.add("setR_"+v); }
+	for(v in vs){ PpairR.add("set_"+v); PpairL.add("setL_"+v); }
+	for(v in vs){ QpairR.add("share"); QpairL.add("setL_"+v); }
+	for(v in vs){ QpairR.add("set_"+v); QpairL.add("setR_"+v); }
+	var channel_names = new Set<String>;
+	channel_names.addAll(cs);
+	channel_names.add("share");
+	for(v in vs){ channel_names.add("setL_"+v); channel_names.add("setR_"+v); }
+	var par = createParallelAction(channel_names, P.createRenameAction(PpairR, PpairL), Q.createRenameAction(QpairR, QpairL));
+	if(vs.size() = 0){
+		return par;
+	}
+	var outR = new Sequence<String>; var outL = new Sequence<String>;
+	for(v in vs){ outR.add("setL_"+v); outL.add("set_"+v); }
+	for(v in vs){ outR.add("setR_"+v); outL.add("set_"+v); }
+	return par.createRenameAction(outR, outL);
+}
 
 operation createParallelAction(cs: Set<String>,
 							   ns1: Set<String>,
@@ -6636,6 +7320,43 @@ RoboChart Assignable = VarRef | ArrayAssignable | VarSelection
 The update is built recursively from the innermost Assignable outwards.
 ***********************************************/
 
+//The name of a record field qualified by its record type, R.f (23 Nov 2026, generator issues NN and LL). In
+//Isabelle the fields of a record R are the constants R.f; with two records that have a field of the same name
+//the unqualified f refers to the one declared last (checked: Point.x and Pixel.x, x p0 is a type error for
+//p0 :: Point), and an unqualified f also clashes with any other constant f of the theory.
+operation Any qualifiedFieldName(): String{
+	var c = self.eContainer();
+	if(c.isDefined() and c.isKindOf(RC!RecordType)){
+		return c.name + "." + self.name;
+	}
+	return self.name;
+}
+
+//The variables an assignment reads through its left-hand side (23 Nov 2026, generator issue LL): none for x = e;
+//for r.f = e and x[i] = e the root variable (its old value is updated) and the variables of the index
+//expressions, at every level.
+operation RC!Assignable leftReadVariables(container: Any): Set<String>{
+	var s = new Set<String>;
+	if(self.isTypeOf(RC!VarRef)){
+		return s;
+	}
+	s.add(self.rootVarName());
+	var a = self;
+	while(not a.isTypeOf(RC!VarRef)){
+		if(a.isTypeOf(RC!ArrayAssignable)){
+			for(ix in a.parameters){
+				s = s.includingAll(usedVariablesInExpr(ix, container));
+			}
+			a = a.value;
+		} else if(a.isTypeOf(RC!VarSelection)){
+			a = a.receiver;
+		} else {
+			return s;
+		}
+	}
+	return s;
+}
+
 //name of the variable at the root of an Assignable, e.g. modelScore for modelScore[model]
 operation RC!Assignable rootVarName(): String{
 	if(self.isTypeOf(RC!VarRef)){
@@ -6669,7 +7390,7 @@ operation RC!Assignable createReadExpr(): Z!Expr{
 	if(self.isTypeOf(RC!VarSelection)){
 		var expr = new Z!BindSelExpr;
 		expr.expr = self.receiver.createReadExpr();
-		expr.name = self.member.name.createZName();
+		expr.name = self.member.qualifiedFieldName().createZName(); //qualified since 23 Nov 2026 (NN, LL)
 		return expr;
 	}
 	("createReadExpr: unsupported Assignable " + self).println();
@@ -6689,8 +7410,9 @@ operation RC!Assignable createUpdatedValueExpr(new_value: Z!Expr): Z!Expr{
 		return self.value.createUpdatedValueExpr(upd);
 	}
 	if(self.isTypeOf(RC!VarSelection)){
+		//the field name qualified by the record type since 23 Nov 2026 (NN, LL): r\<lparr>R.f := e\<rparr>
 		var upd = createOperatorApplExpr("_recupd_",
-			Sequence{self.receiver.createReadExpr(), self.member.name.createRefExpr(false,false), new_value});
+			Sequence{self.receiver.createReadExpr(), self.member.qualifiedFieldName().createRefExpr(false,false), new_value});
 		return self.receiver.createUpdatedValueExpr(upd);
 	}
 	("createUpdatedValueExpr: unsupported Assignable " + self).println();
@@ -6791,7 +7513,7 @@ operation RC!Statement createStmtInContextAsAction(): Z!CircusAction{
 		*/
 //		var id = "tbd";
 //		var elseAction = createPrefixingAction(createSynchCommunication("aviol"), ("Trans_" + id).createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
-		var elseAction = createPrefixingAction(createSynchCommunication("aviol"), stmt_container.createCallAction(Sequence{"n"}.createRefExprSeq(false,false)));
+		var elseAction = createPrefixingAction(createSynchCommunication("aviol"), stmt_container.createCallAction(Sequence{"n__id"}.createRefExprSeq(false,false)));
 		elseAction = createGuardedAction(else_pred, elseAction);
 	
 	
@@ -6809,23 +7531,25 @@ operation RC!Statement createStmtInContextAsAction(): Z!CircusAction{
 
 //CSP Rule 65_aux
 operation RC!Statement createStmtAsAction(): Z!CircusAction{
+	//withToolkitGuards (16 Nov 2026, generator issue AA): the preconditions of toolkit functions, for the four
+	//kinds of statements that the CSP-M generator guards (assignment, call, communication, if)
 	if(self.instanceOf(RC!Assignment)){
-		return self.createAssignmentStmtAsAction();
+		return self.withToolkitGuards(self.createAssignmentStmtAsAction());
 	} else
 	if(self.instanceOf(RC!Call)){
-		return self.createCallStmtAsAction();
+		return self.withToolkitGuards(self.createCallStmtAsAction());
 	} else
 	if(self.instanceOf(RC!Skip)){
 		return self.createSkipStmtAsAction();
 	} else
 	if(self.instanceOf(RC!CommunicationStmt)){
-		return self.createCommuStmtAsAction();
+		return self.withToolkitGuards(self.createCommuStmtAsAction());
 	} else
 	if(self.instanceOf(RC!ParStmt)){
 		return self.createParStmtAsAction();
 	} else
 	if(self.instanceOf(RC!IfStmt)){
-		return self.createIfStmtAsAction();
+		return self.withToolkitGuards(self.createIfStmtAsAction());
 	} else
 	if(self.instanceOf(RC!SeqStatement)){
 		return self.createSeqStmtAsAction();
@@ -6887,32 +7611,124 @@ operation RC!Assignment createAssignmentStmtAsAction(): Z!CircusAction{
 	
 	
 
-	//if assignment.right is a function call, and the function has a precondition, then circusAction should be guarded with function.precondition
-	//e.g., pre_Chemical_location(gs) & (share__choice(set_anl!Chemical_location(gs) -> SKIP)
-	if(self.right.instanceOf(RC!CallExp)){
-		("line 3207, self.right.`function`.type = " + self.right.`function`.type()).println();
-		("line 3208, self.right.`function`.ref = " + self.right.`function`.ref).println();
-		
-		var size = self.right.`function`.ref.preconditions.size();
-			
-		if(size>0){
-			var precond = self.right.`function`.ref.preconditions.at(0).createExpr();
-			if(size>1){
-				precond = createAndExpr(precond, self.right.`function`.ref.preconditions.at(1).createExpr());
-				var i = 2;
-				while(i<size){
-					precond = createAndExpr(precond, self.right.`function`.ref.preconditions.at(i).createExpr());
-					i++;
-				} 
-			}
-			
-			var pred = precond.createMemPredEquality();
-			circusAction = createGuardedAction(pred, circusAction);
-	
+	//if assignment.right is a call of a USER-DEFINED function with preconditions, circusAction is guarded by
+	//the conjunction of its preconditions with the arguments of the call in place of the formal parameters,
+	//e.g. x = location(gs) with precondition size(gs) > 0 gives (size(gs) > 0) & (SSTOP /\ set_x!location(gs) -> Skip);
+	//the CSP-M writes pre_Chemical_location(gs) & ... (userPreconditionGuard below).
+	//Fix of generator issue CC (22 Nov 2026, branch composite-states). Before, the precondition was copied with the
+	//FORMAL parameters (x = head(q) got the guard of head with the formal of head) and toolkit functions got a
+	//second guard besides the one of AA (toolkitGuards). Now: toolkit functions are skipped (AA guards them), the
+	//formals are replaced by the arguments (by position, each argument in parentheses), and a bound name of the
+	//precondition (quantifier, lambda, set comprehension, let) that occurs in an argument is renamed first.
+	//PROVISIONAL: the preconditions are guards as in RoboTool's CSP-M. In January 2026 Ana and Alvaro concluded that
+	//the right semantics is that of the manual, which does not treat a precondition as a guard; the guards of the
+	//CSP-M are a pragmatic choice. The ITP 2026 paper uses the semantics with guards. When preconditions become
+	//definedness proof obligations, this guard is removed (with the guards of AA, in the same change).
+	//Only for an assignment whose right-hand side is the call itself (as before the fix); AA covers four kinds of
+	//statement and descends into divisions, sequence indexing and arguments (docs/SEMANTICS_DIFFERENCES.md, entry 7).
+	if(self.right.isKindOf(RC!CallExp)){
+		var g = self.right.userPreconditionGuard();
+		if(g.isDefined()){
+			circusAction = createGuardedAction(g.createMemPredEquality(), circusAction);
 		}
 	}
-	
+
 	return circusAction;
+}
+
+//Generator issue CC (22 Nov 2026): the guard of a call of a user-defined function with preconditions, or null.
+//null for a call of a toolkit function (guarded by AA, toolkitGuardsOf), of a function-typed variable or constant
+//(no preconditions) and of a function without preconditions. Several preconditions are joined by conjunction.
+operation RC!CallExp userPreconditionGuard(): Any{
+	var f = self.`function`;
+	if(not (f.isTypeOf(RC!RefExp) and f.ref.isKindOf(RC!Function))){
+		return null;
+	}
+	var pkg = packageOf(f.ref);
+	if(pkg.isDefined() and toolkitPackages().includes(pkg.name)){
+		return null;
+	}
+	var pres = f.ref.preconditions;
+	if(pres.size() = 0){
+		return null;
+	}
+	var precond = null;
+	for(p in pres){
+		var e = self.substitutedPrecondition(p).createExpr();
+		if(e.isUndefined()){
+			//createExpr has no case for the expression (e.g. exists, forall, lambda, set comprehension: not translated
+			//anywhere by this generator); the marker as the guard, so that Isabelle stops here instead of the guard
+			//being lost (22 Nov 2026; before the fix of CC such a guard was not checked)
+			("Precondition of " + f.ref.name + " not translated (expression not supported, e.g. a quantifier); "
+				+ "printed as the guard marker").println();
+			return generatorErrorMarker("untranslated_precondition", f.ref.name).createRefExpr(false,false);
+		}
+		if(precond.isUndefined()){
+			precond = e;
+		} else {
+			precond = createAndExpr(precond, e);
+		}
+	}
+	return precond;
+}
+
+//Generator issue CC (22 Nov 2026): a copy of the precondition pre of the function called by self with the arguments
+//of the call in place of the formal parameters (by position; a copy of each argument, printed in parentheses). Bound names of
+//the copy that occur in an argument are renamed first (name_1, name_2, ...; fresh with respect to the names of the
+//arguments and of the precondition), so that no name of an argument is captured. The copy keeps its references to
+//its own bound variables (EcoreUtil.copy), so renaming a bound variable renames its occurrences.
+operation RC!CallExp substitutedPrecondition(pre: RC!Expression): RC!Expression{
+	var fn = self.`function`.ref;
+	var copy = clone(pre);
+	var argNames = new Set;
+	for(a in self.args){
+		for(x in Sequence{a}.includingAll(allContentsOf(a))){
+			if(x.isKindOf(RC!RefExp)){ argNames.add(x.ref.name); }
+		}
+	}
+	var copyNodes = Sequence{copy}.includingAll(allContentsOf(copy));
+	var used = new Set;
+	used.addAll(argNames);
+	for(x in copyNodes){
+		if(x.isKindOf(RC!RefExp)){ used.add(x.ref.name); }
+		if(x.isKindOf(RC!Variable) or x.isKindOf(RC!Declaration)){ used.add(x.name); }
+	}
+	for(x in copyNodes){
+		if((x.isKindOf(RC!Variable) or x.isKindOf(RC!Declaration)) and argNames.includes(x.name)){
+			var k = 1;
+			while(used.includes(x.name + "_" + k)){ k++; }
+			("CC: bound name " + x.name + " of a precondition of " + fn.name + " renamed to " + x.name + "_" + k
+				+ " (it occurs in an argument)").println();
+			x.name = x.name + "_" + k;
+			used.add(x.name);
+		}
+	}
+	var emfTool = new Native("org.eclipse.epsilon.emc.emf.tools.EmfTool");
+	var ecoreUtil = emfTool.ecoreUtil;
+	for(x in copyNodes){
+		if(x.isKindOf(RC!RefExp) and fn.parameters.includes(x.ref)){
+			//a copy of the argument, not a new RC!ParExp: a new object would be added to the RoboChart model as a
+			//root. The parentheses come from the printers, which print every binary operation, call and
+			//indexing in parentheses or as an atom (createExpr drops a ParExp anyway).
+			var arg = clone(self.args.at(fn.parameters.indexOf(x.ref)));
+			if(x = copy){
+				copy = arg;
+			} else {
+				ecoreUtil.replace(x, arg);
+			}
+		}
+	}
+	return copy;
+}
+
+//all objects contained in o, at any depth (eContents recursively)
+operation allContentsOf(o: Any): Sequence{
+	var r = new Sequence;
+	for(c in o.eContents()){
+		r.add(c);
+		r.addAll(allContentsOf(c));
+	}
+	return r;
 }
 
 operation createStopAction(): Z!StopAction{
@@ -6982,7 +7798,16 @@ operation RC!IfStmt createIfStmtAsAction(): Z!IfGuardedCommand{
 		
 		actions = Sequence{ifActionInContext, elseActionInContext};
 	} else {
-		actions = Sequence{ifActionInContext};
+		//Generator issue FF, second part (22 Nov 2026, branch composite-states; present since the rules of the ITP
+		//2026 paper). Without else the command had one branch and was printed "if b then P" without else, which
+		//Isabelle does not parse (transition actions as well as state actions). As RoboTool's CSP-M
+		//(CStatementGenerator.xtend 274, "else SKIP") and the meaning of "if e then s end" in RoboChart: the
+		//missing else is Skip. Same construction of the negated condition as for an else above.
+		var no_else_expr = new RC!Not;
+		no_else_expr.exp = clone(if_expr);
+		var pred_no_else = no_else_expr.createExpr().createMemPredEquality();
+		var skipActionInContext = createGuardedAction(pred_no_else, createSkipAction());
+		actions = Sequence{ifActionInContext, skipActionInContext};
 	}
 	
 	var action = createIFGuardedCommand(actions);
@@ -7694,6 +8519,15 @@ operation RC!CallExp createCallExpr(): Z!ApplExpr{
 	("line 6843, self.`function`.ref.name = " + self.`function`.ref.name).println();
 	
 	expr.leftExpr = self.`function`.createExpr();
+	//A function of a toolkit (16 Nov 2026, generator issue AA): written with the qualified name
+	//<package>_<function>, as RoboTool's CSP-M generator does (ExpressionGenerator.xtend, compileCallExpression,
+	//https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/untimed/ExpressionGenerator.xtend#L190-L237);
+	//the templates print it by toolkitFunctionTable (toolkitFunctions.eol). A toolkit function that is not
+	//in the table, and size of a set, stop the generation.
+	var tkName = toolkitCallName(self);
+	if(tkName.isDefined()){
+		expr.leftExpr = tkName.createRefExpr(false,false);
+	}
 	
 	("self.function = " + self.`function`).println();
 	("self.function.type = " + self.`function`.type()).println();
@@ -7714,6 +8548,119 @@ operation RC!CallExp createCallExpr(): Z!ApplExpr{
 	return 	expr;
 }
 
+
+//Generator convention, not a rule of the manual (16 Nov 2026, generator issue AA). The qualified name
+//<package>_<function> of a call of a toolkit function, or null for another call. For a toolkit function that
+//is not supported (not in toolkitFunctionTable) and for size of a set, the marker of generatorErrors.eol
+//(GENERATOR_ERROR_unsupported_toolkit_<package>_<function>, GENERATOR_ERROR_size_of_set) in place of the
+//name, printed as a call; Isabelle stops there (16 Nov 2026, branch m2t-partial-output; before, these cases
+//stopped the generation).
+operation toolkitCallName(c: RC!CallExp): Any{
+	var f = c.`function`;
+	if(not (f.isTypeOf(RC!RefExp) and f.ref.isKindOf(RC!Function))){
+		return null;
+	}
+	var pkg = packageOf(f.ref);
+	if(pkg.isUndefined() or not toolkitPackages().includes(pkg.name)){
+		return null;
+	}
+	var name = pkg.name + "_" + f.ref.name;
+	if(not toolkitFunctionTable().containsKey(name)){
+		("Toolkit function " + f.ref.name + " (package " + pkg.name + ") is not supported by the HOL-CSP "
+			+ "generator yet (generator issue AA; see toolkitFunctions.eol); printed as a marker.").println();
+		return generatorErrorMarker("unsupported_toolkit", name);
+	}
+	if(name = "sequence_toolkit_size"){
+		var t = c.args.first().rcType();
+		if(t.isDefined() and t.isKindOf(RC!SetType) and not t.isKindOf(RC!SeqType)){
+			("Toolkit function size applied to a set is not supported by the HOL-CSP generator yet "
+				+ "(generator issue AA: the Isabelle term would be card); printed as a marker.").println();
+			return generatorErrorMarker("size_of_set", "");
+		}
+	}
+	return name;
+}
+
+//Preconditions of toolkit functions as guards (16 Nov 2026, generator issue AA). As RoboTool's CSP-M
+//generator (CStatementGenerator.xtend, guards(Statement), guards(Expression) and guard, lines 447-562 of
+//https://github.com/UoY-RoboStar/robochart-csp-gen/blob/a6412b40c83ded4ab2c18c2b9bd28575ec270983/circus.robocalc.robochart.generator.csp/src/circus/robocalc/robochart/generator/csp/comp/untimed/CStatementGenerator.xtend#L447-L562):
+//an assignment, a communication statement, an operation call and an if statement are guarded by
+//pre_<function>(args) for every call of a function with a precondition that the guards of the CSP-M
+//generator reach: the expressions of the statement (for a communication its value, for an if its condition,
+//for an assignment also the index of an indexed left-hand side), descending only through divisions, sequence
+//indexing and the arguments of calls, as there. The guard is placed after the reads of the statement and
+//before it, as there (readState(vars, guard & stmt)); several guards are nested in the reverse order, as the
+//CSP-M writes g1 & g2 & ... & stmt. Only toolkit functions; DIFFERENT FROM CSP-M: the guards of the CSP-M
+//for division by zero and for an index outside the sequence are not generated here; the preconditions of
+//user-defined functions only for x = f(args) (createAssignmentStmtAsAction, generator issue CC, fixed 22 Nov
+//2026). Transition conditions are not guarded, in the CSP-M neither. PROVISIONAL (22 Nov 2026): see CC.
+operation RC!Statement toolkitGuards(): Sequence{
+	var conds = new Sequence;
+	if(self.isKindOf(RC!CommunicationStmt)){
+		if(self.communication.value.isDefined()){
+			conds.addAll(toolkitGuardsOf(self.communication.value));
+		}
+	} else if(self.isKindOf(RC!IfStmt)){
+		conds.addAll(toolkitGuardsOf(self.expression));
+	} else {
+		for(e in self.eContents().select(x|x.isKindOf(RC!Expression))){
+			conds.addAll(toolkitGuardsOf(e));
+		}
+		if(self.isKindOf(RC!Assignment) and self.left.isKindOf(RC!ArrayAssignable)
+			and self.left.parameters.size() = 1){
+			conds.addAll(toolkitGuardsOf(self.left.parameters.first()));
+		}
+	}
+	return conds;
+}
+
+//guards(Expression) of the CSP-M generator, keeping only the preconditions of toolkit functions
+operation toolkitGuardsOf(o: Any): Sequence{
+	var conds = new Sequence;
+	if(o.isKindOf(RC!Div)){
+		conds.addAll(toolkitGuardsOf(o.left));
+		conds.addAll(toolkitGuardsOf(o.right));
+	} else if(o.isKindOf(RC!ArrayExp)){
+		var t = o.value.rcType();
+		if(t.isDefined() and t.isKindOf(RC!SeqType) and o.parameters.size() = 1){
+			conds.addAll(toolkitGuardsOf(o.value));
+			conds.addAll(toolkitGuardsOf(o.parameters.first()));
+		}
+	} else if(o.isKindOf(RC!CallExp)){
+		var name = toolkitCallName(o);
+		//a marker (unsupported function, size of a set) has no guard of its own: the call is the marker
+		if(name.isDefined() and not name.startsWith("GENERATOR_ERROR_")
+			and o.`function`.ref.preconditions.size() > 0){
+			var pre = "pre_" + name;
+			if(not toolkitFunctionTable().containsKey(pre)){
+				//no pre_ entry in the table: the marker as the guard (16 Nov 2026; before, an exception)
+				pre = generatorErrorMarker("no_precondition_guard", name);
+			}
+			if(pre.startsWith("GENERATOR_ERROR_") or toolkitFunctionTable().get(pre) <> ""){
+				var g = new Z!ApplExpr;
+				g.mixFix = false;
+				g.leftExpr = pre.createRefExpr(false,false);
+				var args = new Sequence<Z!Expr>;
+				for(a in o.args){ args.add(a.createExpr()); }
+				g.rightExpr = args.createTupleExpr();
+				conds.add(g);
+			}
+		}
+		for(e in o.args){
+			conds.addAll(toolkitGuardsOf(e));
+		}
+	}
+	return conds;
+}
+
+//the action of a statement under its guards (toolkitGuards), nested in the reverse order
+operation RC!Statement withToolkitGuards(action: Z!CircusAction): Z!CircusAction{
+	var a = action;
+	for(g in self.toolkitGuards()){
+		a = createGuardedAction(g.createMemPredEquality(), a);
+	}
+	return a;
+}
 
 //covers Neg, Not
 //TO DO: is there other unaryApplExpr?
@@ -7959,9 +8906,53 @@ operation RC!Expression createExpr():Z!Expr{
 		return self.createEnumExpr();
 	} //else
 	
+	//Fix of generator issue MM (23 Nov 2026): a literal with arguments, Shape::Circle(1.0), is a CallExp whose
+	//function is the EnumExp; translated to the constructor application (Circle 1.0) (_conapp_, printed by the
+	//templates as the application of the constructor to its arguments). Before, the generation stopped.
+	if(self.isTypeOf(RC!CallExp) and self.`function`.isTypeOf(RC!EnumExp)){
+		var cargs = Sequence{self.`function`.literal.name.createRefExpr(false,false)};
+		for(arg in self.args){
+			cargs.add(arg.createExpr());
+		}
+		return createOperatorApplExpr("_conapp_", cargs);
+	} //else
+
 	if(self.isTypeOf(RC!CallExp)){
 		"line 7080 executed".println();
 		return self.createCallExpr();
+	} //else
+
+	//Fix of generator issue LL (23 Nov 2026, branch composite-states): field access r.f (RC!Selection) is the
+	//field selection of Isabelle, printed (R.f r) by the templates (BindSelExpr) with the field name QUALIFIED
+	//by the record type (two records may have a field of the same name, NN); a record literal R(| f = e, ... |)
+	//(RC!RecordExp) is the record construction \<lparr>R.f = e, ...\<rparr> (_reclit_), the fields in the order
+	//of the declaration (Isabelle requires it). Before, both stopped the generation (createExpr returned
+	//nothing: "The 'no null' constraint is violated"), on main as well.
+	if(self.isTypeOf(RC!Selection)){
+		if(self.member.isKindOf(RC!Field)){
+			var sel = new Z!BindSelExpr;
+			sel.expr = self.receiver.createExpr();
+			sel.name = self.member.qualifiedFieldName().createZName();
+			return sel;
+		}
+		return generatorErrorMarker("unsupported_selection", self.member.name).createRefExpr(false,false);
+	} //else
+	if(self.isTypeOf(RC!RecordExp)){
+		var rargs = new Sequence;
+		for(f in self.record.fields){
+			var d = self.definitions.selectOne(x | x.field = f);
+			rargs.add(f.qualifiedFieldName().createRefExpr(false,false));
+			if(d.isDefined()){
+				rargs.add(d.value.createExpr());
+			} else {
+				rargs.add(generatorErrorMarker("missing_field", f.name).createRefExpr(false,false));
+			}
+		}
+		return createOperatorApplExpr("_reclit_", rargs);
+	} //else
+	//a string literal "abc" is the Isabelle string ''abc'' (needed with KK: strings get a default)
+	if(self.isTypeOf(RC!StringExp)){
+		return ("''" + self.value + "''").createRefExpr(false,false);
 	} //else
 	
 	if(self.isTypeOf(RC!SeqExp)){
@@ -8133,6 +9124,9 @@ operation RC!Expression rcType(): RC!Type{
 	if(self.isTypeOf(RC!LetExpression)){
 		return self.expression.rcType();
 	}
+	if(self.isTypeOf(RC!Selection) and self.member.isKindOf(RC!Field)){ //23 Nov 2026 (LL): r.f has the type of f
+		return self.member.type.resolveType();
+	}
 	if(self.isTypeOf(RC!IfExpression)){
 		return self.ifexp.rcType();
 	}
@@ -8156,6 +9150,15 @@ operation RC!ArrayExp createTupleSelExprGeneral(): Z!TupleSelExpr{
 		("createTupleSelExprGeneral: tuple index must be a number literal in " + self).println();
 	}
 	tupleSelExpr.numeral.value = self.parameters.first().value;
+	//arity of the tuple (15 Nov 2026, generator issue Y): the number of components of the RoboChart product
+	//type of the selected value, which createExpr has checked to be a ProductType before calling this
+	//operation. The attribute is a deviation from CZT (see the annotation in circus_metamodel.ecore); the
+	//templates need it to print the projection of an n-tuple (tupleSelection.eol). Left at 0 (unknown) if the
+	//type cannot be determined.
+	var base_type = self.value.rcType();
+	if(base_type.isDefined() and base_type.isKindOf(RC!ProductType)){
+		tupleSelExpr.arity = base_type.types.size();
+	}
 	return tupleSelExpr;
 }
 

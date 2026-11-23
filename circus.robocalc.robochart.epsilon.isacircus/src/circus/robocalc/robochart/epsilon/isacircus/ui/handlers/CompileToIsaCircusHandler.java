@@ -21,6 +21,7 @@ import org.eclipse.epsilon.emc.emf.InMemoryEmfModel;
 
 import circus.robocalc.robochart.epsilon.isacircus.loader.RctLoader;
 import circus.robocalc.robochart.epsilon.isacircus.loader.RuntimeResourceSets;
+import circus.robocalc.robochart.epsilon.isacircus.m2t.PartialOutput;
 import org.eclipse.epsilon.eol.EolModule;
 import org.eclipse.epsilon.eol.exceptions.EolRuntimeException;
 import org.eclipse.epsilon.eol.exceptions.models.EolModelLoadingException;
@@ -47,6 +48,11 @@ import org.eclipse.epsilon.eol.dt.ExtensionPointToolNativeTypeDelegate;
  *         circus_gen/IsaCircus_enriched_*.thy
  *         hol-csp_gen/HOLCSP_*.thy
  *         hol-csp-abstact_gen/HOLCSP_AbstractInst_*.thy
+ *
+ *   Each template of Step 2 is caught on its own (16 Nov 2026, PartialOutput): a template that throws writes the
+ *   text generated so far, under its usual file name, with INCOMPLETE at the beginning and GENERATOR ERROR (and
+ *   an ML command that stops Isabelle there) at the end; the other templates still run. The failures are
+ *   reported by a dialog and in the log. A failure of Step 1 still stops before Step 2.
  */
 public class CompileToIsaCircusHandler extends AbstractHandler implements IRunnableWithProgress {
 
@@ -299,6 +305,27 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
     return; // stop here, do not proceed to Step 2
 }
 
+        // Warnings of RC2Z (16 Nov 2026, GeneratorNotes; at present the name clash of functions of imported
+        // packages, GG; the exit-action check of composite states was removed on 23 Nov 2026): reported, the
+        // generation goes on; the theories carry them as comments
+        final java.util.List<String> notes = circus.robocalc.robochart.epsilon.isacircus.m2t.GeneratorNotes.collect(circusModel);
+        if (!notes.isEmpty()) {
+            StringBuilder nb = new StringBuilder();
+            for (String n : notes) {
+                CompileLog.warning("RC2Z.eol: " + n);
+                nb.append(n).append("\n\n");
+            }
+            final String noteText = nb.toString();
+            org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+                org.eclipse.jface.dialogs.MessageDialog.openWarning(
+                    org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                    "IsaCircus: generator warning",
+                    "The theories are generated; the generator found the following, also written as comments "
+                    + "(GENERATOR WARNING) in the theories:\n\n" + noteText
+                    + "Log: " + CompileLog.LOG_FILE.getPath());
+            });
+        }
+
         // Disposing circusModel triggers storeOnDisposal, writing _circus.model to temp dir
         circusModel.dispose();
         // rcModel is disposed after Step 2, which uses the same resolved resource
@@ -331,8 +358,12 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         //   "circus_gen/IsaCircus_enriched_*.thy"
         //   "hol-csp_gen/HOLCSP_*.thy"
         //   "hol-csp-abstact_gen/HOLCSP_AbstractInst_*.thy"
+        // the template factory catches the exception of each template (PartialOutput, 16 Nov 2026); before,
+        // new EgxModule(rctDirAbsPath), where the first failing template aborted the EGX and wrote nothing
+        PartialOutput.Factory templateFactory = null;
         try {
-            EgxModule egxModule = new EgxModule(rctDirAbsPath);
+            templateFactory = new PartialOutput.Factory(java.nio.file.Paths.get(rctDirAbsPath).toAbsolutePath());
+            EgxModule egxModule = new EgxModule(templateFactory);
             System.out.println("[DEBUG] EGX base dir: " + rctDirAbsPath);
             egxModule.parse(new java.net.URI(
                 "platform:/plugin/circus.robocalc.robochart.epsilon.isacircus/erules/CircusM2T.egx"));
@@ -368,6 +399,27 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
         rcModel.dispose();
         monitor.worked(3);
 
+        // templates that failed: their partial output is written; report them as 1b3615b reports errors
+        final java.util.List<PartialOutput.Failure> failures = templateFactory.getFailures();
+        if (!failures.isEmpty()) {
+            StringBuilder msg = new StringBuilder();
+            for (PartialOutput.Failure f : failures) {
+                CompileLog.error("CircusM2T.egx: template " + f + "\n" + CompileLog.describe(f.cause), f.cause);
+                msg.append(f.template).append(", ").append(f.where).append(":\n  ").append(f.reason)
+                   .append("\n  incomplete output: ").append(f.target != null ? f.target : "?").append("\n\n");
+            }
+            final String why = msg.toString();
+            org.eclipse.swt.widgets.Display.getDefault().asyncExec(() -> {
+                org.eclipse.jface.dialogs.MessageDialog.openError(
+                    org.eclipse.swt.widgets.Display.getDefault().getActiveShell(),
+                    "IsaCircus: generation of the theories failed in part",
+                    "Step 2 (CircusM2T.egx): " + failures.size() + " template(s) failed. The text generated "
+                    + "before the error is written, marked INCOMPLETE at the beginning and GENERATOR ERROR at "
+                    + "the end; the other theories are complete.\n\n" + why
+                    + "Full stack traces: Error Log view, and " + CompileLog.LOG_FILE.getPath());
+            });
+        }
+
         // ── Refresh the Eclipse workspace ─────────────────────────────────────
         // Without this, the newly generated .thy files won't appear in the
         // Project Explorer until the user manually refreshes.
@@ -377,8 +429,13 @@ public class CompileToIsaCircusHandler extends AbstractHandler implements IRunna
             e.printStackTrace();
         }
         monitor.worked(1);
-        System.out.println("IsaCircus .thy files generated successfully for: " + baseName);
-        CompileLog.info("generated the theories of " + baseName + " under " + rctDirAbsPath);
+        if (failures.isEmpty()) {
+            System.out.println("IsaCircus .thy files generated successfully for: " + baseName);
+            CompileLog.info("generated the theories of " + baseName + " under " + rctDirAbsPath);
+        } else {
+            CompileLog.warning("generated the theories of " + baseName + " under " + rctDirAbsPath + "; "
+                + failures.size() + " of them INCOMPLETE (template errors above)");
+        }
         monitor.done();
     }
 }

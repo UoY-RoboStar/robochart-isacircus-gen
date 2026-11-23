@@ -1,5 +1,5 @@
 #!/bin/bash
-# Compiles RctLoader (plugin source) and the tools in src/ against the jars of an installed RoboTool.
+# Compiles RctLoader and PartialOutput (plugin sources) and the tools in src/ against the jars of an installed RoboTool.
 # usage: dev-tools/build.sh [RoboTool dir]   (default ~/tools/robotool-1.3.2026102101)
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -10,5 +10,6 @@ ls "$P"/*.jar | grep -E "/(org\.eclipse\.xtext|org\.eclipse\.xtend|com\.google\.
   | grep -v -E "\.ui[._]|\.ide[._]|source|\.tests" | tr '\n' ':' > "$HERE/build/classpath.txt"
 javac -d "$HERE/build/classes" -cp "$(cat "$HERE/build/classpath.txt")" \
   "$HERE/../circus.robocalc.robochart.epsilon.isacircus/src/circus/robocalc/robochart/epsilon/isacircus/loader/"*.java \
+  "$HERE/../circus.robocalc.robochart.epsilon.isacircus/src/circus/robocalc/robochart/epsilon/isacircus/m2t/"*.java \
   "$HERE"/src/*.java
 echo "built into $HERE/build/classes"
