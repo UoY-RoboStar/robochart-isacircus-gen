@@ -725,3 +725,31 @@ after checking for each that the generated Trans equation of f585967 is that of 
 Section 3 and Sections 12, 13 ran the TurtleBot `ddl` configuration without the invariant and the running example
 ag_true with E1, and did not run `Trans_no_ag`; corrected in Section 14.2 (conclusions unchanged). Section 13.2: the a8
 theory now loads without initial values (KK fixed).
+
+## 16. Menu generation in RoboTool with 1.0.0.202611231420; renaming (23 Nov 2026, evening)
+
+### 16.1 Menu output (Fang, RoboTool copy, plugin 1.0.0.202611231420)
+
+New files (timestamps 15:19-15:31) in all four projects: `turtlebot-test` (Adaptation_Plan_flat_ddlf, 151904),
+`kk-test` (kk_defaults, 151948), `c8-test` (c8_exit_input, 152007), `DTI-ScrewDetection-lighting-robochart-enriched`
+(Adaptation_Plan, 153122); `~/.isacircus/compile.log`: a compile and a "generated the theories" record for each, no
+WARNING, no ERROR. Against GenAll of f585967 on the same .rct (the workspace c8 differs from the repository copy only in
+the header comment): the trans-core theories of c8, kk and TurtleBot identical, all other files the same tokens in
+another order. c8: no GENERATOR WARNING. kk: varMemory starts with Red, `(Circle (0))`, `⦇Point.x = 0, Point.y = 0⦈`,
+`''''`, 0, True, [], (0,True). No INCOMPLETE or error markers. Isabelle (one process at a time): the HOL-CSP theories of
+TurtleBot (1:21), c8 (2:29), kk (1:54) and DTI (3:53) load; trans core: kk loads; TurtleBot and c8 stop at the `done`
+of the generated lemma, DTI at it and at the `quickcheck` on `NUM_MODELS` (issue T, as in Section 15). No process left
+over.
+
+### 16.2 Renaming
+
+Details: `docs/RENAMING.md`. Correctness: the earlier verification (AG-dev 569f606, edee426, a5f1576,
+`Relational_Renaming_Laws.thy`, the ex10 and Legitimate pilots on generated relations) covers direction, prefix
+renaming with the same value, one-to-many and identity outside the domain for flat machines; added: session
+`renaming_tests` (AG-dev trigger-fqn-naming a1e0d30) on the relations of c2 (composite state: tidsR, two-sided write
+synchronisation), d3 (untyped trigger projection) and ll_records (typed), taken by ML from the generated equations, and
+a script over all 994 clauses of all generated test outputs (four shapes, no mismatch). Shorter notation on branches
+`renaming-short` (generator 58cc646, AG-dev library fd44ca3), NOT merged: renaming text about halved, longest renaming
+line DTI 1246 to 191 characters, the 94 relations proved equal to the old ones, the trans-core and ITP proof theories
+unchanged, load time and memory unchanged. Recommendation: not for this release (it needs a new RC_HOL-CSP together
+with the plugin).
