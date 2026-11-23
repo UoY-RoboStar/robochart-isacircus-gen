@@ -387,3 +387,188 @@ Changes needed (assessment):
 
 Files read: `~/Git/claude-context/robochart-isacircus-gen/CLAUDE.md` (DD 818-830, JJ 919-923, open issue 4 at 1154);
 `~/Git/robochart-isacircus-gen/docs/COMPOSITE_RELEASE_TEST.md` (89, 101, 119, 158, 279-280, 368-370).
+
+## 5. Renaming, process and action, channel names (23 Nov 2026, second read-only pass)
+
+Generator composite-states f2c2087 (code as 5a8a377); library = repository root of RoboChart-Deadlock-HOLCSP-AG-dev
+(RC_HOL-CSP); manual = `~/Git/robochart-reference` (branch csp-m-differences, rule texts as master; rules counted in
+`chapter4.tex` without the commented-out ones, which gives Rule 41 = ncCoreBehaviour and Rule 60 = composite states,
+as in the August 2022 PDF). Example outputs: GenAll of the composite test models c1 and c7
+(`robochart-models/composite-tests/`).
+
+### 5.1 Renaming in the HOL-CSP output
+
+RC2Z creates a `Z!RenameAction` (or `Z!RenameProcess`) with two parallel name lists wherever a rule renames:
+Rule 41 tidsR (4649), Rule 40 trigger projection (4602), the write synchronisation of Definition C.2.2 (4937, 4969,
+5004; the two-sided form of Rule 60, 6775-6782), Rule 25 `share <- set_EXT_v` (2780), and in the controller path
+Rule 22 (2728) and Rule 15 (1857).
+
+All three active templates print every non-empty renaming as the RELATIONAL renaming of RC_HOL-CSP, not as the
+functional `Renaming` of HOL-CSP:
+
+- circusM2T_HOLCSP.egl: `parseRenameProcess` 407-409 and `parseRenameAction` 667-669 print
+  `(P ⟦⟦R⟧⟧)` with R from `parseRelRenaming` 1083-1121: `λrn_a rn_b.` one disjunct per pair
+  `rn_a = lhs ∧ rn_b = rhs`, plus the clause "rn_a outside the domain ∧ rn_b = rn_a" (events outside the domain
+  unchanged, as in CSP-M); parameterised endpoints get bound variables `rn_x`, `rn_v1`, ... (issues F, G, I; added in
+  95ecf71, 4 Nov 2026; comment 968-977). A renaming without pairs is printed as its operand (402-406).
+- circusM2T_HOLCSP_trans_core.egl: the same printers (311, 571, 963).
+- circusM2T.egl (IsaCircus): `cRename (cCompleteRenaming <relation>) (P)` (233-235, 569-571).
+- The functional form `P ⟦ a := b ⟧` survives only in circusM2T_HOLCSP_AbstractInst.egl (381, 629), whose rule is
+  commented out in CircusM2T.egx (48-50).
+
+tidsR of a composite state IS a renaming. Rule 41 runs with the composite state as node container
+(`ncCoreBehaviour`, RC2Z 4613-4649): pairs `interrupt_<source FQN> <- tevent(t)` for each inner transition and
+`interrupt_<n FQN> <- interrupt_<nc FQN>` for each inner state, so for a composite state S the interrupt of every
+inner state is renamed to S's own `interrupt_S` (and to the inner triggers), one-to-many. Output of c1 (state S with
+inner states A, B), `ncCoreBehaviour_S_C1_composite_c1`:
+
+```
+(composeNodes_S_C1_composite_c1
+ ⟦⟦(λrn_a rn_b. (rn_a = interrupt_i0_S_C1_composite_c1 ∧ rn_b = (internal__S_C1_composite_c1 NID_i0_S_C1_composite_c1))
+    ∨ (rn_a = interrupt_A_S_C1_composite_c1 ∧ rn_b = (a_S_C1_composite_c1__in NID_A_S_C1_composite_c1))
+    ∨ (rn_a = interrupt_B_S_C1_composite_c1 ∧ rn_b = (b_S_C1_composite_c1__in NID_B_S_C1_composite_c1))
+    ∨ (rn_a = interrupt_A_S_C1_composite_c1 ∧ rn_b = interrupt_S_C1_composite_c1)
+    ∨ (rn_a = interrupt_B_S_C1_composite_c1 ∧ rn_b = interrupt_S_C1_composite_c1)
+    ∨ (¬ (rn_a = interrupt_i0_S_...) ∧ ¬ (rn_a = interrupt_A_S_...) ∧ ¬ (rn_a = interrupt_B_S_...) ∧ rn_b = rn_a))⟧⟧)
+```
+
+It is not handled by channel names: the inner nodes keep their own `interrupt_<n FQN>`, and the composite node's
+`interrupt_S` is reached only through this renaming (the manual's `interrupt.id(n) <- interrupt.id(s)`; Rule 60,
+difference (3) in the RC2Z comment 6480-6483: the synchronisation set of Behaviour has the one event `interrupt_S`).
+
+Library (RC_HOL-CSP, repository root of AG-dev):
+
+- `Relational_Renaming.thy` (session RC_HOL-CSP, ROOT line 14; imported by `RoboChart_Library.thy` line 7 since
+  3 Nov 2026, comment lines 20-24, so that a generated theory needs only `RC_HOL-CSP.RoboChart_Library`):
+  `Relational_Renaming` (lift_definition, line 463, inside a context with `right_unique S` for the tick relation);
+  notation `P ⟦⟦R⟧⟧ ≡ Relational_Renaming R (=) P` (1327-1328); `mono_Relational_Renaming` (608); continuity
+  `Relational_Renaming_cont` (711): `finitary_rel R ⟹ finitary_rel S ⟹ cont P ⟹ cont (λx. Relational_Renaming (P x))`,
+  with `finitary_rel R ≡ ∀b. finite {a. R a b}` (282); `Relational_Renaming_non_destructive` (1277) and the
+  restriction-shift rules (1282-1288, in `restriction_shift_process_simpset`: non-destructive, constructive) for
+  fixed points by restriction.
+- `Relational_Renaming_Laws.thy` (ROOT line 17, NOT imported by RoboChart_Library): 82 lemmas, among them
+  `Relational_Renaming_functional` (1913: a functional relation gives `Renaming P f id`), the distribution and
+  Interrupt laws, `Renaming_Sync_saturated`.
+- History (git log, AG-dev): `Relational_Renaming.thy` first appears in 7b1b109 (11 Jun 2026, "daily update", 1347
+  lines, on the master line); 569f606 (2 Nov 2026) "Relational_Renaming in RC_HOL-CSP; ex12 s1 renaming pilot"
+  (branch renaming-pilot-ex12-s1); edee426 (3 Nov 2026) "Bring the relational renaming library ..."; a5f1576
+  (6 Nov 2026) "RC_HOL-CSP: Relational_Renaming fixes, Relational_Renaming_Laws, List_Cpo in RoboChart_Library"
+  (also the first commit of `Relational_Renaming_Laws.thy`).
+- Note on continuity (INFERRED from the definitions, not tested): `Relational_Renaming_cont` needs `finitary_rel`,
+  which fails for the generated relations that map all values of a channel to one event (e.g. `share <- setL_x v` for
+  every v of an infinite type: `{a. R a share}` is infinite). The generated fixrecs do not need it: every renamed
+  operand is a call of ANOTHER constant (`composeNodes_S`, `ncCoreBehaviour_S`, ...; each paragraph is its own
+  fixrec), so the renamed term is constant in the recursion variable. A renaming applied to a recursive call inside
+  one fixrec would need it (or the restriction-shift route).
+
+### 5.2 Process and action
+
+RC2Z header (lines 3-56, "01.Sep.2024"): because of Rule 60 most RoboChart components are translated as ACTIONS;
+ProcessParas only for R1 (module), R12 (module memory), R17 (buffer), R19 (controller, a Basic Process); Process (no
+paragraph) for R14, R15, R18; ActionParas for R13, R20, R25 (machine), R29, R31, R33, R35, R37, R39/40, R41, R52, R53,
+R57-R60; Actions without paragraph for R21, R22, R54, R55, R62-73. So "only controllers and modules (and their
+buffers) are processes, everything else is an action" holds for the code: `createControllerAsProcessPara` returns
+`basicProcess.createProcessPara("controller_proc_" + c.FQN(), true)` (2210), whose Basic Process collects ALL
+ActionParas of the model (2196-2206) with main action `controller_action_<c>`.
+
+Printing (circusM2T_HOLCSP.egl):
+
+- 223-245, for each ProcessPara: `locale <name> begin actions is "(mychan, unit) action" where` followed by
+  `parseBasicProcess` (430-444: each ActionPara as `"<name> = <action>" |`), then
+  `definition "ProcDef = cProcess <main action>"` and `end`. This is IsaCircus syntax (`actions is`, `mychan`,
+  `cProcess`), while the action bodies inside are printed by the HOL-CSP printers (`⟦ ⟧`, `\<^bold>;`, `△`). The
+  HOL-CSP theory neither defines `mychan` nor has the `actions` command of IsaCircus, so Isabelle cannot process it.
+- 248-249: the HOL-CSP branch (`locale actions` with one `fixrec` per ActionPara, the composite-state ordering, the
+  generator notes) runs only if `procparas.size()=0`, i.e. for a model without controller and module.
+
+c7 (controller C7 with `sref s = M`, `opref o = Op`, `connection C7 on a to s on a`), HOL-CSP theory, lines 123-214
+(abridged):
+
+```
+locale controller_proc_C7_composite_c7 
+begin
+
+actions  is "(mychan, unit) action" where 
+"InactiveJct_i0_s_C7_composite_c7 = (SSTOP △ (Activation_i0_s_C7_composite_c7
+  □
+  Termination_i0_s_C7_composite_c7))" | 
+...
+"stm_s_C7_composite_c7 = ((((((stateful_s_C7_composite_c7 \ { terminate })❙;  (SSTOP △ (terminate → Skip))))
+  ⟦ shared_variable_events_in_stmbd_s_C7_composite_c7 ⟧ 
+  Skip)
+  ⟦ { terminate } ⟧ 
+  sharedVarMemory_s_C7_composite_c7) \ ({} :: chan_event set))" | 
+
+"composeMachines_C7_composite_c7 = (stm_s_C7_composite_c7)" | 
+
+"crtlMemory_C7_composite_c7 = ((GENERATOR_ERROR_missing_action_crtlMemory_C7_composite_c7
+  □
+  (terminate → Skip)))" | 
+
+"controller_action_C7_composite_c7 = ((composeMachines_C7_composite_c7
+  ⟦ { terminate } ⟧ 
+  crtlMemory_C7_composite_c7⋅) \ ({} :: chan_event set))"
+
+\<comment> \<open>Main action of the process\<close>
+definition "ProcDef = cProcess controller_action_C7_composite_c7"
+
+end
+```
+
+Visible here: no renaming of the connection `a` (Rule 22 empty, Section 2.3 item 7), no paragraph of the operation
+definition Op (item 8), the controller memory without variables (item 5), `crtlMemory_C7⋅` applied to no argument.
+
+What the controller level needs in HOL-CSP (assessment; all paragraphs of type `chan_event process`, in the
+`locale actions` branch, so the Basic Process must not swallow the ActionParas, RC2Z 2196-2209 and 443-447):
+
+| Manual (Chapter 4) | Paragraph | HOL-CSP form |
+|---|---|---|
+| Rule 19, operations `nproc(op)` of `c.lOperations` | `[[opdef]]STM` with parameters | one `fixrec` per defined operation, parameterised by the operation's parameters (a continuous function `T → chan_event process` as `Memory_x`; Rule 27), called from the machines that use it (today they emit `OpCall`, item 8) |
+| Rule 19, required operations | `oCall.args → Skip` | inline prefix, or a `definition` per operation |
+| Rule 19, main | `((composeMachines ⟦lvars ∪ rvars ∪ lconsts ∪ rconsts⟧ ctrlMemory) \ (lvars ∪ rvars ∪ lconsts)) Θ_end Skip` | `definition` (not recursive) or `fixrec` as the generator writes every paragraph; `Θ_end Skip` written as for the machine (Rule 25 output: `(P \ {terminate}) ❙; (SSTOP △ (terminate → Skip))`, c7 line 192) or with a throw operator if one is in the library (not checked) |
+| Rule 20 ctrlMemory | `Memory(vars)` recursion over the values | `fixrec crtlMemory_c :: "(T1 × ... × Tn) → chan_event process"` (the pattern of `Memory_x`, with the discrete_cpo instances), plus the call with `varvalues`; writes `set_Ext_vid(v,m)` for each machine m that requires v |
+| Rule 21 composeMachines | parallel composition on `connevts` | `definition` (or non-recursive fixrec) |
+| Rule 22 renamingMachine | `[[m]]STM ⟦⟦eventId(e.eto).in <- eventId(e.efrom).out, ...⟧⟧` | relational renaming as already printed by `parseRelRenaming`; requires distinct channels per machine (5.3), otherwise both sides are the same constructor |
+| Rule 23 renStmEvts | channel set | `definition ... :: "chan_event set"` as the other channel sets |
+
+Rules 14-18 (module) likewise: ProcessParas and Processes become definitions/fixrecs of type `chan_event process`;
+the buffer (Rules 17, 18) is a parameterised recursion (fixrec over the buffer contents).
+
+### 5.3 Channel names
+
+FQN (RC2Z 3683-3840): the element's name followed by the names of its containers, innermost first, joined by `_`
+(node `A` in state `S` of machine `C1` of package `composite_c1`: `A_S_C1_composite_c1`; a machine in a controller:
+`s_C7_composite_c7`). The manual: `vid`, `eventId` and `id` "calculate unique identifiers for their parameters
+(variables, events, node containers) ... One possible implementation ... is to calculate the qualified name, and this
+is the implementation realised by RoboTool" (chapter4.tex 14-18). The manual's channels are parameterised (`enter.id(n)`,
+`interrupt.id(n)`, `internal.id(n)`); the generator makes one constructor per node instead, the CSP-M one CSP-M module
+per node (`n::enter`); correspondence table of the CSP-M: manual Appendix G (`appendix7.tex` 68-134, branch
+csp-m-differences).
+
+| Channel | Generator (HOL-CSP), where | Qualified | Manual | CSP-M |
+|---|---|---|---|---|
+| `share` | `share`, template 190 | no, one | $share$ | `share__` |
+| end | `terminate`, RC2Z 333 | no, one | $end$ | `terminate` (per module, renamed) |
+| internal | `internal__<nc>` with parameter `NIDS_<nc>` (values `NID_<n>`), 3880 | by container | $internal.id(n)$ | `internal__.NID_n` |
+| flow | `interrupt_<nc>` (machine only), `exit_<nc>`, `exited_<nc>` for every container, 3896-3900 | by container | $exit$, $exited$ (no parameter); $interrupt.id(nc)$ (Rule 53) | `exit`, `exited` once per machine; `interrupt` of the machine or composite module |
+| node | `enter_<n>`, `entered_<n>`, `interrupt_<n>`, `enteredL_<n>`, `enteredR_<n>` (junctions: enter, interrupt), 4125-4132 | by node | $enter.id(n)$, $entered.id(n)$, $interrupt.id(n)$ | `n::enter`, ... |
+| trigger | `<e>_<nc>__in` with `NIDS_<nc>` (and the event type), `triggerChan` 5138-5140, used at 4062 | by container (since 14 Nov 2026) | $eventId(e)\_\_.id(src).in$ (Rules 42, 43, 55) | `e__.NID_src.in` |
+| events of the machine | `<e>_in`, `<e>_out`, 4048 | NO (deliberately, comment 5135-5136) | $eventId(e).in$, $.out$ (Rules 15, 18, 22, 69) | `e.in`, `e.out` inside the machine's module, renamed in the composition |
+| events of the controller / platform | `<e>_in`, `<e>_out`, 2306 / 1272 | NO | same | `e` in the controller / module module |
+| local variables and constants of a machine | `get_/set_/setL_/setR_<v>_<stm>` (the Variable object is renamed by `FQNllLocalVariables` 842-847, called 352-354; declared 3916-3919) | by machine | $get\_vid(v)$, $set\_vid(v)$; $setL$, $setR$ (Definition C.2.2) | `get_x`, `set_x`, `setL_x`, `setR_x` in the machine's module |
+| required (interface) variables of a machine | `get_<v>`, `set_<v>`, `set_EXT_<v>`, 3964 | NO | $set\_EXT\_vid(v)$ (Rules 3, 25, 37) | `set_EXT_x` in the machine's module |
+| local variables of a defined operation used by the machine | `get_<op>_<v>`, `set_<op>_<v>`, 3999-4000 | by operation | through $vid$ | `get_o_x`, `set_o_x` |
+| controller variables | `get_<v>`, `set_<v>`, 2233-2252; required: `set_EXT_<v>`, 2279 | NO (FQNllLocalVariables runs only for machines) | $set\_vid(v)$; $set\_Ext\_vid(v)$ and $set\_Ext\_vid(v,m)$ (Rules 19, 20: the copy for machine m) | `set_x`, `set_EXT_x`; the memory writes `m::set_EXT_x` |
+| platform (module) variables | `get_<v>`, `set_<v>`, ~1340-1360 | NO | $set\_vid(v)$ (Rules 3, 12) | `set_x` in the module |
+| undefined / required operations | `<op>Call`, 4092 (machine), 2325 (controller), 1295 (module) | NO | $o.nameCall.args$ | `oCall` |
+| a-g | `aviol`, `gviol`, 4189 | NO, once per machine | (not in the manual) | — |
+| node identifiers | type `NIDS_<nc>`, values `NID_<n>`, 3871-3875 | by container / node | $id(n)$ | `NID_n` |
+
+So the names that come from a node, a node container or a machine's own variable are qualified; the names that a
+connection or an interface links across components (events `<e>_in/_out`, interface and controller variables,
+`set_EXT_`, `<op>Call`) and the a-g events are not. In a model with one machine and no controller this is harmless.
+With a controller it causes the duplicate declarations of Section 2.2, and it makes the manual's `vid(v, m)` (one
+`set_Ext` channel per machine m that requires v) and the renamings of Rules 15 and 22 (`eventId(e.eto).in <-
+eventId(e.efrom).out` between two different machines) inexpressible, since both sides are the same constructor. The
+CSP-M gets the distinction from its module namespaces. Possible clash (INFERRED, not tested): FQNs are joined by `_`
+without escaping, so different paths whose names contain `_` can give the same FQN.
