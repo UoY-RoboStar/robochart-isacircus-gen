@@ -434,7 +434,7 @@ end
 }%]
 [%operation Z!RenameProcess parseRenameProcess(): String{
 	if(self.assignmentPairs.isDefined() and self.assignmentPairs.hasRenamePairs()){
-	return  "(" + self.circusProcess.parseProc()  + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenaming() + "\\<rbrakk>\\<rbrakk>)";
+	return  "(" + self.circusProcess.parseProc()  + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenamingShort() + "\\<rbrakk>\\<rbrakk>)";
 	}
 	else {
 	return  "(" + self.circusProcess.parseProc() + ")";
@@ -694,7 +694,7 @@ operation parseActionOrMarker(a: Any, owner: Any): String{
 
 [%operation Z!RenameAction parseRenameAction(): String{
 	if(self.assignmentPairs.isDefined() and self.assignmentPairs.hasRenamePairs()){
-	return  "(" + parseActionOrMarker(self.circusAction, self) + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenaming() + "\\<rbrakk>\\<rbrakk>)";}
+	return  "(" + parseActionOrMarker(self.circusAction, self) + "\r\n" + "	\\<lbrakk>\\<lbrakk>" + self.assignmentPairs.parseRelRenamingShort() + "\\<rbrakk>\\<rbrakk>)";}
 	else {
 	return  "(" + parseActionOrMarker(self.circusAction, self) + ")";
 	}
@@ -1108,6 +1108,84 @@ operation channelArities(): Map{
   (c.v <- d.v for all v, e.g. setL_x <- set_x): the variables rn_v1, ... are shared. If only one side has
   remaining arguments, all of its completions are related to the other side (e.g. share <- setL_x.v for all v,
   interrupt_X <- e__in NID v for all v). Otherwise (mismatch, not expected) the two sides get separate variables.*]
+[*23 Nov 2026 (branch renaming-short, NOT merged): the same renaming as parseRelRenaming in the short notation of
+  RC_HOL-CSP.Renaming_Notation: ren_else [pair, pair, ...], one pair per line, each pair
+    ren_ev a b         event to event
+    ren_chan c d       c v to d v (prefix renaming, the same value; ren_chan2 for two values)
+    ren_chan_ev c b    every c x to b (trigger projection, event without type)
+    ren_proj c d       every c x v to d v (trigger projection, event with type)
+    ren_ev_chan a d    a to every d v (one-to-many, e.g. share to every setR_x v)
+  and ren_else leaves every other event unchanged (the last clause of parseRelRenaming). A pair of another shape
+  is printed as before, as a lambda term (\<lambda>rn_a rn_b. ...), which is also an element of the list.*]
+[%operation String relPar(): String{
+	if(self.indexOf(" ") >= 0 and not self.startsWith("(")){
+		return "(" + self + ")";
+	}
+	return self;
+}%]
+[%operation Sequence relWithoutX(): Sequence{
+	var q = new Sequence;
+	for(p in self){
+		if(p <> "x"){
+			q.add(p);
+		}
+	}
+	return q;
+}%]
+[%operation Sequence relXLast(): Boolean{
+	return self.size() >= 2 and self.last() = "x" and self.relWithoutX().size() = self.size() - 1;
+}%]
+[%operation Z!AssignmentPairs parseRelRenamingShort(): String{
+	var elems = new OrderedSet;
+	var i = 0;
+	while(i < self.lhsElement.names.size()){
+		var lp = self.lhsElement.names.at(i).word.relSplit();
+		var rp = self.rhsElement.exprs.at(i).relRawName().relSplit();
+		var rl = lp.relRest();
+		var rr = rp.relRest();
+		var xl = lp.relHasX();
+		var xr = rp.relHasX();
+		var e = "";
+		if(not xl and not xr and rl = 0 and rr = 0){
+			e = "ren_ev " + lp.relTerm(Sequence{}).relPar() + " " + rp.relTerm(Sequence{}).relPar();
+		} else if(not xl and not xr and rl = 1 and rr = 1){
+			e = "ren_chan " + lp.relTerm(Sequence{}).relPar() + " " + rp.relTerm(Sequence{}).relPar();
+		} else if(not xl and not xr and rl = 2 and rr = 2){
+			e = "ren_chan2 " + lp.relTerm(Sequence{}).relPar() + " " + rp.relTerm(Sequence{}).relPar();
+		} else if(xl and not xr and lp.relXLast() and rl = 0 and rr = 0){
+			e = "ren_chan_ev " + lp.relWithoutX().relTerm(Sequence{}).relPar() + " " + rp.relTerm(Sequence{}).relPar();
+		} else if(xl and not xr and lp.relXLast() and rl = 1 and rr = 1){
+			e = "ren_proj " + lp.relWithoutX().relTerm(Sequence{}).relPar() + " " + rp.relTerm(Sequence{}).relPar();
+		} else if(not xl and not xr and rl = 0 and rr = 1){
+			e = "ren_ev_chan " + lp.relTerm(Sequence{}).relPar() + " " + rp.relTerm(Sequence{}).relPar();
+		} else if(not xl and not xr and rl = 1 and rr = 0){
+			e = "ren_chan_ev " + lp.relTerm(Sequence{}).relPar() + " " + rp.relTerm(Sequence{}).relPar();
+		} else {
+			//any other shape: the clause of parseRelRenaming as a lambda term
+			var lext = relVars("rn_v", rl);
+			var rext = relVars("rn_v", rr);
+			if(rl <> rr and rl > 0 and rr > 0){
+				rext = relVars("rn_w", rr);
+			}
+			var bound = new Sequence;
+			if(xl or xr){
+				bound.add("rn_x");
+			}
+			for(v in lext){
+				bound.add(v);
+			}
+			for(v in rext){
+				if(not bound.includes(v)){
+					bound.add(v);
+				}
+			}
+			e = "(\\<lambda>rn_a rn_b. " + relClause(bound, "rn_a = " + lp.relTerm(lext) + " \\<and> rn_b = " + rp.relTerm(rext)) + ")";
+		}
+		elems.add(e);
+		i++;
+	}
+	return "ren_else\r\n\t    [" + elems.concat(",\r\n\t     ") + "]";
+}%]
 [%operation Z!AssignmentPairs parseRelRenaming(): String{
 	var clauses = new OrderedSet;
 	var domain = new OrderedSet;
