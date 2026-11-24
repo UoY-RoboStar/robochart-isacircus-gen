@@ -313,3 +313,236 @@ changes the relation printer (the short notation of `renaming-short` is independ
 
 Decisions needed from Fang before step 2: the exception form (2.1 (a) or (b)); following the CSP-M in hiding
 unconnected machine events and in synchronising the `set_EXT` copies in Rule 19 (2.1); constants as `consts` (1.2).
+
+## 7. Answers to the questions of 24 Nov 2026 (read-only; nothing implemented)
+
+Outputs read: main f242344 (GenAll) for ctl2 (Section 2.2, now written and valid by the RoboChart parser and
+validator: the controller declares `var obs : int = 0`; a controller cannot `provides` an interface), c7, and the
+original running example (`robot_ctrl`, RoboChart2Circus c0e67a0 `Abstract_examples/example_robot.rct`).
+No IsaCircus environment exists on this workstation (the theories import `Test_Generation.Ax_CyPhyCircus`; no such
+session is installed): the IsaCircus output was analysed as text only.
+
+### 7.1 Channel naming today
+
+Qualified by the FQN of their container: node channels (`enter_/entered_/interrupt_<node FQN>`), flow channels
+(`exit_/exited_/interrupt_<nc FQN>`), `internal__<nc FQN>`, NIDS types, trigger channels (`<e>_<nc FQN>__in`, since
+14 Nov 2026), the variables and constants declared in a state machine (`<v>_<stm FQN>`, `FQNllLocalVariables`, RC2Z
+360-374, restored 3b23960 on 9 Oct 2026), the variables of defined operations (`get_<op FQN>_<v>`).
+NOT qualified: the event channels `<e>_in`/`<e>_out` of machines, controllers and the platform; the interface variable
+channels `get_<v>`, `set_<v>`, `set_EXT_<v>`; the variables of controllers and of the platform (`get_<v>`, `set_<v>`;
+`FQNllLocalVariables` runs only for state machines); `<op>Call`; `aviol`, `gviol`.
+Reasons on record: events, "deliberately not qualified (connections match them by name)" (RC2Z header 92; 369-372
+"renaming events: event channels keep their names (they are matched by connections)", the 9 Oct 2026 restoration;
+5221-5222, comment of `triggerChan`). The original qualified forms are still there commented out
+(`e.FQN() + "_in"` in createchanParaNC, present since the first commit a8177dc). Interface variables: only open
+questions, "TBC with Pedro: v to be FQN at which level? stm or ctrl or pkg?" (2320, 4045) and "TBC here we use v.name
+instead of FQN because we assume all variables have the fully qualified names" (1678, 2466, 2550). `<op>Call`,
+`aviol`, `gviol`: no comment. Consequence (main f242344): duplicated constructors in BOTH outputs: ctl2 `get_obs`,
+`set_obs` (three times), `set_EXT_obs`, `done_in/out`, `ack_in/out`, `aviol`, `gviol` (twice); c7 `a_in`, `a_out`;
+robot_ctrl `get_obs`, `set_obs`.
+
+### 7.2 Printing of the controller level: IsaCircus today, HOL-CSP planned (ctl2)
+
+IsaCircus today (`IsaCircus_enriched_ctl2_t.thy` 215-422, abridged): one `locale controller_proc_C_ctl2` whose
+`actions is "(mychan, unit) action" where` lists ALL paragraphs of the model (the nodes of m1 and m2, ..., then)
+
+```
+"composeMachines_C_ctl2 = ((cRename (cCompleteRenaming ({})) (stm_m1_C_ctl2))
+  \<lbrakk> \<^bold>0 | \<lbrace> terminate \<rbrace> | \<^bold>0 \<rbrakk>
+  (cRename (cCompleteRenaming ({})) (stm_m2_C_ctl2)))" |
+"crtlMemory_C_ctl2(obs :: int) = (((set_obs\<^bold>?x__v \<rightarrow> ctrlMemory_C_ctl2(x__v)) \<box> (terminate \<rightarrow> Skip)))" |
+"controller_action_C_ctl2 = ((composeMachines_C_ctl2
+  \<lbrakk> \<^bold>0 | \<lbrace> set_obs,terminate \<rbrace> | \<^bold>0 \<rbrakk> crtlMemory_C_ctl2((0::int))) \<Zhide> \<lbrace> set_obs \<rbrace>)"
+definition "ProcDef = cProcess controller_action_C_ctl2"
+```
+
+The HOL-CSP theory prints the same locale with HOL-CSP operators inside (lines 409-419): it cannot be processed
+(IsaCircus commands in a HOL-CSP theory). Errors visible in the text, in both: the three connections are lost (empty
+renamings; the machines synchronise only on terminate); the memory sends nothing to the machines (7.4); the memory
+paragraph is `crtlMemory_` but calls `ctrlMemory_`; the duplicated constructors of 7.1.
+
+HOL-CSP planned: Section 2.2 (every paragraph a `fixrec ... :: "chan_event process"` with `[simp del]` in the one
+`locale actions`; the memory one fixrec per variable with a value parameter). fixrec or definition: a paragraph that
+calls itself (memories, buffers, Trans, node paragraphs) must be a fixrec (least fixed point over the cpo of
+processes; its parameter types need `discrete_cpo`, which the templates provide for the basic types, enumerations,
+records, char and lists). A paragraph that does not (renamingMachine, composeMachines, ctrlMemory, controller,
+renamingController, composeControllers, module) can be a `definition`; the plan keeps `fixrec` for them too, as the
+generator does today for every non-recursive paragraph (ncCoreBehaviour, Behaviour, stm_...): one form, the same
+`.simps` names for the proof methods (`deadlock_free'` and the AG-dev methods unfold with `<name>.simps`), and no
+continuity obligation (a fixrec without recursion is constant in its argument). The channel sets (renStmEvts,
+renCtrlEvts, hiddenModuleChannels, memoryChannels) are `definition`s of type `chan_event set`, as the channel sets today.
+Difference to IsaCircus: the IsaCircus form is a Circus process (state, actions, a main action, `cProcess`), the
+HOL-CSP form flat CSP processes over one `chan_event`; the IsaCircus template keeps its form.
+
+### 7.3 set_Ext and set_EXT
+
+Manual (chapter4.tex, Aug 2022 numbering): `set_EXT_vid(v)` in Rule 3 memoryChannels (line 161, `set_EXT_vid(v,c)`),
+Rule 25 (538 the renaming `share \<leftarrow> set_EXT_vid(v)`, 552 sharedVarSync), Rule 37 sharedMemory (828,
+`set_EXT_vid(v)?x \<rightarrow> Memory(x)`), and the text at 561; `set_Ext_vid(v,c)` in Rule 12 modMemory (263);
+`set_Ext_vid(v)` in Rule 19 rvars (424, also the timed copy 2312); `set_Ext_vid(v,m)` and `set_Ext_vid(v)` in Rule
+20 ctrlMemory (437, 440-441). Meaning: the same kind of event, "a write of the required variable v arriving from
+outside the component": the memory of the providing component (controller, module) sends `set_Ext_vid(v,m)` to each
+component m that requires v, and the requiring component receives it as its own `set_EXT_vid(v)` (Rule 37). The
+manual spells it two ways and never defines `vid(v,m)`; the robochart-reference annotation (branch csp-m-differences,
+`appendix7.tex` 77 and 123) already says "Spelling differs within the manual ... the CSP-M has one spelling; the
+second argument of vid(v,c) is realised by qualification with the module of c". CSP-M: one channel name `set_EXT_x`,
+declared in the state machine module and in the controller module (appendix7.tex 77); the controller memory writes
+`stm::set_EXT_x` (comp/untimed `CMemoryGenerator.xtend` 214 for local variables, 219 for required ones, which it
+receives as its own `set_EXT_x`), the machine's shared memory reads `set_EXT_x` (`sharedMemory_rule`, 172-184). So:
+ONE channel per (variable, receiving component), two spellings in the manual. RC2Z: the memories write `set_Ext_<v>_<m
+FQN>` (1659-1666, 2451-2458, 2535-2550) and the machines declare `set_EXT_<v>`: different names. Not changed yet.
+
+### 7.4 The controller memory does not reach the machines
+
+Output: robot_ctrl, both theories: `crtlMemory_robot_ctrl\<cdot>obs\<cdot>dest = ((set_obs\<^bold>?x__v \<rightarrow>
+ctrlMemory_robot_ctrl\<cdot>x__v\<cdot>dest) \<box> (terminate \<rightarrow> Skip))`: no `set_Ext_obs_ObsDetect_...`; ctl2: the
+same, nothing for m1, m2; c7 has no variable (marker `GENERATOR_ERROR_missing_action_crtlMemory_C7_composite_c7`,
+defect 6). Cause: `ctrl_memory` (RC2Z 2425-) selects the machines that require v by
+`ms.select(m|requiredVariables(m).includes(v))` (2445): v is the controller's Variable object, `requiredVariables(m)`
+(1507) returns the Variable objects of the interfaces m requires; they are different objects with the same name, so
+the set is always empty and the branch that builds `set_Ext_..._m!x \<rightarrow> Skip` (2448-2462) is skipped. The CSP-M
+matches by name (`gu.requiredVariables(...).map[x|x.name].contains(v.name)`, CMemoryGenerator 214).
+
+### 7.5 The sixteen defects (Section 3), with their effect on both outputs
+
+| # | Where (f242344) | Effect HOL-CSP | Effect IsaCircus | Fix |
+|---|---|---|---|---|
+| 1 | event channels not unique | duplicate datatype constructors (c7, robot_ctrl, ctl2) | duplicate chantype entries (the same) | Section 1 |
+| 2 | `e\<cdot>in` in Rules 15, 22 (1873-1879, 2744-2750) | renamings with names that are no channels (not reached today: defect 8 empties the renaming first) | the same | eventChan names, prefix pairs for typed events |
+| 3 | renStmEvts, renCtrlEvts: event names and `set_<const>` | `set_dest` (robot_ctrl) in a sync set, undeclared | the same | channel sets of the event channels; no `set_` of constants (7.9) |
+| 4 | `crtlMemory_` vs `ctrlMemory_` (2408 vs 2501, 2505, 2584, 2588) | undefined constant in the memory body | undefined action | a typing error: one name, `ctrlMemory_` |
+| 5 | `set_Ext_` vs `set_EXT_` | different channels (not reached today: defect 7) | the same | 7.3: one channel `set_EXT_<v>_<m FQN>` |
+| 6 | memory without variables (c7) | marker, the theory stops | marker | `terminate \<rightarrow> Skip` |
+| 7 | machines found by object identity (2445) | memory never writes to the machines (7.4) | the same | by name |
+| 8 | connections point to the references (replaceRef), `RC!Connection.all()` | renamings empty: connections lost (c7, ctl2) | the same (`cCompleteRenaming ({})`) | see replaceRef below |
+| 9 | operations: OperationRef not resolved, defined operations not translated | `CALL__Op(1)` (c7) calls no paragraph | the same (`Active_s0` line 133) | Rule 19 / issue R, below |
+| 10 | Basic Process takes all ActionParas (2238-2246) | only one controller works | with two controllers (module) wrong grouping | Section 2.3 |
+| 11 | Rule 1: `bufferSet` undefined, `evasyncs.proc1`, memoryChannels copy (1200-1256) | module with async connections: RC2Z fails or wrong process | the same | rewrite (Section 2.1) |
+| 12 | Rule 14 `"teminate"` (1825) | an undeclared name in the sync set of two controllers | the same | `terminate` |
+| 13 | constants declared twice (1066 in Rule 19 and Rule 25) | possible duplicate `consts` | the same | declare once |
+| 14 | renamingMachine `set_c \<leftarrow> set_c` for required constants (2764) | identity pair with an undeclared name | the same | remove (7.9) |
+| 15 | ordering and notes only in the machine-only branch | composite states in a controller printed in model order | not affected (its own order) | Section 2.3 |
+| 16 | Rule 19 sync set without the machines' `set_EXT` copies; unconnected events not hidden | copies not synchronised (7.8) | the same | as the CSP-M (7.7, 7.8), recorded as differences |
+
+IsaCircus (text): c7's IsaCircus theory has the duplicate `a_in`, `a_out`, the call `CALL__Op(1)` of an undefined
+action, the marker in the memory and the empty renaming of the connection; ctl2's and robot_ctrl's the `crtlMemory_`/
+`ctrlMemory_` mismatch and the duplicates. So the controller part of the IsaCircus output is already wrong at these
+places, independently of HOL-CSP (not loaded: no IsaCircus environment).
+
+Operations (defect 9 and issue R): issue R (generator CLAUDE.md, 14 Nov 2026) is the general one: a call statement is
+translated to `CALL__<op>(args)` and no paragraph of that name is generated (`createCallOpActionPara` builds `<op>Call`
+paragraphs whose result is not used). Defect 9 is its controller part: Rule 19 requires, for every operation defined
+in the controller (`c.lOperations`), a process `nproc(op)(params) = [[opdef]]STM^nops` (the operation definition's
+semantics, Rule 27), for every required operation `nproc(op)(params) = o.nameCall.params \<rightarrow> SKIP`, and passes
+`nops` (operation name to nproc) to `composeMachines`, so that a machine's call statement is `nproc(op)(args)`. So
+defect 9 is issue R plus Rule 27 for defined operations; fixing R (calls name an existing paragraph) is a prerequisite.
+
+replaceRef (RC2Z 1028-1060): for every `RoboticPlatformRef`, `ControllerRef`, `StateMachineRef` it inserts a COPY of
+the referenced definition (`clone(x.ref)`) into the container of the reference, so that every instance has its own
+objects, hence its own FQN-based names (`m1_C_ctl2` and `m2_C_ctl2` for two references to one definition). The removal
+of the reference (`ctl(stmr).machines.remove(stmr)`, `delete stmr`) is commented out with "THIS is commented out
+BECAUSE EOL will fail, msg: Unknown reason" (1044-1057); Fang recalls that it fails once the source model of the
+transformation has been modified before replaceRef is called. Not reproduced here; a likely cause (INFERRED): the
+connections and other objects still refer to the reference objects, and deleting a referenced object in the source
+resource (an Xtext resource with lazy cross-references) fails. Consequence: the references stay, the connections
+still point to them, and the code compares with the copies (defect 8). Alternative (no copy, no deletion, the source
+model unchanged; follow `.ref` when a reference is met): defect 8 disappears (a connection end IS the reference, and
+the translation of the reference is the translation of `ref.ref`), no stale object remains, the source model is not
+modified (which also removes the failure Fang recalls). Cost: every name of an instance (machine, its nodes, variables,
+events) must be computed from the PATH of references (`m1` in `C`), not from the container of the definition, because
+two references share one definition: the FQN operations and every caller would take an instance context. A middle
+way with less change: keep the copies and record the map reference -> copy in replaceRef, and resolve connection ends
+through it (fixes defect 8 only). Duplicate declarations (defect 1, 13) are NOT caused by the copies; they come from
+the naming (7.1) and go with Section 1 either way.
+
+### 7.6 Termination and the exception \<Theta>_end Skip
+
+- State machine (Rule 25, chapter4.tex 530-557): `((stateful(stm) \ {end} ; SStop \<triangle> end \<rightarrow> Skip)
+  [[share \<leftarrow> set_EXT_vid(v)]] |[{shared}]| Skip) |[sharedVarSync \<union> sharedConstSync \<union> {end}]| (sharedVarMemory
+  |[{end}]| sharedConstMemory)) \ (...)`: no \<Theta> at the machine level; `;`, `\<triangle>` and synchronisation on `end`, as Fang
+  recalls. RC2Z (2805-2811) prints exactly this with `terminate` for `end`; `terminate` IS the manual's `end` (one to
+  one: Rules 25, 29, 31-37, 41, 52, 53, 57-60; the CSP-M also calls it `terminate`, appendix7.tex 74, 120).
+- \<Theta>_end Skip in the manual: Rule 1 (chapter4.tex 128) and Rule 19 (416) only (2304 is the timed Rule 19, 698 is
+  commented out).
+- RC2Z (header 72-77, "06.Sep.2024"): "option 1: an Exception action/process in the Circus metamodel, not adopted, to
+  stay consistent with the Circus AST; option 2: remove the Exception by pushing the end event into the process".
+  Option 2 is implemented: Rule 19 adds `terminate` to the synchronisation set of machines and memory (2188, and to
+  the machines' composition 2690 "terminate is added to solve the issue with exception operator"), every memory gets
+  a choice `terminate \<rightarrow> Skip` (2004, 2030, 2076, 2105), Rule 1 adds `terminate` to `evasyncs` and to the memory
+  channels (1203, 1243 "this terminate is added to deal with the EXCEPTION operator issue"); the exception itself is
+  commented out (1270 `createExceptionProcess(...) //TBC ??`). No \<Theta> is printed.
+- CSP-M: Rule 19, `compileAux` (comp/untimed `CControllerGenerator.xtend` 103-136) ends with `[|{|terminate|}|>SKIP`
+  (134), the CSP-M exception operator; the module (`CModuleGenerator.xtend`, `moduleProcesses`) likewise.
+- HOL-CSPM: `Throw` (Throw.thy 65, `P \<Theta> a \<in> A. Q a`): the traces of P without A, then, at the first event a of A,
+  Q a; divergences likewise. Laws: `Throw_Mprefix` (Step_CSPM_Laws 56), `Throw_read`, `Throw_write`, `Throw_write0`
+  (Read_Write_CSPM_Laws 54-68), `Throw_Det`, `Throw_GlobalDet`, `Throw_NdetR` (CSPM_Laws 54-135),
+  `inj_on_Renaming_Throw` (549), `Throw_STOP`, `Throw_SKIP`, `Throw_BOT`, `Throw_disjoint_events_of`, `mono_Throw`,
+  `Throw_cont` (Throw.thy 396-653), `Throw_non_destructive` (HOL-CSP_RS); no law with `\<lbrakk>S\<rbrakk>` or hiding.
+  Usable in RC_HOL-CSP directly (HOL-CSP_RS is built on HOL-CSPM; the generated theories already use `\<triangle>` from it).
+- A (print Throw) against B (option 2). Meaning: A is the manual's and the CSP-M's form: the first `end` of any
+  machine (machines synchronise `end` among themselves, renStmEvts) ends the controller, whatever the memory is doing.
+  B needs the memory to take part in `terminate`: it does so only in a state that offers `terminate` (between two
+  writes, not in the middle of the sequence `set_EXT_..._m1!x \<rightarrow> set_EXT_..._m2!x` that forwards one write). They
+  agree when the memory can always finish a forwarding (each machine's shared memory accepts `set_EXT` until its own
+  `terminate`, Rule 37), which holds for the generated shapes, but this is an argument, not a check: to be checked with
+  FDR on ctl2 (Throw form against option 2) before deciding. Work: A needs a new Z node (exception), its creation in
+  Rules 1 and 19 and printing in the HOL-CSP and IsaCircus templates (IsaCircus: does the IsaCircus library have an
+  exception? not checked); B exists. Proofs: A gives the manual's process, but HOL-CSPM has no law moving Throw through
+  `\<lbrakk>S\<rbrakk>` or hiding, so deadlock arguments at the controller level would need new laws; B is plain parallel composition
+  and hiding (existing laws, the machine-level methods), with `terminate` an ordinary synchronised event. Recommendation:
+  B for the implementation (no metamodel change, proofs with existing laws), with the FDR check of A against B on ctl2
+  and mod1 as the justification, recorded in SEMANTICS_DIFFERENCES; A if the FDR check fails.
+
+### 7.7 Events of a machine that are not connected
+
+CSP-M: comp/untimed `CControllerGenerator.xtend` 408-412 (`connectedEvents`, `unconnectedEvents = allEvents(stm)
+minus connected`), 424-429 (`\ {| stm::e |}` for each, in `RenamingStateMachineChanset` 276-); also `composeStateMachines`
+(247-270) hides the events of the connections between machines (`\ diff({| ... |}, {|terminate|})`, 264-270). Manual:
+Rule 21 composeMachines (chapter4.tex 461-480) and Rule 22 renamingMachine (482-501) rename and synchronise, hide
+nothing; Rule 19 (393-430) hides only `lvars \<union> rvars \<union> lconsts` and Rule 1 `hiddenModuleChannels` (asynchronous
+connections and memory channels, 143-151). So in the manual the unconnected events of a machine, and the events of the
+connections between machines, remain visible at the controller's interface; in the CSP-M they are internal.
+Minimal example: a controller `C` with one machine `M`, `event e`, `initial i0`, `state s0 { }`, `transition t0 { from
+i0 to s0 }`, `transition t1 { from s0 to s0 trigger e }`, and no connection. Manual: the controller offers `e` forever
+(an environment may send it); deadlock-free and divergence-free. CSP-M: `e` is hidden, so `t1` fires on its own
+infinitely often: the process diverges ([FD] deadlock check and divergence check fail; the [F] deadlock check passes,
+there is no stable deadlock). In general hiding does not change whether a stable deadlock state is reachable (a
+deadlock reached by a trace with e is reached by the same trace without e, and vice versa), but it changes divergence,
+refusals (an unconnected input event becomes a spontaneous internal step) and every refinement result. (Read, not run;
+the example is for FDR, not checked.)
+
+### 7.8 Synchronisation set of Rule 19 and the memory copies
+
+Manual: Rule 19 (chapter4.tex 393-430): `((composeMachines(c,ms,cs) |[lvars \<union> rvars \<union> lconsts \<union> rconsts]| ctrlMemory(c))
+\ (lvars \<union> rvars \<union> lconsts)) \<Theta>_{end} Skip` with `lvars = {| v : allLocalVariables(c) @ set_vid(v) |}`, `rvars = {| v :
+requiredVariables(c) @ set_Ext_vid(v) |}`. Rule 20 (433-459): the memory, on `set_vid(v)?x` (or `set_Ext_vid(v)?x`), does
+`(; m : rmachines(v) @ set_Ext_vid(v,m)!x \<rightarrow> Skip)` and continues. Rule 22 (482-501): renames only events and the `set_`
+of required constants. Rule 25 (530-557): the machine receives `set_EXT_vid(v)` (its shared memory, Rule 37).
+Item by item: (1) machine writes `set_vid(v)` to the controller: in S (lvars), synchronised with the memory: connected,
+provided the machine's `vid(v)` is the controller's `vid(v)` (the same variable by name; Rule 22 does not rename
+`set_`); (2) the memory forwards `set_Ext_vid(v,m)!x` to machine m: NOT in S, NOT renamed by Rule 22, and with 7.3 it
+is the same event as m's `set_EXT_vid(v)` only if `vid(v,m)` of the controller equals `vid(v)` of m, which the manual
+does not define: as written, the memory's `set_Ext_vid(v,m)` and the machine's `set_EXT_vid(v)` interleave (each can
+happen alone), and neither is hidden. (3) The machine's own `set_EXT_vid(v)` is in its own sync set with its shared
+memory (Rule 25) and is therefore offered to the outside of the machine. CSP-M (comp/untimed `CControllerGenerator.xtend`
+`compileAux` 103-136): the sync set is `{| set_x |}` of the controller's variables UNION `{| stm::set_EXT_x |}` of every
+machine that requires a variable (107-118), the memory writes `stm::set_EXT_x` (CMemoryGenerator 214), the machine's
+`set_x` and `get_x` are renamed to the controller's (`stm::set_x <- set_x`, `stm::get_x <- get_x`, 396-397), and the
+hidden set contains `set_x`, `get_x` and `stm::set_EXT_x` (122-133). So the CSP-M connects memory and machines by
+naming the machine's channel itself (module qualification, the second argument of vid) and synchronising on it. Issue
+text for the manual: Rule 19 should synchronise on, and hide, `{| m : ms; v : requiredVariables(m) @ set_EXT_vid(v,m)
+|}`, and the manual should define `vid(v,m)` (or `set_Ext_vid(v,m)`) as the event `set_EXT_vid(v)` of m, with one
+spelling (Rules 3, 12, 19, 20, 25, 37).
+
+### 7.9 Constants
+
+State machines: constants are uninterpreted `consts` (machine constants `consts <c>_<stm FQN>`, `declareConstants`
+1066 called at 2802-), no `set_` or `get_` events and no constant memory: "Rule 32, 34, 36, 38 for constants are not
+implemented because constants are processed as parameters" (RC2Z 2885); confirmed in the outputs (e.g. the running
+example: `consts dest_stm0 :: "nat"`, no `set_dest`). Controller and module: the plan does the same: `consts` declared
+once (by the providing context), no `set_vid(c)` events, no constInit (Rules 13, 20), no `rconsts`/`lconsts` in the
+sets of Rules 15, 16, 19, 22, 23. Today Rule 19 is not consistent with this: it passes the constants as parameters of
+the memory (`crtlMemory_robot_ctrl\<cdot>obs\<cdot>dest`) and puts `set_dest` (undeclared) in the sync set (defects 3, 14);
+both go. Difference from the manual and the CSP-M (which give constants values through `set_`/instantiations):
+recorded in SEMANTICS_DIFFERENCES (an uninterpreted constant covers every value, as the manual's choice of the initial
+value of a constant without value).
