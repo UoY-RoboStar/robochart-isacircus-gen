@@ -513,26 +513,59 @@ the example is for FDR, not checked.)
 
 ### 7.8 Synchronisation set of Rule 19 and the memory copies
 
-Manual: Rule 19 (chapter4.tex 393-430): `((composeMachines(c,ms,cs) |[lvars \<union> rvars \<union> lconsts \<union> rconsts]| ctrlMemory(c))
-\ (lvars \<union> rvars \<union> lconsts)) \<Theta>_{end} Skip` with `lvars = {| v : allLocalVariables(c) @ set_vid(v) |}`, `rvars = {| v :
-requiredVariables(c) @ set_Ext_vid(v) |}`. Rule 20 (433-459): the memory, on `set_vid(v)?x` (or `set_Ext_vid(v)?x`), does
-`(; m : rmachines(v) @ set_Ext_vid(v,m)!x \<rightarrow> Skip)` and continues. Rule 22 (482-501): renames only events and the `set_`
-of required constants. Rule 25 (530-557): the machine receives `set_EXT_vid(v)` (its shared memory, Rule 37).
-Item by item: (1) machine writes `set_vid(v)` to the controller: in S (lvars), synchronised with the memory: connected,
-provided the machine's `vid(v)` is the controller's `vid(v)` (the same variable by name; Rule 22 does not rename
-`set_`); (2) the memory forwards `set_Ext_vid(v,m)!x` to machine m: NOT in S, NOT renamed by Rule 22, and with 7.3 it
-is the same event as m's `set_EXT_vid(v)` only if `vid(v,m)` of the controller equals `vid(v)` of m, which the manual
-does not define: as written, the memory's `set_Ext_vid(v,m)` and the machine's `set_EXT_vid(v)` interleave (each can
-happen alone), and neither is hidden. (3) The machine's own `set_EXT_vid(v)` is in its own sync set with its shared
-memory (Rule 25) and is therefore offered to the outside of the machine. CSP-M (comp/untimed `CControllerGenerator.xtend`
-`compileAux` 103-136): the sync set is `{| set_x |}` of the controller's variables UNION `{| stm::set_EXT_x |}` of every
-machine that requires a variable (107-118), the memory writes `stm::set_EXT_x` (CMemoryGenerator 214), the machine's
-`set_x` and `get_x` are renamed to the controller's (`stm::set_x <- set_x`, `stm::get_x <- get_x`, 396-397), and the
-hidden set contains `set_x`, `get_x` and `stm::set_EXT_x` (122-133). So the CSP-M connects memory and machines by
-naming the machine's channel itself (module qualification, the second argument of vid) and synchronising on it. Issue
-text for the manual: Rule 19 should synchronise on, and hide, `{| m : ms; v : requiredVariables(m) @ set_EXT_vid(v,m)
-|}`, and the manual should define `vid(v,m)` (or `set_Ext_vid(v,m)`) as the event `set_EXT_vid(v)` of m, with one
-spelling (Rules 3, 12, 19, 20, 25, 37).
+Rewritten 25 Nov 2026 after the FDR experiment. Rule numbers as in the PDF of the manual (August 2022); line numbers of
+chapter4.tex as "upstream master 04e7b96 / branch csp-m-differences 0eabbe8".
+
+**Main point: the synchronisation set of Chapter 4 Rule 19 omits the writes from the controller memory to the
+machines.** Rule 19 (376-412 / 393-429) is `((composeMachines(c,ms,cs) |[lvars \<union> rvars \<union> lconsts \<union> rconsts]|
+ctrlMemory(c)) \ (lvars \<union> rvars \<union> lconsts)) \<Theta>_{end} Skip` (390, 394-396 / 407, 411-413), with `lvars = {| v :
+allLocalVariables(c) @ set_vid(v) |}` and `rvars = {| v : requiredVariables(c) @ set_Ext_vid(v) |}` (406-407 / 423-424), the
+latter the controller's OWN required variables. Rule 20 (416-440 / 433-457) lets the memory, after `set_vid(v)?x` (or
+`set_Ext_vid(v)?x`), perform `(; m : rmachines(v) @ set_Ext_vid(v,m)!x \<rightarrow> Skip)` (420, 424 / 437, 441), with `rmachines =
+\<lambda> v @ {m: ms | v \<in> requiredVariables(m)}` (437 / 454). These events are in neither the synchronisation set nor the hidden
+set of Rule 19. The machine side receives external writes on `set_EXT_vid(v)` (Rule 25: the renaming `share \<leftarrow>
+set_EXT_vid(v)` 521 / 538 and `sharedVarSync` 535 / 552; Rule 37: `set_EXT_vid(v)?x \<rightarrow> Memory(x)` 795 / 828), which Rule 25
+does not hide. So even with the names matched, a literal reading lets the memory's writes and the machine's inputs happen
+independently, both visible at the controller's interface.
+
+RoboTool's CSP-M closes this: comp/untimed `CControllerGenerator.xtend` `compileAux` (103-136) synchronises the machines
+with the memory on `{| set_x |}` UNION `{| stm::set_EXT_x |}` for every machine that requires a variable (107-118, the
+machine part at 115) and hides `set_x`, `get_x` and `stm::set_EXT_x` (122-133, 130); the memory writes `stm::set_EXT_x!x__`
+(`CMemoryGenerator.xtend` 214, 219). Running example (`isacircus-generator-demo/csp-gen/defs/ctrl.csp` in AG-dev): memory
+726, synchronisation 745-753, hiding 757-764.
+
+FDR evidence (checked with FDR 4.2.7, 25 Nov 2026; AG-dev `robochart-models/controller-fdr/rule19-sync/`, trigger-fqn-naming
+46a35ef; finite data, not a proof). A = RoboTool's `ctrl.csp` unchanged; B = the same with `ObsD::set_EXT_obs` removed
+from the synchronisation and the hidden set (Rule 19 read literally, names matched); B' = B with `ObsD::set_EXT_obs` hidden.
+In the running example ObsD only reads the controller variable `obs` (initially 0) and nobody writes it.
+- A and B differ in traces: B has `<ObsD::set_EXT_obs.1, terminate>`: the environment writes 1 into ObsD's copy of `obs`,
+  ObsD takes t1 and t3 and terminates, while the controller memory still holds 0. In A this trace is impossible.
+- A and B' differ already in traces: B' has `<terminate>` (ObsD's copy changes internally), A has only `<>`.
+- A deadlocks (ObsD reads 0 forever in Detect; an active state offers no `terminate`), B is deadlock free, B' diverges.
+So the literal Rule 19 is distinguishable from RoboTool's CSP-M in traces, failures, deadlock and divergence. Not covered:
+a write by one machine forwarded to another (the running example has no writer).
+
+Proposed issue text for the manual: "Rule 19: the events `set_Ext_vid(v,m)` by which the controller memory (Rule 20)
+forwards a write to the machines m that require v are neither synchronised between `composeMachines(c,ms,cs)` and
+`ctrlMemory(c)` nor hidden. As written, the memory's write and the machine's input `set_EXT_vid(v)` (Rules 25, 37) occur
+independently and both remain visible, so a controller-local variable can be written from outside the controller. RoboTool's
+CSP-M synchronises on and hides `{| m : ms; v : requiredVariables(m) @ stm::set_EXT_v |}` (FDR comparison on the running
+example attached). Should Rule 19 include `{| m : ms; v : requiredVariables(m) @ set_Ext_vid(v,m) |}` in both sets?"
+
+Questions, secondary:
+- Meaning of `vid(v,m)`. vid is introduced with one argument (14-18 in both versions: "unique identifiers for their
+  parameters ... One possible implementation ... is to calculate the qualified name"); the two-argument form occurs in Rules
+  3, 12, 15, 16, 20, 22, 23 (e.g. 144, 246, 420 / 161, 263, 437) without a definition. Is `set_Ext_vid(v,m)` intended to be
+  the event `set_EXT_vid(v)` of m, i.e. m's input named from outside m? (The CSP-M names it so, by module qualification
+  `m::set_EXT_x`, not by a renaming.)
+- Spelling: `set_EXT_` (Rules 3, 25, 37) and `set_Ext_` (Rules 12, 19, 20); the CSP-M has one name.
+- For comparison only: for required constants the manual does relate the two identifiers, by the renaming `set_vid(v)
+  \<leftarrow> set_vid(v,c)` of Rule 22 (474 / 491), and Rule 15 (313 / 330) for controllers. For variables there is no such
+  relation; the CSP-M does not need one, because it connects the two ends by the qualified name.
+
+Implementation (decision of 25 Nov 2026): one event per target machine, which IS m's `set_EXT` event (the name of m's
+own channel, qualified by m), in the synchronisation set between memory and machines and hidden, as the CSP-M. Recorded
+in SEMANTICS_DIFFERENCES.
 
 ### 7.9 Constants
 
