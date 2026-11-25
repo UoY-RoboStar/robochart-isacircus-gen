@@ -504,3 +504,19 @@ the generator).
   parameter of record type does not load; RoboTool's validator (circus.robocalc.robochart.textual
   3.1.0.202610211110) throws a ClassCastException on a literal with arguments (`constantConstructionWellTyped`),
   the editor shows "Error executing EValidator", the model is nevertheless valid.
+
+## 20. Channel names and the correspondence with the CSP-M events (25 Nov 2026)
+
+- Manual: `vid`, `eventId` and `id` "calculate unique identifiers" for variables, events and nodes; one possible
+  implementation is the qualified name (chapter4.tex 14-18). Nothing more is required of the names.
+- CSP-M: CSP-M modules are name spaces; the same short name is used in several modules (`m1::set_EXT_obs`,
+  `m2::set_EXT_obs`, `ctrl::set_obs`), and the composition renames between them (`ObsD::set_obs <- set_obs`).
+- This generator: HOL-CSP and IsaCircus channels are global (one datatype `chan_event`, one `chantype`).
+  PRINCIPLE (Fang, 25 Nov 2026): the channel names are NOT required to agree literally with the CSP-M. They are
+  required (1) to be unique, as the manual requires of `vid`, `eventId`, `id`, and (2) to correspond injectively to
+  the events of the CSP-M, such that under this correspondence the behaviour is the same. A comparison with
+  RoboTool's CSP-M by FDR renames by this correspondence first and then checks the refinements in both directions.
+- Kind: convention.
+- Status: principle adopted 25 Nov 2026. How it is applied at the controller level (names printed inside the
+  machine paragraphs, or the machine paragraphs as for a machine alone and a renaming at the composition) is open:
+  CONTROLLER_PLAN.md 1.1 and 7.10.

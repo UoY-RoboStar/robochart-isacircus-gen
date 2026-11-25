@@ -22,6 +22,17 @@ the defects rule by rule, and test against RoboTool's CSP-M with FDR.
 
 ### 1.1 Principle
 
+NAMING PRINCIPLE (Fang, 25 Nov 2026; also SEMANTICS_DIFFERENCES.md 20): the channel names need not agree literally
+with the CSP-M, which uses modules as name spaces, while the channels of HOL-CSP and Circus are global. They must be
+unique (as the manual requires of `vid`, `eventId`, `id`) and correspond injectively to the events of the CSP-M,
+with the same behaviour under that correspondence. FDR comparisons with RoboTool's CSP-M rename by this
+correspondence and then check refinement.
+
+OPEN (25 Nov 2026): the scheme below qualifies the names INSIDE the machine paragraphs (variant (i) of 7.10). The
+alternative (ii), the machine paragraphs exactly as for the machine alone and a renaming of each machine at the
+composition (as Rule 22 does for constants), is being evaluated in 7.10; this section is rewritten after Fang's
+decision.
+
 The manual: `vid`, `eventId` and `id` "calculate unique identifiers ... One possible implementation is to calculate
 the qualified name" (chapter4.tex 14-18). The CSP-M gets uniqueness from CSP-M modules (`m1::done`, `m2::done`) and
 renames them in the composition (`stm::e <- e`, `tgt::e.in <- src::e.out`, `stm::set_v <- set_v`). One Isabelle
@@ -579,3 +590,91 @@ the memory (`crtlMemory_robot_ctrl\<cdot>obs\<cdot>dest`) and puts `set_dest` (u
 both go. Difference from the manual and the CSP-M (which give constants values through `set_`/instantiations):
 recorded in SEMANTICS_DIFFERENCES (an uninterpreted constant covers every value, as the manual's choice of the initial
 value of a constant without value).
+
+### 7.10 Naming of the machine copies of controller variables: (i) or (ii) (25 Nov 2026; evaluation, nothing implemented)
+
+Read from the ctl2 output of controller-layer a051d64 (dev-tools GenAll, scratch copy of ctl2: controller C with
+`var obs : int = 0`, machines m1 (reads obs) and m2 (writes obs), connections C.start→m1.go, m1.done→m2.done,
+m2.ack→C.ack).
+
+- (i) inside a controller, the machine paragraphs print qualified names (`set_EXT_obs_m1_C_ctl2`,
+  `sharedMemory_obs_m1_C_ctl2`).
+- (ii) the machine paragraphs are printed as for a machine alone (`set_EXT_obs`, `sharedMemory_obs`, the renaming
+  share ↦ set_EXT_obs, the channel sets); the composition renames each machine m,
+  set_EXT_obs ↦ set_EXT_obs_<FQN m>; the controller memory writes `set_EXT_obs_<FQN m>`, synchronised and hidden;
+  every channel declared once, a paragraph with the same name and text printed once. The structure of the manual:
+  the semantics of a machine (Rule 25) does not depend on where it is used; Rule 22 renames the constants
+  set_vid(v) ↦ set_vid(v,c) at the composition.
+
+0. Where set_EXT_obs occurs. Not in the Trans-core theory except its channel declaration (HOLCSP_trans_core lines
+   112, 142); not in Trans, the nodes, ncCoreBehaviour, ncBehaviour, machineBody, stateful. Only in: the channel
+   declaration (RC2Z 4044), `shared_variable_events_in_stmbd_m`, `sem__events_stm_m` (5165), `sharedMemory_obs`
+   (3334), and `stm_m`: the renaming share ↦ set_EXT_obs (2816) and the synchronisation set with the memory (2828).
+   Trans offers `share` only. So under (i) and (ii) Trans core and its deadlock-freedom proof are the same; the
+   difference is in these five places (i) or in the controller paragraphs only (ii).
+1. Reuse of the machine theory. Both are generated per instance (the local names already carry the instance FQN,
+   `get_k_m2_C_ctl2`), so "verbatim as alone" means: the machine printing does not depend on the context beyond the
+   FQN. (ii): `stm_m` is the same process as for the machine alone (up to the FQN), so a theorem about `stm_m` is a
+   theorem about the controller's component. (i): `stm_m` is a different process (other alphabet); only Trans core
+   carries over.
+2. Models without controller. (ii): unchanged by construction (only controller paragraphs change). (i): unchanged
+   only if the condition "inside a controller" is right at every one of the five places; checked only by the
+   regression.
+3. One renaming with Rule 22. Yes under (ii): the renaming of m at the composition (`renamingMachine_m`, Rule 22) is
+   one relation; set_EXT_obs ↦ set_EXT_obs_<FQN m> is one more disjunct, beside the connection disjuncts. RC2Z prints
+   no connection renaming for ctl2 today (`composeMachines_C_ctl2 = stm_m1 ⟦{terminate}⟧ stm_m2`; IsaCircus
+   `cCompleteRenaming ({})`), so this paragraph has to be written in any case. Under (i) there is no renaming for
+   set_EXT, only the connection renaming.
+4. Proofs. The renaming is a function (set_EXT_obs v ↦ set_EXT_obs_m v, identity elsewhere).
+   - Deadlock freedom is preserved by a functional renaming without injectivity: HOL-CSPM
+     `deadlock_free⇩S⇩K⇩I⇩P⇩S_imp_deadlock_free⇩S⇩K⇩I⇩P⇩S_Renaming` (CSPM_Deadlock_Results.thy 502; HOL-CSPM is an ancestor of
+     RC_HOL-CSP); `Relational_Renaming_functional` (RC_HOL-CSP, Relational_Renaming_Laws.thy 1913) turns the printed
+     relational renaming into `Renaming P f id`. Converse: `deadlock_free⇩S⇩K⇩I⇩P⇩S_Renaming_imp` (RC_HOL-CSP 1888, no
+     injectivity), HOL-CSPM `..._Renaming_iff` (inj f, inj g).
+   - Through synchronisation: `Relational_Renaming_Sync_eq`, `Relational_Renaming_Sync_eq_id` (RC_HOL-CSP 968,
+     1104), condition on the relation and the set. HOL-CSPM `bij_Renaming_Sync` (CSPM_Laws 1152) and
+     `bij_Renaming_Hiding` (842) need a bijection; "identity elsewhere" is not one (set_EXT_obs v and set_EXT_obs_m v
+     have the same image). If needed, printing the renaming as a swap (also set_EXT_obs_m v ↦ set_EXT_obs v) gives a
+     bijection with the same effect on `stm_m`, which never performs set_EXT_obs_m. No relational law for hiding
+     exists in RC_HOL-CSP.
+   - No controller-level proof exists or is planned in this step; under (i) none of these laws is needed for
+     set_EXT, under (ii) the first item suffices to carry a machine-level result to the renamed machine.
+5. Effort and risk. (i): five places in the machine printing plus the name of `sharedMemory_obs`, each with a
+   condition on the context; risk: the non-controller output. (ii): no change of the machine printing; in the
+   controller paragraphs one disjunct per machine and required variable in `renamingMachine_m`, the qualified
+   channels declared, the memory, the two sets; plus the deduplication of declarations and of identical paragraphs
+   (needed for step 1 in any case: `sharedMemory_obs` is printed twice today with the same text). Risk: the size of
+   the printed relations (known issue of the HOL-CSP plugin with large relations) and the order of renaming and
+   synchronisation (the renaming must be applied to each machine before `composeMachines` synchronises them).
+
+ctl2 under (ii), HOL-CSP (machine events with today's machine names; connection disjuncts as Rule 22 in the CSP-M's
+direction; the qualification of machine EVENTS is a separate question of step 1):
+
+    "renamingMachine_m1_C_ctl2 = (stm_m1_C_ctl2
+       ⟦⟦(λrn_a rn_b. (rn_a = go_in ∧ rn_b = start_in) ∨ (rn_a = go_out ∧ rn_b = start_out)
+          ∨ (∃rn_v1. rn_a = set_EXT_obs rn_v1 ∧ rn_b = set_EXT_obs_m1_C_ctl2 rn_v1)
+          ∨ (¬ (rn_a = go_in) ∧ ¬ (rn_a = go_out) ∧ ¬ (∃rn_v1. rn_a = set_EXT_obs rn_v1) ∧ rn_b = rn_a))⟧⟧)" |
+    "renamingMachine_m2_C_ctl2 = (stm_m2_C_ctl2
+       ⟦⟦(λrn_a rn_b. (∃rn_v1. rn_a = done_in rn_v1 ∧ rn_b = done_out rn_v1)
+          ∨ (∃rn_v1. rn_a = done_out rn_v1 ∧ rn_b = done_in rn_v1)
+          ∨ (∃rn_v1. rn_a = set_EXT_obs rn_v1 ∧ rn_b = set_EXT_obs_m2_C_ctl2 rn_v1)
+          ∨ (¬ (∃rn_v1. rn_a = done_in rn_v1) ∧ ¬ (∃rn_v1. rn_a = done_out rn_v1)
+             ∧ ¬ (∃rn_v1. rn_a = set_EXT_obs rn_v1) ∧ rn_b = rn_a))⟧⟧)" |
+    "composeMachines_C_ctl2 = (renamingMachine_m1_C_ctl2
+       ⟦ ({ terminate } ∪ range done_in ∪ range done_out) ⟧
+       renamingMachine_m2_C_ctl2)" |
+    "ctrlMemory_C_ctl2⋅obs = ((set_obs❙?x__v → (set_EXT_obs_m1_C_ctl2❙!x__v → (set_EXT_obs_m2_C_ctl2❙!x__v
+                                 → ctrlMemory_C_ctl2⋅x__v)))
+       □ (terminate → Skip))" |
+    "controller_action_C_ctl2 = ((composeMachines_C_ctl2
+       ⟦ ({ terminate } ∪ range set_obs ∪ range set_EXT_obs_m1_C_ctl2 ∪ range set_EXT_obs_m2_C_ctl2) ⟧
+       ctrlMemory_C_ctl2⋅0)
+       \ (range set_obs ∪ range set_EXT_obs_m1_C_ctl2 ∪ range set_EXT_obs_m2_C_ctl2))"
+
+Notes: m2's ack is renamed to C's ack by the identity, as the names agree today. The memory forwards in the CSP-M's
+order (m1, then m2, the writer m2 included; agreed by Fang 25 Nov 2026) as nested prefixes, the CSP-M's form
+(`set_obs?x__ -> m1::set_EXT_obs!x__ -> m2::set_EXT_obs!x__ -> Memory(...)`); Rule 20's `(;  m @ ... → Skip) ; Memory`
+is equivalent. `get_obs` is not hidden at the controller (the CSP-M hides it, but each `stm_m` already hides it).
+The relations are written in the form printed today for the renaming share ↦ set_EXT_obs. IsaCircus: the same with
+`cRename` on each machine. Declared once: `set_EXT_obs`, `set_EXT_obs_m1_C_ctl2`, `set_EXT_obs_m2_C_ctl2`;
+`sharedMemory_obs` printed once.
