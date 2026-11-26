@@ -729,10 +729,13 @@ treated by (ii), renamed in renamingMachine: agreed; (3) the controller's own `s
 To do (recorded 25 Nov 2026, not done):
 - Initial value of a machine's copy of a controller variable (SEMANTICS_DIFFERENCES 25): the default of the type in
   both generators; read the manual, ask Alvaro (Fang, 26 Nov 2026); then decide.
-- Defect of the MACHINE level found with ctl_comp: a composite state whose inner action writes a REQUIRED variable
-  v uses `setL_v`, `setR_v` in `Behaviour_<S>` (write synchronisation of the composite level), which are declared
-  only for local variables (`var_channel_stmbd`), not in `shared_var_channel_stmbd` (get, set, set_EXT): Isabelle
-  "Extra variables on rhs: setR_v, setL_v". The same without a controller and on f242344.
+- Defect of the MACHINE level found with ctl_comp (setL_v, setR_v of a required variable written in a composite
+  state not declared; also without a controller and on f242344): generator issue OO, FIXED 26 Nov 2026 on branch
+  required-write-composite (04cfbd2, from composite-states), merged here (fdd0bdf); ctl_comp's HOL-CSP theory loads.
+- Trans-core theory of a controller model (found 26 Nov 2026 when loading ctl_comp): one `locale trans_core_action`
+  is opened per machine container, Isabelle "Duplicate definition of locale trans_core_action" (ctl2, ctl_comp,
+  DDLK; obsDetect and the running example have one machine and one locale). The machine alone prints all Transc in
+  one locale. Not fixed.
 - Operations (issue R, Rule 27): only the warning (decision 8); `CALL__<op>` is still printed.
 - Two references to ONE definition in a controller: supported by enterInstance/leaveInstance, not tested.
 - Module level (step 4): ControllerRef/RoboticPlatformRef still cloned by replaceRef; module memory still writes
