@@ -2,8 +2,7 @@
 
 Released 23 Nov 2026: `main` f242344 (merge of composite-states 23d181e), plugin 1.0.0.202611232203, update site
 https://robostar.cs.york.ac.uk/robotool/robochart-isacircus-gen/update/. The test results behind these notes are in
-`docs/COMPOSITE_RELEASE_TEST.md`. A fix release followed on 26 Nov 2026 (section "Fix release of 26 Nov 2026"
-below).
+`docs/COMPOSITE_RELEASE_TEST.md`. Fix releases followed on 26 Nov 2026 (section "Fix release of 26 Nov 2026" below: OO, then PP).
 
 The plugin writes three theories per state machine: the HOL-CSP semantics (`HOLCSP_<model>_<time>.thy`), the
 HOL-CSP Trans core (`HOLCSP_trans_core_<model>_<time>.thy`) and the IsaCircus semantics
@@ -45,6 +44,18 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
   unchanged (checked on the composite-state, definedness, DTI, ITP and regression test models: the same tokens).
   RoboTool's CSP-M declares them for every variable of every machine (docs/SEMANTICS_DIFFERENCES.md entry 27).
   Test model: RoboChart-Deadlock-HOLCSP-AG-dev `robochart-models/regression-tests/oo_required_composite/`.
+- PP (second fix of 26 Nov 2026). A state machine that requires a variable `v`: in the machine process `stm_<m>`
+  (Chapter 4 Rule 25) the renamed `share` (now `set_EXT_v`) was synchronised with `Skip` on
+  `shared_variable_events_in_stmbd_<m>` = `range set_EXT_v`. This blocked every external write: since 9 Oct 2026 a
+  machine with required variables never received a write from outside (from a controller memory or the
+  environment), and the semantics differed from RoboTool's CSP-M in traces and failures. Now the set is `{ share }`,
+  as the CSP-M's `[| {share__} |] SKIP` (the manual writes `{shared}`, read as `share`); after the renaming `share`
+  no longer occurs, so nothing is blocked. Changed: only the `stm_<m>` paragraph of the HOL-CSP and IsaCircus
+  theories of machines with required variables (the set name replaced by `{ share }`); machines without required
+  variables are unchanged (docs/SEMANTICS_DIFFERENCES.md entry 28 records that the CSP-M blocks `share__` there and
+  this generator does not). The Trans-core theories are unchanged, so the ITP results are not affected (all Trans
+  cores of the ITP configurations byte-identical). Checked with FDR (AG-dev `robochart-models/controller-fdr/
+  stm-shell/`): the new shell equals RoboTool's STM in traces, failures and failures-divergences.
 
 ## Fixes
 
