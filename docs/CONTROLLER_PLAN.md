@@ -794,6 +794,13 @@ To do (recorded 25 Nov 2026, not done):
   equations for dest" (the constant dest is a `consts`, decision 7; the same message as at line 175 of
   HOLCSP_robot_runningexample.thy in a batch build, only a message in jEdit). Models without a controller:
   unchanged (82 files identical with f242344, 35 order only, no token difference).
+- Machine shell (Rule 25, generator issue PP, found 26 Nov 2026): the machine synchronised with Skip on
+  `range set_EXT_v`, so the copies of the controller variables never received the memory's writes (ctl2 with the
+  generated machines deadlocked). FIXED and released 26 Nov 2026 (main 2c69c90, plugin 1.0.0.202611262148; merged
+  here, 2edbace): `{share}`, as the CSP-M. With both levels transcribed from the generated theories (AG-dev
+  `robochart-models/controller-fdr/hol-csp-full/`, checked with FDR 4.2.7): ctl2 and the running example equal
+  RoboTool's controller in traces, failures and failures-divergences, both directions. The earlier comparison
+  (`hol-csp-compare/`, RoboTool's machines standing in) did not cover the machine level and so missed PP.
 - Operations (issue R, Rule 27): only the warning (decision 8); `CALL__<op>` is still printed.
 - Two references to ONE definition in a controller: supported by enterInstance/leaveInstance, not tested.
 - Module level (step 4): ControllerRef/RoboticPlatformRef still cloned by replaceRef; module memory still writes
