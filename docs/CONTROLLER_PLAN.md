@@ -581,6 +581,17 @@ Implementation (decision of 25 Nov 2026): one event per target machine, which IS
 own channel, qualified by m), in the synchronisation set between memory and machines and hidden, as the CSP-M. Recorded
 in SEMANTICS_DIFFERENCES.
 
+Answer of Alvaro (26 Nov 2026; SEMANTICS_DIFFERENCES 22, 24, 25):
+- `set_EXT_` / `set_Ext_`: a typo; one name.
+- Rule 19: the definition of `rvars` is wrong; it should be `rvars = {| v : requiredVariables(c); m : ms @
+  set_Ext_vid(v,m) |}`, in both the synchronisation set and the hidden set. Fang has asked (open) whether it should
+  cover the controller's local variables, `{| m : ms; v : requiredVariables(m) @ set_Ext_vid(v,m) |}`, which is the
+  CSP-M and the present implementation. Implementation unchanged.
+- Hiding of `rvars` (entry 24): with the corrected `rvars` the controller's own `set_Ext_vid(v)` is no longer hidden;
+  this agrees with the implementation.
+- Initial value of the copies (entry 25): a by-product of the propagation mechanism, intended; kept; GitHub issue
+  (draft in Section 8, "To do").
+
 ### 7.9 Constants
 
 State machines: constants are uninterpreted `consts` (machine constants `consts <c>_<stm FQN>`, `declareConstants`
@@ -728,7 +739,48 @@ treated by (ii), renamed in renamingMachine: agreed; (3) the controller's own `s
 
 To do (recorded 25 Nov 2026, not done):
 - Initial value of a machine's copy of a controller variable (SEMANTICS_DIFFERENCES 25): the default of the type in
-  both generators; read the manual, ask Alvaro (Fang, 26 Nov 2026); then decide.
+  both generators. Alvaro (26 Nov 2026): intended (a by-product of the propagation), kept. GitHub issue to be filed
+  by Fang; draft:
+
+      Title: Initial value of a machine's copy of a controller variable
+
+      A state machine that requires a variable of its controller keeps its own copy of it. In RoboTool's CSP-M
+      (CSP generator 3.1.0.202608041330) the copy starts with the default value of the type
+      (sharedVarMemory(id__) = Memory_obs(0)), while the controller memory starts with the declared initial value
+      (Memory(id__, 5)). The copy receives the controller's value only when some machine writes the variable and
+      the controller memory forwards the write. So, before any write, the machine reads the default, not the
+      controller's initial value.
+
+      Example (ctl_init.rct):
+
+        interface IObs { var obs : int }
+        stm R {
+          requires IObs
+          event saw5 event saw0 event other
+          initial i0 state W { } state D { }
+          transition t0 { from i0 to W }
+          transition t1 { from W to D condition obs == 5 action saw5 }
+          transition t2 { from W to D condition obs == 0 action saw0 }
+          transition t3 { from W to D condition obs != 5 /\ obs != 0 action other }
+        }
+        controller C {
+          var obs : int = 5
+          event saw5 event saw0 event other
+          sref r = R
+          connection r on saw5 to C on saw5
+          connection r on saw0 to C on saw0
+          connection r on other to C on other
+        }
+
+      Checked with FDR 4.2.7 (generated instantiations, core_int = {-2..5}): the controller C performs saw0 (trace
+      <ctl_init::C::saw0.out>) and never saw5 or other.
+
+      We understand this is a by-product of the propagation mechanism and intended. Should the copies be
+      initialised with the controller's initial value instead (for example by an initial forwarding step), so that
+      a machine reading a controller variable before any write sees the declared value? If the present behaviour
+      stays, could the manual state it?
+
+  (FDR files: proof repository `robochart-models/controller-fdr/shared-init/`.)
 - Defect of the MACHINE level found with ctl_comp (setL_v, setR_v of a required variable written in a composite
   state not declared; also without a controller and on f242344): generator issue OO, FIXED 26 Nov 2026 on branch
   required-write-composite (04cfbd2, from composite-states), merged here (fdd0bdf); ctl_comp's HOL-CSP theory loads.

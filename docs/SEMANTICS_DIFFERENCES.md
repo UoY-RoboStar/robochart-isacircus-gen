@@ -443,7 +443,7 @@ the generator).
   `setL(v)`/`setR(v)` of Definition C.2.2, `eventId(e).in/out`, `eventId(e)__.id(src).in`, `o.nameCall`) and the
   identifiers `vid`, `eventId`, `id` without declaring them: parameters, their types and the place of the
   declaration are not given. Inconsistencies inside the manual: `set_EXT_` (Chapter 4 Rules 3, 25, 37)
-  against `set_Ext_` (Chapter 4 Rules 12, 19, 20); `shared` in Chapter 4 Rule 25 where `share` is meant (the
+  against `set_Ext_` (Chapter 4 Rules 12, 19, 20; a typo, confirmed by Alvaro on 26 Nov 2026); `shared` in Chapter 4 Rule 25 where `share` is meant (the
   CSP-M has `share__`); the introduction of Chapter 4 says that RoboTool realises the identifiers as qualified
   names, but the CSP-M uses plain names inside CSP-M modules.
 - CSP-M: declared per CSP-M module: the state machine module declares `internal__ : NIDS`, `interrupt`,
@@ -557,10 +557,18 @@ the generator).
   (`set_EXT_v`); `renamingMachine_<m>` adds the pair `set_EXT_v <- set_EXT_v_<FQN m>` (the CSP-M's `m::set_EXT_v`
   in the global name space), as Rule 22 does for constants: ADDED BY US after Rule 22's treatment of constants. The
   copies `set_EXT_v_<FQN m>` are in the synchronisation set of Rule 19 and hidden: ADDED BY US after the CSP-M.
-  Both are an OMISSION OF THE MANUAL, TO ASK ALVARO. Spelling `set_EXT_` throughout (the manual writes `set_Ext_` in
+  Both are an OMISSION OF THE MANUAL. Spelling `set_EXT_` throughout (the manual writes `set_Ext_` in
   Rules 15, 20 and `set_EXT_` in Rule 25).
-- Kind: omission of the manual.
-- Status: adopted 25 Nov 2026 (controller-layer); question to Alvaro open.
+- Answer of Alvaro (26 Nov 2026): `set_EXT_` / `set_Ext_` is a typo (one name). The definition of `rvars` in Rule 19
+  is wrong; it should be `rvars = {| v : requiredVariables(c); m : ms @ set_Ext_vid(v,m) |}`, used in both the
+  synchronisation set and the hidden set. Follow-up question of Fang (26 Nov 2026, OPEN): should it cover the
+  controller's LOCAL variables too, i.e. `{| m : ms; v : requiredVariables(m) @ set_Ext_vid(v,m) |}`? That is the
+  CSP-M (`{| stm::set_EXT_x |}` for every machine that requires x) and the present implementation; with Alvaro's
+  formula over `requiredVariables(c)` only, the copies of a controller-local variable (ctl2, the running example)
+  would again be neither synchronised nor hidden.
+- Kind: error of the manual (confirmed by Alvaro, 26 Nov 2026).
+- Status: adopted 25 Nov 2026 (controller-layer); confirmed in principle by Alvaro on 26 Nov 2026; the extent of
+  `rvars` (required or all variables of the machines) still open, the implementation stays as the CSP-M.
 
 ## 23. Events of the machines in a controller: unconnected and internal connections hidden (25 Nov 2026)
 
@@ -588,9 +596,12 @@ the generator).
 - This generator: as the CSP-M (before 25 Nov 2026 RC2Z hid `rvars` as the manual). Not exercised by a test model
   (no controller of the tests requires a variable); relevant at the module level (step 4).
 - Kind: difference between the manual and the CSP-M (the manual's hiding would disconnect the module memory).
-- Status: adopted 25 Nov 2026, confirmed by Fang 26 Nov 2026; TO ASK ALVARO (together with 22).
+- Answer of Alvaro (26 Nov 2026): with his corrected `rvars` (entry 22), the controller's own `set_Ext_vid(v)` is no
+  longer in the hidden set. So the manual, once corrected, agrees with the CSP-M and with this generator.
+- Status: adopted 25 Nov 2026, confirmed by Fang 26 Nov 2026; agrees with Alvaro's correction of Rule 19
+  (26 Nov 2026).
 
-## 25. Initial value of a machine's copy of a controller variable (25 Nov 2026; TO BE CHECKED)
+## 25. Initial value of a machine's copy of a controller variable (25 Nov 2026)
 
 - Manual: not read for this point.
 - CSP-M: the machine's copy starts with the default of the type (`sharedVarMemory(id__) = Memory_obs(0)`), not with
@@ -598,8 +609,11 @@ the generator).
   Checked with FDR (25 Nov 2026, proof repository `robochart-models/controller-fdr/shared-init/`): with
   `var obs : int = 5` in the controller and a machine that reads obs before any write, the machine reads 0.
 - This generator: the same (`sharedVarMemory_<m> = sharedMemory_obs⋅0`).
-- Kind: open question (possibly a defect of both generators).
-- Status: TO ASK ALVARO (Fang, 26 Nov 2026); TO DO: read the manual (Rules 20, 25, 37); nothing changed.
+- Answer of Alvaro (26 Nov 2026): a by-product of the propagation mechanism (the copies receive the value only through
+  the memory's forwarding of a write), and intended behaviour. Kept as it is; to be discussed in a GitHub issue
+  (draft: CONTROLLER_PLAN Section 8, "To do").
+- Kind: intended behaviour of both generators (Alvaro, 26 Nov 2026); open for discussion.
+- Status: kept (Fang, 26 Nov 2026); nothing changed; GitHub issue drafted, to be filed by Fang.
 
 ## 26. Termination of the controller: option 2 instead of the exception (25 Nov 2026)
 
