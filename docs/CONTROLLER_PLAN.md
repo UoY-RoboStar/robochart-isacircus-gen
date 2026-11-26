@@ -733,9 +733,15 @@ To do (recorded 25 Nov 2026, not done):
   state not declared; also without a controller and on f242344): generator issue OO, FIXED 26 Nov 2026 on branch
   required-write-composite (04cfbd2, from composite-states), merged here (fdd0bdf); ctl_comp's HOL-CSP theory loads.
 - Trans-core theory of a controller model (found 26 Nov 2026 when loading ctl_comp): one `locale trans_core_action`
-  is opened per machine container, Isabelle "Duplicate definition of locale trans_core_action" (ctl2, ctl_comp,
-  DDLK; obsDetect and the running example have one machine and one locale). The machine alone prints all Transc in
-  one locale. Not fixed.
+  was opened per Transc, "Duplicate definition of locale trans_core_action" (ctl2, ctl_comp, DDLK). FIXED 26 Nov
+  2026 (47c3acf): all Transc of the controller processes in one locale, as for a machine alone. Loaded (Isabelle,
+  one process at a time): ctl2 and ctl_comp load without error (ctl_comp 69 s alone); obsDetect, the running
+  example and DDLK load their definitions, the deadlock-freedom lemma stops at `done` with guard-coverage goals
+  (`obs = 1` or `obs = -1`; generator issue T, not an issue: the plugin calls sledgehammer, and these guards are
+  not complete, the ITP counterexample) and quickcheck in the find-counterexample lemma reports "No code
+  equations for dest" (the constant dest is a `consts`, decision 7; the same message as at line 175 of
+  HOLCSP_robot_runningexample.thy in a batch build, only a message in jEdit). Models without a controller:
+  unchanged (82 files identical with f242344, 35 order only, no token difference).
 - Operations (issue R, Rule 27): only the warning (decision 8); `CALL__<op>` is still printed.
 - Two references to ONE definition in a controller: supported by enterInstance/leaveInstance, not tested.
 - Module level (step 4): ControllerRef/RoboticPlatformRef still cloned by replaceRef; module memory still writes
