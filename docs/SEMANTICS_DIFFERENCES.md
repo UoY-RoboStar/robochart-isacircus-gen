@@ -572,10 +572,11 @@ the generator).
 - This generator: as the CSP-M. The unconnected events are hidden in `renamingMachine_<m>` (before the renaming, which
   does not touch them; equivalent to the CSP-M's order); the internal connection events, `e_<FQN source>_in/out`,
   are hidden in `composeMachines_<c>`. Hiding the unconnected events: decision 2 of Fang (25 Nov 2026), TO ASK PEDRO.
-  Hiding the internal connections: needed for the FDR comparison with the CSP-M (otherwise extra visible events),
-  not decided separately by Fang (reported 25 Nov 2026).
+  Hiding the internal connections: needed for the FDR comparison with the CSP-M (otherwise extra visible events);
+  confirmed by Fang on 26 Nov 2026. Both (unconnected and internal connections): TO ASK PEDRO.
 - Kind: difference between the manual and the CSP-M; this generator follows the CSP-M.
-- Status: adopted 25 Nov 2026 (controller-layer); question to Pedro open. The effect of hiding an unconnected event
+- Status: adopted 25 Nov 2026, confirmed 26 Nov 2026 (controller-layer); question to Pedro open (unconnected events
+  and internal connections). The effect of hiding an unconnected event
   that triggers a self-loop (divergence): `robochart-models/controller-fdr/termination-unconnected/`.
 
 ## 24. Rule 19: the controller's own required variables are not hidden (25 Nov 2026)
@@ -587,7 +588,7 @@ the generator).
 - This generator: as the CSP-M (before 25 Nov 2026 RC2Z hid `rvars` as the manual). Not exercised by a test model
   (no controller of the tests requires a variable); relevant at the module level (step 4).
 - Kind: difference between the manual and the CSP-M (the manual's hiding would disconnect the module memory).
-- Status: adopted 25 Nov 2026; to ask Alvaro together with 22.
+- Status: adopted 25 Nov 2026, confirmed by Fang 26 Nov 2026; TO ASK ALVARO (together with 22).
 
 ## 25. Initial value of a machine's copy of a controller variable (25 Nov 2026; TO BE CHECKED)
 
@@ -598,7 +599,7 @@ the generator).
   `var obs : int = 5` in the controller and a machine that reads obs before any write, the machine reads 0.
 - This generator: the same (`sharedVarMemory_<m> = sharedMemory_obs⋅0`).
 - Kind: open question (possibly a defect of both generators).
-- Status: TO DO: read the manual (Rules 20, 25, 37), ask; nothing changed.
+- Status: TO ASK ALVARO (Fang, 26 Nov 2026); TO DO: read the manual (Rules 20, 25, 37); nothing changed.
 
 ## 26. Termination of the controller: option 2 instead of the exception (25 Nov 2026)
 

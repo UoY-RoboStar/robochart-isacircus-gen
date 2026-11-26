@@ -721,9 +721,14 @@ Templates:
 
 Verification: see the report of 25 Nov 2026 and CONTROLLER_MODULE_STATUS.md Section 6.
 
+Decisions of Fang, 26 Nov 2026, on the points of the report of 25 Nov 2026: (1) the internal connection events are
+hidden as in the CSP-M (SEMANTICS_DIFFERENCES 23; to ask Pedro, with the unconnected events); (2) the events are
+treated by (ii), renamed in renamingMachine: agreed; (3) the controller's own `set_EXT_v` is not hidden
+(SEMANTICS_DIFFERENCES 24; to ask Alvaro); (4) c7's `CALL__Op` stays as it is until operations are implemented.
+
 To do (recorded 25 Nov 2026, not done):
 - Initial value of a machine's copy of a controller variable (SEMANTICS_DIFFERENCES 25): the default of the type in
-  both generators; read the manual, ask; then decide.
+  both generators; read the manual, ask Alvaro (Fang, 26 Nov 2026); then decide.
 - Defect of the MACHINE level found with ctl_comp: a composite state whose inner action writes a REQUIRED variable
   v uses `setL_v`, `setR_v` in `Behaviour_<S>` (write synchronisation of the composite level), which are declared
   only for local variables (`var_channel_stmbd`), not in `shared_var_channel_stmbd` (get, set, set_EXT): Isabelle
