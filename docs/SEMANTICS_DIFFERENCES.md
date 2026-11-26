@@ -521,3 +521,29 @@ of main, generator issue OO.)
   CSP-M's extra channels are not used by any process, so no event of either side is affected.
 - Kind: form (declarations).
 - Status: adopted 26 Nov 2026 (fix of generator issue OO).
+
+## 28. Chapter 4 Rule 25: the synchronisation of the machine with Skip (26 Nov 2026)
+
+(Written for the second fix release of main, generator issue PP, 26 Nov 2026; on main entries 20-26 are absent.)
+
+- Manual: Chapter 4 Rule 25 (upstream master 04e7b96 chapter4.tex 514-539, branch csp-m-differences 0eabbe8
+  531-556): after the renaming `share <- set_EXT_vid(v)` of the required variables, `[| { shared } |] Skip`
+  (upstream 522, branch 539). There is no channel `shared`; read as `share`, as the CSP-M (to be confirmed by
+  Alvaro).
+- CSP-M: `[[ share__ <- x__ | x__ <- {|set_EXT_v|} ]]`, then `[| {share__} |] SKIP`. With required variables
+  `share__` no longer occurs after the renaming, so nothing is blocked: the machine accepts `set_EXT_v.x` wherever it
+  offered `share__`. Without required variables the renaming is empty and the synchronisation BLOCKS `share__`.
+- This generator: with required variables `[| {share} |] Skip`, as the CSP-M (since 26 Nov 2026). From 9 Oct 2026
+  (RC2Z 9faa957, which replaced the undeclared channel `shared` of the initial commit) to 26 Nov 2026 the set was
+  `shared_variable_events_in_stmbd_<m>` = `range set_EXT_v`, which blocked every external write of a required
+  variable: the machine never received a write from outside (from the controller memory or the environment). Checked
+  with FDR on oo_required_composite and on ctl2 (proof repository `robochart-models/controller-fdr/stm-shell/`): with
+  the old set the machine differs from RoboTool's STM in traces and failures, and ctl2 with the generated machine
+  shells deadlocks; with `{share}` both agree with RoboTool in T, F and FD.
+  Without required variables the generator still synchronises on `shared_variable_events_in_stmbd_<m>` = `{}`, so
+  `share` is NOT blocked, unlike the CSP-M: a REMAINING DIFFERENCE, not fixed (Fang to decide), kept so that the
+  output of these machines does not change.
+- Kind: error of the generator (with required variables, fixed); difference from the CSP-M (without required
+  variables, open); typo of the manual (`shared`, to ask Alvaro).
+- Status: fixed 26 Nov 2026 for machines with required variables (branch stm-shell-share); the case without
+  required variables open.
