@@ -1,8 +1,9 @@
-# Release notes (DRAFT): composite states
+# Release notes: composite states
 
-22 Nov 2026, updated 23 Nov 2026 (composite-states f585967, plugin 1.0.0.202611231420). Draft for the release of branch `composite-states` into `main`. NOT released: `main` is still
-2976313 (published plugin 1.0.0.202611071400). The test results behind this draft are in
-`docs/COMPOSITE_RELEASE_TEST.md`.
+Released 23 Nov 2026: `main` f242344 (merge of composite-states 23d181e), plugin 1.0.0.202611232203, update site
+https://robostar.cs.york.ac.uk/robotool/robochart-isacircus-gen/update/. The test results behind these notes are in
+`docs/COMPOSITE_RELEASE_TEST.md`. A fix release followed on 26 Nov 2026 (section "Fix release of 26 Nov 2026"
+below).
 
 The plugin writes three theories per state machine: the HOL-CSP semantics (`HOLCSP_<model>_<time>.thy`), the
 HOL-CSP Trans core (`HOLCSP_trans_core_<model>_<time>.thy`) and the IsaCircus semantics
@@ -33,6 +34,17 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
   unchanged. Affects all three theories; list of places: `docs/ISACIRCUS_CHANGES_trigger-fqn-naming.md`.
 - Theories that copied generated names (proof theories) must be updated; the order of elements of
   generated sets (channel declarations, synchronisation sets, renaming relations) may differ between runs.
+
+## Fix release of 26 Nov 2026
+
+- OO. A state machine with a composite state that writes a REQUIRED variable `v` (a variable of a required
+  interface) inside the composite state: the write synchronisation of `Behaviour_<S>` (Chapter 4 Rule 60, over all
+  variables of the machine, since fix EE) uses `setL_v` and `setR_v`, which were declared only for local variables.
+  The HOL-CSP theory did not load ("Extra variables on rhs: setR_v, setL_v"). Now `setL_v` and `setR_v` are declared
+  for the required variables of a state machine that has a composite state; the output of all other models is
+  unchanged (checked on the composite-state, definedness, DTI, ITP and regression test models: the same tokens).
+  RoboTool's CSP-M declares them for every variable of every machine (docs/SEMANTICS_DIFFERENCES.md entry 27).
+  Test model: RoboChart-Deadlock-HOLCSP-AG-dev `robochart-models/regression-tests/oo_required_composite/`.
 
 ## Fixes
 
