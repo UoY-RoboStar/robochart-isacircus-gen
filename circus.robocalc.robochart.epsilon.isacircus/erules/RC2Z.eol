@@ -4032,6 +4032,7 @@ operation RC!NodeContainer createchanParaNC()  {
 	
 	//4. Shared variable channels
 	if(self.hasSharedVars()){//i.e., has requied interface which contains variables
+		var hasCompositeState = RC!State.all().exists(st | st.nodes.size() > 0 and machineOf(st) = self);
 		var shared_var_chanpara = createChannelPara("shared_var_channel_stmbd_" + self.FQN());
 		for(ri in self.rInterfaces){
 			for(vl in ri.variableList.select(l|l.modifier = VariableModifier#VAR)){
@@ -4042,6 +4043,16 @@ operation RC!NodeContainer createchanParaNC()  {
 					//get_x and set_x are used by the stm to read/write the shared variable and by
 					//sharedMemory_x (Rule 37), so they must be declared together with set_EXT_x
 					var var_seq = Sequence{"get_" + v.name, "set_" + v.name, "set_EXT_" + v.name};
+					//Generator issue OO (26 Nov 2026): since EE (16 Nov 2026) the write synchronisation of
+					//Behaviour of a composite state (Rule 60, machineVarNames) also uses setL_x and setR_x of
+					//the required variables, which were not declared ("Extra variables on rhs: setR_x,
+					//setL_x"). RoboTool's CSP-M declares get_x, set_x, setL_x, setR_x for every variable of the
+					//machine, required ones included, and set_EXT_x separately. Here they are declared only
+					//when the machine has a composite state (the only place where they are used), so that the
+					//output of the other machines does not change.
+					if(hasCompositeState){
+						var_seq = Sequence{"get_" + v.name, "set_" + v.name, "setL_" + v.name, "setR_" + v.name, "set_EXT_" + v.name};
+					}
 					//TBC with Pedro: v to be FQN at which level? stm or ctrl or pkg?
 					
 					shared_var_chanpara.declList.decls.add(var_seq.createChannelDecl(type_expr));
