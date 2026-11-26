@@ -223,41 +223,27 @@ abbreviation "SSTOP \<equiv> SSTOP_aux share"
 
 
 [%var procparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ProcessPara));%]
-[%for(procpara in procparas){%]
-
-[*Trans_core*]
-[%for(actpara in procpara.circusProcess.paraList.paras.select(ap|ap.name.word.startsWith("Transc_"))){%]
-locale trans_core_action 
-begin
-fixrec [%= actpara.name.word%] :: "[%=actpara.paramType()%] \<rightarrow> chan_event process"
-where
-[simp del] :\<open>[%= actpara.name.word%]\<cdot>n__id = 
-	[%=parseActionOrMarker(actpara.circusAction, actpara)%] \<close>
-	
-lemma [%=z.version%][%=actpara.lemmaSuffix()%]_trans_core_ddlf:
-  "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%=actpara.name.word%]\<cdot>n)  "
-  apply (deadlock_free' P_def: [%=actpara.name.word%].simps)
-  done
-  
-lemma [%=z.version%][%=actpara.lemmaSuffix()%]_trans_core_findcounterexample:
-  "deadlock_free\<^sub>S\<^sub>K\<^sub>I\<^sub>P\<^sub>S (\<sqinter> n \<in> UNIV. [%= actpara.name.word%]\<cdot>n)"
-  apply (find_counterexample P_def: [%= actpara.name.word%].simps)
-  nitpick
-  quickcheck
-  oops
-
-[*end of locale trans_core_action (issue M)*]
-end
-[%}%]
-[%}%]
-
+[*Controller models (26 Nov 2026, controller-layer): the Transc paragraphs of all machines of the
+controller processes are printed in ONE locale trans_core_action, as for a machine alone; before, one locale was
+opened per Transc ("Duplicate definition of locale trans_core_action" with two machines or a composite state).
+Without a process paragraph the top-level action paragraphs are used, as before.*]
 [%var actparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ActionPara));
-if(procparas.size()=0 and actparas.size()>0){%]
+var transcs = new Sequence;
+if(procparas.size() > 0){
+	for(procpara in procparas){
+		for(ap in procpara.circusProcess.paraList.paras.select(ap|ap.instanceOf(Z!ActionPara) and ap.name.word.startsWith("Transc_"))){
+			if(not transcs.exists(t|t.name.word = ap.name.word)){ transcs.add(ap); }
+		}
+	}
+}else{
+	transcs = actparas.select(ap|ap.name.word.startsWith("Transc_"));
+}
+if((procparas.size() > 0 and transcs.size() > 0) or (procparas.size() = 0 and actparas.size() > 0)){%]
 
 locale trans_core_action 
 begin
 [*Trans_core*]
-[%for(actpara in actparas.select(ap|ap.name.word.startsWith("Transc_"))){%]
+[%for(actpara in transcs){%]
 fixrec [%= actpara.name.word%] :: "[%=actpara.paramType()%] \<rightarrow> chan_event process"
 where
 [simp del] :\<open>[%= actpara.name.word%]\<cdot>n__id = 
