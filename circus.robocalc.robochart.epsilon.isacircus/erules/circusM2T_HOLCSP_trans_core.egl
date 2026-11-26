@@ -812,12 +812,35 @@ operation triggerChanBases(): Map{
 	}
 	return self;
 }%]
-[%operation Z!ChannelDecl keptChans(): Sequence{
+[%operation Z!ChannelDecl usedChans(): Sequence{
 	var para = self.eContainer().eContainer();
 	if(para.isDefined() and para.isTypeOf(Z!ChannelPara) and para.name.word.startsWith("event_channel_stmbd_")){
 		return self.channelNameList.names.select(c | usedEventBases().includes(c.word.eventBase())).asSequence();
 	}
 	return self.channelNameList.names.asSequence();
+}%]
+[*Step 1 of CONTROLLER_PLAN (25 Nov 2026): every channel is declared once. RC2Z declares the channels per
+  component (controller, each machine), so a channel that several components use (set_obs of a controller variable
+  and of its machines, an event name used by two machines, aviol, gviol) appeared several times, which the datatype
+  rejects. A name is declared at its first (kept) declaration, in the order of the channel paragraphs of the section;
+  the later ones are dropped. Machine-only models with one machine have no such duplicates (unchanged).*]
+[%@cached
+operation chanOwners(): Map{
+	var m = new Map;
+	var sect = Z!ZSect.all().first();
+	for(cp in sect.paraList.paras.select(s|s.isTypeOf(Z!ChannelPara))){
+		for(d in cp.declList.decls){
+			for(c in d.usedChans()){
+				if(not m.containsKey(c.word)){
+					m.put(c.word, d);
+				}
+			}
+		}
+	}
+	return m;
+}%]
+[%operation Z!ChannelDecl keptChans(): Sequence{
+	return self.usedChans().select(c | chanOwners().get(c.word) = self);
 }%]
 [%operation Z!Field parseField(): String{
 	

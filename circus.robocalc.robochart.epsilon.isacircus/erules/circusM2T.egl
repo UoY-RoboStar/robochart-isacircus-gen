@@ -99,11 +99,16 @@ share :: unit
 [%z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara)).println();
 var channelparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ChannelPara));
 
+//Step 1 of CONTROLLER_PLAN (25 Nov 2026): every channel is declared once, at its first declaration (as in the
+//HOL-CSP template); RC2Z declares channels per component, so names shared by several components appeared more
+//than once.
+var declaredChans = new Set;
 for(chanpara in channelparas){%]
 \<comment> \<open>[%=chanpara.name.word%]\<close>
 [%//	var chandecl = chanpara.declList.decls.at(0);
 	for(chandecl in chanpara.declList.decls){
-		var chans = chandecl.channelNameList.names;%]
+		var chans = chandecl.channelNameList.names.select(c|not declaredChans.includes(c.word));
+		for(c in chans){ declaredChans.add(c.word); }%]
 
 		[%for(chan in chans){%]
 [%=chan.word%] [*[%if(chandecl.expr.name.word = "SYNCH"){%] :: unit [%} else{%] :: [%if(chandecl.expr.name.word = "Value"){%]real[%}else{%][%=chandecl.expr.name.word%][%}}*]

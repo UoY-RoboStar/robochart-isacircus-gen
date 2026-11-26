@@ -881,8 +881,57 @@ operation Shared2FQLocalVariablesAndConst(nc: RC!NodeContainer){
 
 operation FQNllLocalVariables(nc: RC!NodeContainer){
 
+	//the name in the model is kept in ~baseName (Epsilon's side table) at the first call, so that the names can be
+	//computed again for an instance of a StateMachineRef (enterInstance, leaveInstance; 25 Nov 2026). The first
+	//call gives the same names as before.
 	for(v in allLocalVariablesandConst(nc)){
-		v.name = v.name + "_" + nc.FQN();
+		if(not v.~baseName.isDefined()){
+			v.~baseName = v.name;
+		}
+		v.name = v.~baseName + "_" + nc.FQN();
+	}
+}
+
+/* Instances of state machines in a controller (25 Nov 2026, decision 6 of Fang: follow .ref, no copy).
+   An instance is an element of c.machines: a StateMachineDef written inside the controller, or a StateMachineRef.
+   instDef: its definition; instFQN: <instance name>_<controller FQN>, the FQN of the machine as seen from the
+   controller (for an inline definition the same as its FQN()). While a referenced definition is translated as
+   the instance r, enterInstance sets ~inst of the definition, so that StateMachineDef.FQN() and everything built
+   on it (nodes, triggers, channels) give the names of the instance, and computes the names of its local
+   variables and constants again; leaveInstance undoes both. The translation of the instances is sequential, so
+   two references to one definition give two sets of names. */
+operation instDef(i: Any): RC!StateMachineDef{
+	if(i.isKindOf(RC!StateMachineRef)){
+		return i.ref;
+	}
+	return i;
+}
+
+operation instController(i: Any): RC!ControllerDef{
+	for(c in RC!ControllerDef.all()){
+		if(c.machines.includes(i)){
+			return c;
+		}
+	}
+}
+
+operation instFQN(i: Any): String{
+	return i.name + "_" + instController(i).FQN();
+}
+
+operation enterInstance(i: Any){
+	if(i.isKindOf(RC!StateMachineRef)){
+		var d = i.ref;
+		d.~inst = i;
+		FQNllLocalVariables(d);
+	}
+}
+
+operation leaveInstance(i: Any){
+	if(i.isKindOf(RC!StateMachineRef)){
+		var d = i.ref;
+		d.~inst = null;
+		FQNllLocalVariables(d);
 	}
 }
 
@@ -1046,17 +1095,12 @@ operation replaceRef(){
 		
 	}
 	
-	for(stmr in RC!StateMachineRef.all()){
-	
-		var stm_new = clone(stmr.ref);
-		stm_new.name = stmr.name;
-	 		
-	 	ctl(stmr).machines.add(stm_new);
-//	 	ctl(stmr).machines.remove(stmr);
-//THIS is commented out BECAUSE EOL will fail, msg: Unknown reason
-//	 	delete stmr;
-		
-	}
+	//State machine references (decision of Fang, 25 Nov 2026, CONTROLLER_PLAN 7.5): NO copy of the referenced
+	//definition is inserted any more. The controller translation follows stmr.ref and computes the names of the
+	//instance from the reference (instFQN, withInstance); the source model gets no new machine. Before, a clone
+	//of stmr.ref was added to the controller and the reference stayed (its removal failed), so the connections,
+	//which point to the reference, were compared with the clone and lost (CONTROLLER_PLAN 3, defect 8).
+	//The references to controllers and platforms (module level, step 4) are unchanged.
 	return RC;
 }
 
@@ -1650,7 +1694,7 @@ operation mod_memory(
 		var actionSeq_lvars = new Sequence<Z!CircusAction>;
 		
 		for(v in lvars){
-			var rcontrollers_v = ctrls.select(c|requiredVariables(c).includes(v));
+			var rcontrollers_v = ctrls.select(c|requiredVariables(c).exists(x|x.name = v.name));//by name (decision 4 of Fang, 25 Nov 2026), as the CSP-M
 			
 			var prefixAction;//(; c : rcontrollers(v) . set_EXT_vid(v,c)! x -> Skip))
 			if(rcontrollers_v.size()>0){
@@ -2164,88 +2208,94 @@ operation createControllerAsProcessPara(c: RC!ControllerDef): Z!ProcessPara{
 	
 	
 	
-	var lvars = new Set<String>;
+	/* Rule 19, rewritten 25 Nov 2026 (CONTROLLER_PLAN 7.10, decisions of Fang 1-7 of 25 Nov 2026).
+	   - the machines: every instance (inline StateMachineDef or StateMachineRef) is translated once (Rule 25) with the
+	     names of the instance (enterInstance), then renamed at the composition (Rule 22, renamingMachinePara);
+	   - synchronisation set: the controller's local variables set_v, the machines' copies set_EXT_v_<m> written by
+	     the memory (as the CSP-M, CControllerGenerator compileAux; the manual's Rule 19 omits them, SEMANTICS_DIFFERENCES
+	     22) and terminate (option 2: no exception, the memory offers terminate -> Skip; SEMANTICS_DIFFERENCES 26);
+	   - hidden: set_v of the local variables and the copies, as the CSP-M; NOT the set_EXT_v of the controller's own
+	     required variables (the manual hides them as rvars; the CSP-M does not; SEMANTICS_DIFFERENCES 24);
+	   - constants: consts at both levels, no set_ events and no memory parameters (decision 7; SEMANTICS_DIFFERENCES 21);
+	     before, lconsts/rconsts (set_c of constants) were in both sets and the constants were memory parameters. */
+	var cons = c.connections;
+	var insts = c.machines.select(m|(m.isKindOf(RC!StateMachineDef) or m.isKindOf(RC!StateMachineRef)) and not m.isKindOf(RC!OperationDef)).asSequence();
+
+	//Rule 25 per instance, then Rule 22
+	var copyChans = createChannelPara("machine_copy_channels_ctrl_" + c.FQN());
+	var connChans = createChannelPara("internal_connection_channels_ctrl_" + c.FQN());
+	for(i in insts){
+		enterInstance(i);
+		var stmPara = createStateMachineDefAsActionPara(instDef(i));
+		leaveInstance(i);
+		renamingMachinePara(c, i, cons, stmPara.name.word);
+		for(v in copiedVariables(c, i)){
+			copyChans.declList.decls.add(Sequence{copyChan(v, i)}.createChannelDecl(v.type.createTypeExpr()));
+		}
+		for(con in cons.select(x|x.from = i and x.to.isKindOf(RC!StateMachine))){
+			var evt_seq = Sequence{qualifiedEventChan(con.efrom, i) + "_in", qualifiedEventChan(con.efrom, i) + "_out"};
+			if(con.efrom.type = null){
+				connChans.declList.decls.add(evt_seq.createChannelDecl());
+			} else {
+				connChans.declList.decls.add(evt_seq.createChannelDecl(con.efrom.type.createTypeExpr()));
+			}
+		}
+	}
+
+	//Rule 21
+	var composeMachinePara = composeMachinesAction(c, insts, cons).createActionPara("composeMachines_" + c.FQN());
+
+	//Rule 20
+	var memoryPara = ctrlMemoryPara(c, insts);
+	var vars = memoryVariables(c);
+	var memoryCall;
+	if(vars.size() > 0){
+		var initialSeq = new Sequence<Z!Expr>;
+		for(v in vars){
+			initialSeq.add(v.getInitialOrDefaultValueAsExpr());
+			//in the manual: initial only, but it should be 'initial or default' (Rule 20)
+		}
+		memoryCall = memoryPara.name.word.createCallAction(initialSeq);
+	} else {
+		memoryCall = memoryPara.name.word.createCallAction();
+	}
+
+	var lvars = new Sequence<String>;
 	for(v in allLocalVariables(c)){
 		lvars.add("set_" + v.name);
 	}
-	
-	var rvars = new Set<String>;
-	for(v in requiredVariables(c)){
-		rvars.add("set_EXT_" + v.name);
-	}
-	
-	var lconsts = new Set<String>;
-	for(v in allLocalConstants(c)){
-		lconsts.add("set_" + v.name);
-	}
-	
-	var rconsts = new Set<String>;
-	for(v in requiredConstants(c)){
-		rconsts.add("set_" + v.name);
-	}
-	
-	var cs = lvars.includingAll(rvars).includingAll(lconsts).includingAll(rconsts);
-	cs.add("terminate");
-	//"terminate" is added to deal with the issue of EXCEPTION operator
-	
-	var cons = c.connections;
-	var ms = c.machines.select(m|m.instanceOf(RC!StateMachineDef) and not m.instanceOf(RC!OperationDef)).asSequence();
-	("line 1709 ms = " + ms).println();
-	var composeMachinePara = composeMachines(c,ms,cons).createActionPara("composeMachines_" + c.FQN());
-//	var crtlMemoryPara = crtlMemory(c).createActionPara("crtlMemory_" + c.FQN());
-	
-	/* to create sequence of varaible initials/default as Z!Expr */
-	var vars =  requiredVariables(c).asSequence().includingAll(allLocalVariables(c).asSequence());
-	
-	var initialSeq = new Sequence<Z!Expr>;
-	for(v in vars){
-		initialSeq.add(v.getInitialOrDefaultValueAsExpr());
-		//in the manual: intial only, but it should be 'intial or default'
-		//this paramter is presented in Rule 20 in the manual
-		//Here we use this paramter initialSeq when we call the funciton crtlMemory in the below
-	}
-	
-	//the following is derived from R20: constInit(c)
-	//because we treat constants as paramters, so they are added into initialSeq as part of the paramter of crtlMemory
-	for(const in allConstants(c)){
-		if(const.initial.isDefined()){
-			initialSeq.add(const.initial.createExpr());//parameter is the initial value of constant
-			//TBC need to confirm with Pedro, should we always use const's name or we can use the value of it if exists?
-		} else{
-			initialSeq.add(createVarDecl(const));//parameter is the name of constant
-			//e.g., Memory(id__, 0, 0, 0, (0,0), 0, const_pkg0_M_C1_c2, const_pkg0_M_C1_c3)
+	var copies = new Sequence<String>;
+	for(i in insts){
+		for(v in copiedVariables(c, i)){
+			copies.add(copyChan(v, i));
 		}
 	}
-		
-	var action = createParallelAction(cs, 
-									  composeMachinePara.name.word.createCallAction(), 
-									  crtlMemory(c).name.word.createCallAction(initialSeq) 
-									  //call ctrlMemory with initials as parameters
-									  );
-	
-	var hide_cs = lvars.asSequence().includingAll(rvars.asSequence()).includingAll(lconsts.asSequence());
-	("hide_cs = " + hide_cs).println();
-	("hide_cs.type() = " + hide_cs.type()).println();
-	("action.type() = " + action.type()).println();
-	action = action.createHideAction(hide_cs);
-	
-	
-	
+
+	var cs = new Set<String>;
+	cs.addAll(lvars);
+	cs.addAll(copies);
+	cs.add("terminate");
+
+	var action = createParallelAction(cs, composeMachinePara.name.word.createCallAction(), memoryCall);
+
+	var hide_cs = lvars.includingAll(copies);
+	if(hide_cs.size() > 0){
+		action = action.createHideAction(hide_cs);
+	}
+
 	//create main action
-	action.createActionPara("controller_action_" + c.FQN());
-	
+	var mainPara = action.createActionPara("controller_action_" + c.FQN());
+	operationsNote(c, mainPara);
+
 	//add every actionpara including the main action para into the sequence
 	for(action_para in Z!ActionPara.all()){
 		actionParaSeq.add(action_para);
 	}
-	
-	
+
 	var mainActionname = "controller_action_" + c.FQN();
-	
-	
+
 	var basicProcess = actionParaSeq.createBasicProcess(mainActionname);
-	
-	
+
 	//is this a basic process? although actionParaSeq contains two actionparas
 	return basicProcess.createProcessPara("controller_proc_" + c.FQN(), true);
 	//true means it is a BasicProcss
@@ -2404,259 +2454,6 @@ operation RC!Controller createchanParaCtrl()  {
 	
 }
 
-//Rule 20, Memory in the manual is factored out as a function "ctrl_memory"
-operation crtlMemory(c: RC!ControllerDef): Z!ActionPara{
-	var ms = c.machines.select(m|m.instanceOf(RC!StateMachineDef));
-	var lvars = allLocalVariables(c).asSequence();
-	var rvars = requiredVariables(c).asSequence();
-
-	var vars = rvars.includingAll(lvars) ;
-//	var vars_names = vars.getNames();
-//	var varvalues = rvars.getInitialValues().asSequence().includingAll(lvars.getInitialValues().asSequence());
-	var varsAndconts = vars.includingAll(allConstants(c));
-	
-	return ctrl_memory(varsAndconts,lvars,rvars,ms,c).createActionPara("crtlMemory_" + c.FQN());
-	//constInit(c) not covered as not shown in CSPM, constant c is processed as a parameter in CSPM.
-	
-}
-
-
-//ctrl_memory is a function that returns a ParamAction 
-operation ctrl_memory(
-					  varsAndconts:  Sequence<RC!Variable>,
-					  lvars: Sequence<RC!Variable>,
-					  rvars: Sequence<RC!Variable>,
-					  ms:    Set<RC!StateMachineDef>,
-					  c:     RC!ControllerDef
-					  ) 
-					  :Z!ParamAction{	
-	
-	
-	/******************************************************
-	Step 1: Iterated external choices for LOCAL variables in lvars
-	*******************************************************/
-	
-		var left_choice;
-		
-		if(lvars.size>0){
-		var actionSeq_left_choice_lvars = new Sequence<Z!CircusAction>;
-		
-		for(v in lvars){
-			var rmachines_v = ms.select(m|requiredVariables(m).includes(v));
-			
-			var prefixAction;//(; m : rmachines(v) . set_EXT_vid(v,m)! x -> Skip))
-			if(rmachines_v.size()>0){
-						
-				if(rmachines_v.size() = 1){
-					var prefix = createOutputCommunicationFromString("set_Ext_" + v.name + "_" + rmachines_v.at(0).FQN(), "x__v", "OUTPUT");//To DO v.name is followed by rmachines_v.at(0).FQN(). If v.name is FQN, should be renamed as the simple name first.
-					prefixAction = createPrefixingAction(prefix, createSkipAction());
-				} else{
-					var prefix = createOutputCommunicationFromString("set_Ext_" + v.name + "_" + rmachines_v.at(0).FQN(), "x__v", "OUTPUT");//To DO v.name
-					prefixAction = createPrefixingAction(prefix, createSkipAction());
-					var i=1;
-					while(i< rmachines_v.size()){
-						var prefix = createOutputCommunicationFromString("set_Ext_" + v.name + "_" + rmachines_v.at(i).FQN(), "x__v", "OUTPUT");//To DO v.name
-						prefixAction = createPrefixingAction(prefix, prefixAction);
-						i++;
-					} 
-				}
-			
-			}
-			
-			var commu = createInputCommunication("set_" + v.name, "x__v"); //set_vid(v)?x //TBC here we use v.name instead of FQN because we assume all variables have the fully qualified names
-			var action;
-			
-			//to replace the name of v with "x__"
-			//RoboChart manual: Memory(vars[name(v):=x])
-			var new_varsAndconts_names = new Sequence<String>;
-			var varsAndconts_names = varsAndconts.getNames();
-			
-
-			var new_varsAndconts_names = new Sequence<String>;
-			var size = varsAndconts.size();
-			var i=0;
-			var elem = new String;
-			while(i<size){
-				
-				if(varsAndconts_names.at(i) = v.name){
-					new_varsAndconts_names.add("x__v");
-				}
-				else{
-//					("line 1322, ss.at(i) = " + ss.at(i)).println();
-//					("line 1322, ss.at(i).type = " + ss.at(i).type()).println();
-					elem = varsAndconts_names.at(i);
-					new_varsAndconts_names.add(elem);				
-				}
-				i++;
-			}
-			
-			("line 1321, new_varsAndconts_names = " + new_varsAndconts_names).println();
-			("line 1321, varsAndconts_names = " + varsAndconts_names).println();
-			
-			
-			
-			if(rmachines_v.size() >0){
-				action = createAction2("SeqAction", 
-										createPrefixingAction(commu, prefixAction), 
-										("ctrlMemory_"+ c.FQN()).createCallAction(new_varsAndconts_names.createRefExprSeq(false,false))
-										);
-			} else{
-				action = createPrefixingAction(commu, 
-											   ("ctrlMemory_"+ c.FQN()).createCallAction(new_varsAndconts_names.createRefExprSeq(false,false))
-											  );
-			}
-			actionSeq_left_choice_lvars.add(action);
-		}
-		
-		if(lvars.size()>1){
-			left_choice = actionSeq_left_choice_lvars.createSequenceAsExtchoiceAction();
-		} else {//lvars.size()=1
-			left_choice = actionSeq_left_choice_lvars.at(0);
-		}
-	}
-	
-	
-	
-	/******************************************************
-	Step 2: Iterated external choices for REQUIRED variables in rvars
-	*******************************************************/
-	
-	var right_choice;
-	if(rvars.size>0){
-		var actionSeq_right_choice_rvars = new Sequence<Z!CircusAction>;
-		
-		for(v in rvars){
-		
-			var rmachines_v = ms.select(m|requiredVariables(m).includes(v));
-			var prefixAction; //(; m : rmachines(v) . set_EXT_vid(v,m)! x -> Skip))
-			if(rmachines_v.size()>0){
-			
-				if(rmachines_v.size()=1){
-					var prefix = createOutputCommunicationFromString("set_Ext_" + v.name + "_" + rmachines_v.at(0).FQN(), "x__v", "OUTPUT");//TO DO v.name
-					prefixAction = createPrefixingAction(prefix, createSkipAction());
-				} else{
-					var prefix = createOutputCommunicationFromString("set_Ext_" + v.name + "_" + rmachines_v.at(0).FQN(), "x__v", "OUTPUT");//To DO v.name
-					prefixAction = createPrefixingAction(prefix, createSkipAction());
-					var i=1;
-					while(i< rmachines_v.size()){
-						var prefix = createOutputCommunicationFromString("set_Ext_" + v.name + "_" + rmachines_v.at(i).FQN(), "x__v", "OUTPUT");//To DO v.name
-						prefixAction = createPrefixingAction(prefix, prefixAction);
-						i++;
-					} 
-				}
-			
-			}
-			
-			var commu = createInputCommunication("set_Ext_" + v.name, "x__v"); //set_Ext_vid(v)?x //TBC here we use v.name instead of FQN because we assume all variables have the fully qualified names.
-			var action;
-			
-			//to replace the name of v with "x__"
-			//RoboChart manual: Memory(vars[name(v) := x])
-			//to replace the name of v with "x__"
-			//RoboChart manual: Memory(vars[name(v):=x])
-			var new_varsAndconts_names = new Sequence<String>;
-			var varsAndconts_names = varsAndconts.getNames();
-			
-
-			var new_varsAndconts_names = new Sequence<String>;
-			var size = varsAndconts.size();
-			var i=0;
-			var elem = new String;
-			while(i<size){
-				
-				if(varsAndconts_names.at(i) = v.name){
-					new_varsAndconts_names.add("x__v");
-				}
-				else{
-					elem = varsAndconts_names.at(i);
-					new_varsAndconts_names.add(elem);				
-				}
-				i++;
-			}
-			
-			("line 1414, new_varsAndconts_names = " + new_varsAndconts_names).println();
-			("line 1415, varsAndconts_names = " + varsAndconts_names).println();
-			
-					
-			if(rmachines_v.size() >0){
-				action = createAction2("SeqAction", 
-									    createPrefixingAction(commu, prefixAction), 
-									    ("ctrlMemory_"+ c.FQN()).createCallAction(new_varsAndconts_names.createRefExprSeq(false,false))
-									   );
-			} else{
-				action = createPrefixingAction(commu, 
-											   ("ctrlMemory_"+ c.FQN()).createCallAction(new_varsAndconts_names.createRefExprSeq(false,false))
-											  );
-			}
-			actionSeq_right_choice_rvars.add(action);
-		}
-		
-		if(rvars.size()>1){
-			right_choice = actionSeq_right_choice_rvars.createSequenceAsExtchoiceAction();
-		} else {//rvars.size()=1
-			right_choice = actionSeq_right_choice_rvars.at(0);
-		}
-	}
-	
-	/******************************************************
-	Step 3: external choices for lvars and rvars
-	*******************************************************/
-	var ctrlMemory;
-	if(left_choice.isDefined() and right_choice.isDefined()){
-		ctrlMemory = createAction2("ExtChoiceAction", left_choice, right_choice);
-	} else{
-		if(left_choice.isDefined()){
-			ctrlMemory = left_choice;
-		} else{//(right_choice.isDefined())
-			ctrlMemory = right_choice;
-		}
-	}
-	
-	
-	
-	/******************************************************
-	Step 4: external choices with end -> Skip
-	 end -> Skip is not part of the manual, it is added to deal with
-	the issue of exception operator
-	*******************************************************/
-	
-	ctrlMemory = createAction2("ExtChoiceAction", 
-								ctrlMemory, 
-								createPrefixingAction(createSynchCommunication("terminate"), createSkipAction())
-							   );
-	
-	
-	
-	/******************************************************
-	Step 5: create ParamAction on top of ctrlMemory
-	*******************************************************/
-//	return ctrlMemory;
-	var action = new Z!ParamAction;
-	action.isParamCommand = true;
-	action.circusAction = ctrlMemory;
-	action.declList = new Z!ZDeclList;
-	
-	
-	/* action.declList  is the list of parameters, including variables and constants
-	   e.g., Memory(id__, cv1, x, m, a1, a3, c2, c3) 
-	   c2 and c3 are constants  	*/
-	
-	//add all the variables and constants as parameters
-	for(v in varsAndconts){
-//		var value = new RC!Variable;
-//		value.name = v.name;
-//		value.type = clone(v.type);
-//		action.declList.decls.add(createVarDecl(value));
-		action.declList.decls.add(createVarDecl(v));
-	}
-	//e.g., Memory(id__, 0, 0, 0, (0,0), 0, const_pkg0_M_C1_c2, const_pkg0_M_C1_c3)
-	
-	
-	return action;
-	
-}
-
-
 operation Sequence<RC!Variable> getNames(): Sequence<String>{
 	var nameSet = new Sequence<String>;
 	for(v in self){
@@ -2673,130 +2470,213 @@ operation Set<RC!Variable> getInitialValues(): Set<String>{
 	return initSet;
 }
 
-//Rule 21
-//Difference from manual: we use connevts.including(terminate) instead of connevts
-operation composeMachines(c: RC!Controller, 
-						  ms: Sequence<RC!StateMachineDef>, 
-						  cons: Set<RC!Connection>): 
-//						  Z!ActionPara{ //this function recursively revoke itself, it returns ActionPara, the code will be too complicated.
-//the correspoinding ActionPara shall be created in Rule 19 when composeMachines() is called.
-						  Z!CircusAction{
-						  
-	if(ms.size()=1){
-		return renamingMachine(c,ms.at(0),cons);//TO DO, nops should be incorporated.		
-	} else {
-	
-		var tail_ms = ms.clone();
-		tail_ms.removeAt(0);
-		
-		var renStmEvts_tail = new Set<String>;
-		("line 1453, tail_ms = " + tail_ms).println();
-		for(m in tail_ms){
-			renStmEvts_tail = renStmEvts_tail.includingAll(renStmEvts(c,m,cons));
+/* Rules 20 to 23 for the controller, rewritten 25 Nov 2026 (CONTROLLER_PLAN 7.10, decisions of Fang of 25 Nov 2026).
+   Naming (SEMANTICS_DIFFERENCES 20): the machine paragraphs are printed as for the machine alone (variant (ii)); the
+   composition renames each machine instance m:
+   - an event of m connected to the controller to the controller's event (CSP-M stm::e <- f, manual Rule 22);
+   - an event of m that is the TARGET of a connection from machine src to the qualified event of the source,
+     e_<FQN src>_in/out with in and out swapped (CSP-M tgt::f.in <- src::e.out, manual Rule 22);
+   - an event of m that is the SOURCE of a connection to another machine to e_<FQN m>_in/out (the CSP-M keeps
+     src::e; the qualification is the injective correspondence with it in the global name space of the theory);
+   - set_EXT_v to set_EXT_v_<FQN m> for each required variable v of m provided by the controller: the write of the
+     controller memory into m's copy (CSP-M m::set_EXT_v). The manual's Rule 22 has no such pair (only the constants'
+     set_vid(v) <- set_vid(v,c)); added as Rule 22 does for constants (SEMANTICS_DIFFERENCES 22, manual omission, to
+     ask Alvaro).
+   The events of m that are not connected are hidden in m before the renaming (CSP-M RenamingStateMachineChanset;
+   not in the manual; decision 2 of Fang, SEMANTICS_DIFFERENCES 23, to ask Pedro). The pairs set_c <- set_c of
+   required constants are gone (constants are consts, decision 7). Instances are compared with the connection ends
+   directly: no copy of a referenced definition exists any more (replaceRef, defect 8). */
+
+//the events of a machine definition (its own and those of its defined interfaces, as createchanParaNC)
+operation stmEvents(d: RC!StateMachineDef): Sequence{
+	var evts = new Sequence;
+	evts.addAll(d.events);
+	for(defined_interface in d.interfaces){
+		for(e in defined_interface.events){
+			if(not evts.includes(e)){
+				evts.add(e);
+			}
 		}
-		var connevts = intersect(renStmEvts(c,ms.at(0),cons), renStmEvts_tail);
-		
-		var action = createParallelAction(connevts.including("terminate"), renamingMachine(c,ms.at(0),cons), composeMachines(c,tail_ms,cons));//TO DO, nops should be incorporated.	
-//		connevts.including(terminate) = connevts union {terminate}. terminate is added to slove the issue with exception operator
-		
-		return action;
-//		return action.createActionPara("composeMachines_" + c.FQN());
-		/************************************
-		the ActionPara will be created in Rule 19 when the function composeMachines is call.
-		we do not create ActionPara because the function composeMachines might be called multiple times to create members of the ultimate composeMachines.*************/
 	}
-	
-						  
+	return evts;
+}
+
+//the variables of the controller that the instance i requires; matched by NAME, as the CSP-M
+//(CControllerGenerator: rvarsNames.contains(v.name)): the controller's variable and the variable of the required
+//interface are different objects (decision 4 of Fang, 25 Nov 2026; before, object identity gave no machine)
+operation copiedVariables(c: RC!ControllerDef, i: Any): Sequence{
+	var names = requiredVariables(instDef(i)).collect(v|v.name);
+	return memoryVariables(c).select(v|names.includes(v.name));
+}
+
+//the copy of v in the instance i, written by the controller memory (CSP-M i::set_EXT_v)
+operation copyChan(v: RC!Variable, i: Any): String{
+	return "set_EXT_" + v.name + "_" + instFQN(i);
+}
+
+//the channel base of the event e of the instance i, qualified by the instance (source of an internal connection)
+operation qualifiedEventChan(e: RC!Event, i: Any): String{
+	return e.name + "_" + instFQN(i);
+}
+
+//the variables of the controller memory, in the order of the parameters (required, then local, as before)
+operation memoryVariables(c: RC!ControllerDef): Sequence{
+	return requiredVariables(c).asSequence().includingAll(allLocalVariables(c).asSequence());
 }
 
 //Rule 22
-operation renamingMachine(c: RC!Controller, 
-						  m: RC!StateMachineDef, 
-						  cons: Set<RC!Connection>): 
-//						  Z!ActionPara{
-						  Z!CircusAction{
-						  
-	var internalConns = new Set<RC!Connection>;
-	for(con in RC!Connection.all()){
-		if(con.from.instanceOf(RC!StateMachine) and con.to.instanceOf(RC!StateMachine) and Set{con.from, con.to}.includes(m)){
-		internalConns.add(con);
+operation renamingMachinePara(c: RC!ControllerDef, i: Any, cons: Any, stmName: String): Z!ActionPara{
+	var L = new Sequence<String>;
+	var R = new Sequence<String>;
+	var connected = new Sequence;
+	for(con in cons){
+		if(con.from = i){
+			connected.add(con.efrom);
+			if(con.to.isKindOf(RC!Controller)){
+				L.add(con.efrom.name + "_in");  R.add(con.eto.name + "_in");
+				L.add(con.efrom.name + "_out"); R.add(con.eto.name + "_out");
+			} else if(con.to.isKindOf(RC!StateMachine)){
+				L.add(con.efrom.name + "_in");  R.add(qualifiedEventChan(con.efrom, i) + "_in");
+				L.add(con.efrom.name + "_out"); R.add(qualifiedEventChan(con.efrom, i) + "_out");
+			}
+		}
+		if(con.to = i){
+			connected.add(con.eto);
+			if(con.from.isKindOf(RC!Controller)){
+				L.add(con.eto.name + "_in");  R.add(con.efrom.name + "_in");
+				L.add(con.eto.name + "_out"); R.add(con.efrom.name + "_out");
+			} else if(con.from.isKindOf(RC!StateMachine)){
+				L.add(con.eto.name + "_in");  R.add(qualifiedEventChan(con.efrom, con.from) + "_out");
+				L.add(con.eto.name + "_out"); R.add(qualifiedEventChan(con.efrom, con.from) + "_in");
+			}
 		}
 	}
-	
-	var toController = new Set<RC!Connection>;
-	for(con in RC!Connection.all()){
-		if(con.from = m and RC!Controller.all().includes(con.to)){
-			toController.add(con);
+	for(v in copiedVariables(c, i)){
+		L.add("set_EXT_" + v.name); R.add(copyChan(v, i));
+	}
+	var hidden = new Sequence<String>;
+	for(e in stmEvents(instDef(i))){
+		if(not connected.includes(e)){
+			hidden.add(e.name + "_in");
+			hidden.add(e.name + "_out");
 		}
 	}
-	
-	var fromController = new Set<RC!Connection>;
-	for(con in RC!Connection.all()){
-		if(con.to = m and RC!Controller.all().includes(con.from)){
-			fromController.add(con);
-		}
+	var action = stmName.createCallAction();
+	if(hidden.size() > 0){
+		action = action.createHideAction(hidden);
 	}
-	
-	var renamepairL = new Sequence<String>;
-	var renamepairR = new Sequence<String>;
-	
-	for(con in internalConns){
-		 renamepairL.add(con.eto.name +"\\<cdot>in" );
-		 renamepairR.add(con.efrom.name +"\\<cdot>out");
-	}	
-	
-	for(con in internalConns){
-		 renamepairL.add(con.eto.name +"\\<cdot>out" );
-		 renamepairR.add(con.efrom.name +"\\<cdot>in");
-	}	
-	
-	for(con in fromController){
-		 renamepairL.add(con.eto.name);
-		 renamepairR.add(con.efrom.name);
-	}				  
-						  
-	for(con in toController){
-		 renamepairL.add(con.efrom.name);
-		 renamepairR.add(con.eto.name);
-	}					  
-	
-	for(v in requiredConstants(m)){
-		 renamepairL.add("set_" + v.name);
-		 renamepairR.add("set_" + v.name); //TBC, "set_" + v.name should be replace by vid(v,c)?? but I don't know the definition of vid(v,c)
-	}	
-	
-	var action = createStateMachineDefAsActionPara(m).name.word.createCallAction().createRenameAction(renamepairL, renamepairR);
-	
-	return action;
-//	return action.createActionPara("renamingMachine_" + m.FQN());
+	if(L.size() > 0){
+		action = action.createRenameAction(L, R);
+	}
+	return action.createActionPara("renamingMachine_" + instFQN(i));
 }
 
-//Rule 23
-operation renStmEvts(c: RC!Controller, 
-					 m: RC!StateMachineDef, 
-					 cons: Set<RC!Connection>): 
-					 Set<String>{
-					 
-	var internalConns = new Set<RC!Connection>;
-	for(con in RC!Connection.all()){
-		if(con.from.instanceOf(RC!StateMachine) and con.to.instanceOf(RC!StateMachine) and Set{con.from, con.to}.includes(m)){
-		internalConns.add(con);
+//Rule 23: the events of the internal connections between the instance head and the instances of tail
+//(as qualified channels of the source) 
+operation internalConnChans(head: Any, tail: Sequence, cons: Any): Sequence<String>{
+	var chans = new Sequence<String>;
+	for(con in cons){
+		if(con.from.isKindOf(RC!StateMachine) and con.to.isKindOf(RC!StateMachine) and
+		   ((con.from = head and tail.includes(con.to)) or (con.to = head and tail.includes(con.from)))){
+			for(suffix in Sequence{"_in", "_out"}){
+				var ch = qualifiedEventChan(con.efrom, con.from) + suffix;
+				if(not chans.includes(ch)){
+					chans.add(ch);
+				}
+			}
 		}
 	}
-	
-	var cs = new Set<String>;
-	for(con in internalConns){
-		cs.add(con.efrom.name);
-	}				 
-	
-	cs.add("terminate");
-	
-	for(v in requiredConstants(m)){
-		 cs.add("set_" + v.name);//TBC vid(v,c)  ??
-	}
-	
-	return cs;
+	return chans;
 }
+
+//Rule 21: right-nested composition of the renamed machines, synchronised on the internal connections and
+//terminate; the internal connection events are hidden afterwards, as the CSP-M (composeStateMachines:
+//\ diff(intersection, {|terminate|})); the manual's Rule 21 does not hide them (SEMANTICS_DIFFERENCES 23).
+//terminate is in the set (option 2, as before).
+operation composeMachinesAction(c: RC!ControllerDef, insts: Sequence, cons: Any): Z!CircusAction{
+	var head = insts.at(0);
+	var headCall = ("renamingMachine_" + instFQN(head)).createCallAction();
+	if(insts.size() = 1){
+		return headCall;
+	}
+	var tail = insts.clone();
+	tail.removeAt(0);
+	var connevts = internalConnChans(head, tail, cons);
+	var sync = new Set<String>;
+	sync.addAll(connevts);
+	sync.add("terminate");
+	var action = createParallelAction(sync, headCall, composeMachinesAction(c, tail, cons));
+	if(connevts.size() > 0){
+		action = action.createHideAction(connevts);
+	}
+	return action;
+}
+
+//Rule 20: one recursive memory over the variables of the controller (required, then local), as before; a write
+//set_v?x (local v) or set_EXT_v?x (required v) is forwarded to the copies of the instances that require v, in the
+//order of the machines of the controller (the CSP-M: set_v?x__ -> m1::set_EXT_v!x__ -> m2::set_EXT_v!x__ -> Memory),
+//then the memory continues with the new value; terminate -> Skip (option 2). No constants (decision 7). Without
+//variables: terminate -> Skip (defect 6). Named ctrlMemory_<c> (decision 5; before the paragraph was crtlMemory_<c>
+//and its recursive calls ctrlMemory_<c>, defect 4).
+operation ctrlMemoryPara(c: RC!ControllerDef, insts: Sequence): Z!ActionPara{
+	var name = "ctrlMemory_" + c.FQN();
+	var terminateSkip = createPrefixingAction(createSynchCommunication("terminate"), createSkipAction());
+	var vars = memoryVariables(c);
+	if(vars.size() = 0){
+		return terminateSkip.createActionPara(name);
+	}
+	var names = vars.collect(v|v.name);
+	var branches = new Sequence<Z!CircusAction>;
+	for(v in vars){
+		var newNames = new Sequence<String>;
+		for(n in names){
+			if(n = v.name){
+				newNames.add("x__v");
+			} else {
+				newNames.add(n);
+			}
+		}
+		var act = name.createCallAction(newNames.createRefExprSeq(false,false));
+		var targets = insts.select(t|copiedVariables(c, t).exists(x|x.name = v.name));
+		var k = targets.size() - 1;
+		while(k >= 0){
+			act = createPrefixingAction(createOutputCommunicationFromString(copyChan(v, targets.at(k)), "x__v", "OUTPUT"), act);
+			k = k - 1;
+		}
+		var input;
+		if(allLocalVariables(c).includes(v)){
+			input = createInputCommunication("set_" + v.name, "x__v");
+		} else {
+			input = createInputCommunication("set_EXT_" + v.name, "x__v");
+		}
+		branches.add(createPrefixingAction(input, act));
+	}
+	branches.add(terminateSkip);
+	var body = branches.createSequenceAsExtchoiceAction();
+	var action = new Z!ParamAction;
+	action.isParamCommand = true;
+	action.circusAction = body;
+	action.declList = new Z!ZDeclList;
+	for(v in vars){
+		action.declList.decls.add(createVarDecl(v));
+	}
+	return action.createActionPara(name);
+}
+
+//Decision 8 of Fang (25 Nov 2026): operations of a controller (Rule 27, generator issue R) are not translated yet; an
+//explicit warning instead of a silent undefined call CALL__<op>
+operation operationsNote(c: RC!ControllerDef, para: Z!ActionPara){
+	if(c.lOperations.size() > 0){
+		var note = "The operations of controller " + c.name + " (" + c.lOperations.collect(o|o.name).concat(", ")
+			+ ") are not supported yet (Chapter 4 Rule 27, generator issue R): a call of them in a state machine is printed as CALL__<operation>, which is not defined, so the theory does not load.";
+		if(para.generatorNote.isDefined() and para.generatorNote <> ""){
+			para.generatorNote = para.generatorNote + " " + note;
+		} else {
+			para.generatorNote = note;
+		}
+	}
+}
+
 
 //Rule 25
 operation createStateMachineDefAsActionPara(stm: RC!StateMachineDef): Z!ActionPara{
@@ -3012,7 +2892,9 @@ operation RC!Variable getInitialOrDefaultValueAsExpr(): Z!Expr{
 // TO DO: is fully qualified name needed for shared var? what is the FQN for shared var?
 
 operation sharedVarMemory(stm: RC!Context): Z!ActionPara{
-
+	//OPEN QUESTION (25 Nov 2026, SEMANTICS_DIFFERENCES 25): the copy of a required variable starts with the default
+	//of its type, not with the initial value of the providing controller's variable; RoboTool's CSP-M does the same
+	//(Memory_obs(0); checked with FDR on ctl_init, proof repository controller-fdr/shared-init). Not changed.
 
 	var vars = requiredVariables(stm);
 	
@@ -3309,6 +3191,13 @@ operation createBooleanExpr(value: Boolean): Z!RefExpr{
 
 operation sharedMemory(v: RC!Variable): Z!ActionPara{
 
+	//25 Nov 2026 (variant (ii), CONTROLLER_PLAN 7.10): the paragraph depends only on the name and the type of v, so
+	//two machines that require v (in a controller) share it: it is created once (before, it was printed twice with
+	//the same name and text). A second one with another type would be a different process with the same name.
+	var existing = Z!ActionPara.all().selectOne(p|p.name.isDefined() and p.name.word = "sharedMemory_" + v.name);
+	if(existing.isDefined()){
+		return existing;
+	}
 	return IndividualSharedVarMemory(v).createActionPara("sharedMemory_" + v.name);
 
 }
@@ -3841,6 +3730,13 @@ operation RC!OperationDef FQN(): String{
 
 //Fully Qualified Name for StateMachineDef
 operation RC!StateMachineDef FQN(): String{
+
+	//Case 0 (25 Nov 2026): the definition is being translated as the instance of a StateMachineRef
+	//(withInstance): the names are those of the instance, <reference name>_<controller FQN>. The extended
+	//property ~inst is Epsilon's side table, not a feature of the model.
+	if(self.~inst.isDefined()){
+		return instFQN(self.~inst);
+	}
 
 	//Case 1: the stm is contained in a controllerdef
 	for(ctl in RC!ControllerDef.all()){

@@ -520,3 +520,93 @@ the generator).
 - Status: principle adopted 25 Nov 2026. How it is applied at the controller level (names printed inside the
   machine paragraphs, or the machine paragraphs as for a machine alone and a renaming at the composition) is open:
   CONTROLLER_PLAN.md 1.1 and 7.10.
+
+## 21. Constants at the controller and the machine level (25 Nov 2026)
+
+- Manual: Chapter 4 Rule 13 `constInit` (upstream 04e7b96 chapter4.tex 265; branch csp-m-differences 282) initialises
+  the constants of a controller or module by events `set_vid(c)!value` or `set_vid(c)?name(c)`; Rule 19 (upstream
+  376-412, branch 393-429) has `lconsts` and `rconsts` (`set_vid(c)` of the local and required constants) in its
+  synchronisation set and `lconsts` in its hidden set; Rule 20 (upstream 416-440, branch 433-457) calls `constInit`.
+  The corresponding rule for machines, `constInitSTM`, is commented out in the source (upstream 1672, branch 1845).
+- CSP-M: at both levels the constants are PARAMETERS of the processes (`STM(id__, const_ctrl_ObsD_dest)`,
+  `D__(id__, const_ctrl_dest)`, `Memory(id__, obs, dest)`); no `set_` event of a constant exists.
+- This generator: at both levels the constants are Isabelle `consts` (or `definition` with an initial value), which
+  is the meaning of the CSP-M's parameters (a fixed value for the whole process, arbitrary when not initialised).
+  No `set_` event of a constant, no constant as a parameter of the controller memory (decision 7 of Fang,
+  25 Nov 2026). Before, RC2Z printed the controller's constants as memory parameters, `set_<c>` (never declared) in
+  both sets of Rule 19 and a renaming `set_c <- set_c` in Rule 22, with the comments "TBC need to confirm with Pedro,
+  should we always use const's name or we can use the value of it if exists?" (Rule 19) and "TBC, set_ + v.name
+  should be replace by vid(v,c)??" (Rule 22): it followed Rules 13, 19, 20 of the manual at the controller level,
+  while the machine level already used `consts`.
+- Kind: form (a constant as a logical constant instead of an initialising event).
+- Status: adopted 25 Nov 2026 (controller-layer).
+
+## 22. Rule 22 and Rule 19: the controller memory's writes into the machines' copies (25 Nov 2026)
+
+- Manual: Rule 20 (upstream 420, 424; branch 437, 441) writes a controller variable v into the copy of each machine m
+  that requires it, `set_Ext_vid(v,m)!x`. Rule 22 (renamingMachine, upstream 474, branch 491) renames the machine's
+  constants `set_vid(v) <- set_vid(v,c)` but has NO pair for the variables, so the machine's input `set_EXT_vid(v)`
+  (Rule 25) is never connected to `set_Ext_vid(v,m)`; Rule 19's synchronisation and hidden sets (upstream 390,
+  394-396; branch 407, 411-413) do not contain `set_Ext_vid(v,m)` either. Read literally the copies are open to the
+  environment of the controller (FDR experiment of 25 Nov 2026, proof repository `robochart-models/controller-fdr/
+  rule19-sync/`: distinguishable from the CSP-M in traces, failures, deadlock and divergence).
+- CSP-M: the memory writes `m::set_EXT_v!x`, the event of m's memory itself (no renaming needed, the module is the
+  name space); `m::set_EXT_v` is in the synchronisation set between the machines and the memory and hidden
+  (CControllerGenerator `compileAux`; CMemoryGenerator 214, 219).
+- This generator (variant (ii) of CONTROLLER_PLAN 7.10): the machine paragraphs are those of the machine alone
+  (`set_EXT_v`); `renamingMachine_<m>` adds the pair `set_EXT_v <- set_EXT_v_<FQN m>` (the CSP-M's `m::set_EXT_v`
+  in the global name space), as Rule 22 does for constants: ADDED BY US after Rule 22's treatment of constants. The
+  copies `set_EXT_v_<FQN m>` are in the synchronisation set of Rule 19 and hidden: ADDED BY US after the CSP-M.
+  Both are an OMISSION OF THE MANUAL, TO ASK ALVARO. Spelling `set_EXT_` throughout (the manual writes `set_Ext_` in
+  Rules 15, 20 and `set_EXT_` in Rule 25).
+- Kind: omission of the manual.
+- Status: adopted 25 Nov 2026 (controller-layer); question to Alvaro open.
+
+## 23. Events of the machines in a controller: unconnected and internal connections hidden (25 Nov 2026)
+
+- Manual: Rules 21-23 neither hide the events of a machine that are not connected nor the events of a connection
+  between two machines; they stay visible events of the controller.
+- CSP-M: `RenamingStateMachineChanset` hides the unconnected events of each machine (`\ {| stm::e |}`,
+  CControllerGenerator 408-429); `composeStateMachines` hides the events of the connections between the machines
+  after the composition (`\ diff(intersection, {|terminate|})`).
+- This generator: as the CSP-M. The unconnected events are hidden in `renamingMachine_<m>` (before the renaming, which
+  does not touch them; equivalent to the CSP-M's order); the internal connection events, `e_<FQN source>_in/out`,
+  are hidden in `composeMachines_<c>`. Hiding the unconnected events: decision 2 of Fang (25 Nov 2026), TO ASK PEDRO.
+  Hiding the internal connections: needed for the FDR comparison with the CSP-M (otherwise extra visible events),
+  not decided separately by Fang (reported 25 Nov 2026).
+- Kind: difference between the manual and the CSP-M; this generator follows the CSP-M.
+- Status: adopted 25 Nov 2026 (controller-layer); question to Pedro open. The effect of hiding an unconnected event
+  that triggers a self-loop (divergence): `robochart-models/controller-fdr/termination-unconnected/`.
+
+## 24. Rule 19: the controller's own required variables are not hidden (25 Nov 2026)
+
+- Manual: Rule 19 hides `rvars`, the `set_Ext_vid(v)` of the variables the controller requires (upstream 394-396,
+  406-407; branch 411-413, 423-424).
+- CSP-M: hides only `set_v`, `get_v` of the local variables and the machines' copies; the controller's
+  `set_EXT_v` stays visible (it is the module's write into the controller, Rule 12/1 at the module level).
+- This generator: as the CSP-M (before 25 Nov 2026 RC2Z hid `rvars` as the manual). Not exercised by a test model
+  (no controller of the tests requires a variable); relevant at the module level (step 4).
+- Kind: difference between the manual and the CSP-M (the manual's hiding would disconnect the module memory).
+- Status: adopted 25 Nov 2026; to ask Alvaro together with 22.
+
+## 25. Initial value of a machine's copy of a controller variable (25 Nov 2026; TO BE CHECKED)
+
+- Manual: not read for this point.
+- CSP-M: the machine's copy starts with the default of the type (`sharedVarMemory(id__) = Memory_obs(0)`), not with
+  the initial value of the controller's variable; the controller memory starts with that value (`Memory(id__, 5)`).
+  Checked with FDR (25 Nov 2026, proof repository `robochart-models/controller-fdr/shared-init/`): with
+  `var obs : int = 5` in the controller and a machine that reads obs before any write, the machine reads 0.
+- This generator: the same (`sharedVarMemory_<m> = sharedMemory_obs⋅0`).
+- Kind: open question (possibly a defect of both generators).
+- Status: TO DO: read the manual (Rules 20, 25, 37), ask; nothing changed.
+
+## 26. Termination of the controller: option 2 instead of the exception (25 Nov 2026)
+
+- Manual: Rule 19 ends with the exception `\<Theta>_{end} Skip`; the memory has no `end` branch.
+- CSP-M: `[|{|terminate|}|> SKIP`; `terminate` is not in the synchronisation set with the memory.
+- This generator (option 2, decision 1 of Fang, 25 Nov 2026; as RC2Z did before): `terminate` is in the
+  synchronisation sets of composeMachines and of the controller, and the memory offers `terminate -> Skip`; no
+  exception is printed (the Z metamodel has none). Comparison of the two forms on ctl2:
+  `robochart-models/controller-fdr/termination-unconnected/`.
+- Kind: form; equivalence see the FDR package.
+- Status: adopted.

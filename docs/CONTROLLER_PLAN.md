@@ -28,26 +28,29 @@ unique (as the manual requires of `vid`, `eventId`, `id`) and correspond injecti
 with the same behaviour under that correspondence. FDR comparisons with RoboTool's CSP-M rename by this
 correspondence and then check refinement.
 
-OPEN (25 Nov 2026): the scheme below qualifies the names INSIDE the machine paragraphs (variant (i) of 7.10). The
-alternative (ii), the machine paragraphs exactly as for the machine alone and a renaming of each machine at the
-composition (as Rule 22 does for constants), is being evaluated in 7.10; this section is rewritten after Fang's
-decision.
+DECIDED (Fang, 25 Nov 2026): variant (ii) of 7.10. REWRITTEN 25 Nov 2026; the scheme of 24 Nov 2026 (names qualified
+INSIDE the machine paragraphs, variant (i)) is withdrawn.
 
-The manual: `vid`, `eventId` and `id` "calculate unique identifiers ... One possible implementation is to calculate
-the qualified name" (chapter4.tex 14-18). The CSP-M gets uniqueness from CSP-M modules (`m1::done`, `m2::done`) and
-renames them in the composition (`stm::e <- e`, `tgt::e.in <- src::e.out`, `stm::set_v <- set_v`). One Isabelle
-theory has one name space, so the names themselves must be unique. Scheme:
+- The semantics of a machine does not depend on where it is used (manual Rule 25): the paragraphs of a machine in a
+  controller are printed exactly as for the machine alone, up to its FQN (the instance's FQN, `m1_C_ctl2`, which
+  already qualifies its nodes, triggers and local variables). Its event channels (`done_in`), its copy of a
+  required variable (`set_EXT_obs`), `sharedMemory_obs` and the channel sets keep their names.
+- Uniqueness is made at the composition, by the renaming of each machine instance m (`renamingMachine_<m>`, Rule 22):
+  an event connected to the controller becomes the controller's event (`go_in` to `start_in`); the target of a
+  connection from machine src becomes the source's event, qualified by the source (`done_in` of m2 to
+  `done_m1_C_ctl2_out`); the source of such a connection is qualified by itself (`done_in` of m1 to
+  `done_m1_C_ctl2_in`); the copy `set_EXT_v` becomes `set_EXT_v_<FQN m>`, written by the controller memory. These are
+  the CSP-M's `stm::f <- e`, `tgt::f.in <- src::e.out`, `src::e`, `m::set_EXT_v` under the injective correspondence
+  `m::e` ↦ `e_<FQN m>`, `C::e` ↦ `e` (the controller is the outermost component and keeps unqualified names). The
+  pair for `set_EXT` is not in the manual's Rule 22 (SEMANTICS_DIFFERENCES 22, to ask Alvaro).
+- The events of a machine that are not connected are hidden in `renamingMachine_<m>`, the internal connection events
+  in `composeMachines_<c>` (as the CSP-M, SEMANTICS_DIFFERENCES 23).
+- Every channel is declared once, at its first declaration (the templates; a shared name such as `set_obs`, `done_in`,
+  `aviol` is one constructor); a paragraph with the same name and the same text (`sharedMemory_<v>`) is created once
+  (RC2Z).
+- Constants: `consts` at both levels, no `set_` events (decision 7, SEMANTICS_DIFFERENCES 21).
 
-- the OUTERMOST component of the theory (the module; else the controller; else the state machine) keeps the
-  unqualified names it has today;
-- every component inside it qualifies its event and interface-variable channels with its FQN (the generator's FQN,
-  innermost first, as for nodes and triggers since 14 Nov 2026);
-- a channel that several components must share by the semantics (the controller's variable written by its machines)
-  is declared ONCE; every declaration is deduplicated by name (a second declaration of the same name with the same
-  argument type is dropped; with another type the generation stops with an error naming both);
-- `vid(v, m)` (the copy of a variable v for machine m, Rules 19, 20) is `<v>_<FQN of m>`.
-
-So a model without controller and without module produces the same channels as today.
+So a model without controller and without module produces the same channels as before.
 
 ### 1.2 Per kind of channel (before → after)
 
@@ -56,14 +59,14 @@ interface variable `obs`, machine variable `k`.
 
 | Channel | Today | After, machine without controller | After, inside a controller | Manual |
 |---|---|---|---|---|
-| machine event | `done_in`, `done_out` | unchanged | `done_m1_C_ctl2_in`, `done_m1_C_ctl2_out` | `eventId(e).in/.out` |
+| machine event | `done_in`, `done_out` | unchanged | unchanged inside the machine; after `renamingMachine_<m>`: the controller's event, or `done_<src FQN>_in/out` for an internal connection, or hidden (not connected) | `eventId(e).in/.out` |
 | controller event | `start_in`, `start_out` | — | unchanged if the controller is outermost; `start_C_mod_in` inside a module | `eventId(e)` |
 | platform / module event | `e_in`, `e_out` | — | unchanged (module outermost) | `eventId(e)` |
 | trigger channel | `<e>_<container FQN>__in` | unchanged | unchanged (the FQN already contains the controller) | `eventId(e)__.id(src).in` |
 | machine variable | `get_/set_/setL_/setR_<v>_<m FQN>` | unchanged | unchanged | `vid(v)` |
 | machine's required variable: write | `set_<v>` | unchanged | `set_<v>` of the providing context (controller), declared once | `set_vid(v)` |
 | machine's required variable: read (inside the machine, hidden there) | `get_<v>` | unchanged | `get_<v>`, declared once (hidden in each machine, so no synchronisation between machines) | `get_vid(v)` |
-| copy for machine m | `set_EXT_<v>` | unchanged | `set_EXT_<v>_<m FQN>` | `set_EXT_vid(v)`, `set_Ext_vid(v, m)` |
+| copy for machine m | `set_EXT_<v>` | unchanged | `set_EXT_<v>` inside the machine, renamed to `set_EXT_<v>_<m FQN>` by `renamingMachine_<m>` | `set_EXT_vid(v)`, `set_Ext_vid(v, m)` |
 | controller variable | `get_<v>`, `set_<v>` | — | unchanged if outermost; `<v>_<C FQN>` inside a module | `vid(v)` |
 | controller's required variable (from the module) | `set_EXT_<v>` | — | `set_EXT_<v>_<C FQN>` | `set_Ext_vid(v, c)` |
 | operation call (undefined operation) | `<op>Call` | unchanged | the machine's `<op>Call` is the controller's (CSP-M `stm::oCall <- oCall`), declared once | `o.nameCall` |
@@ -678,3 +681,56 @@ is equivalent. `get_obs` is not hidden at the controller (the CSP-M hides it, bu
 The relations are written in the form printed today for the renaming share ↦ set_EXT_obs. IsaCircus: the same with
 `cRename` on each machine. Declared once: `set_EXT_obs`, `set_EXT_obs_m1_C_ctl2`, `set_EXT_obs_m2_C_ctl2`;
 `sharedMemory_obs` printed once.
+
+## 8. Implementation of 25 Nov 2026 (controller-layer; steps 1 and 2 and decisions 1-8 of Fang)
+
+RC2Z.eol:
+- replaceRef: no copy of a referenced state machine definition (decision 6). The controller translation follows
+  `StateMachineRef.ref`: `instDef`, `instFQN` (`<reference name>_<controller FQN>`), `enterInstance`/`leaveInstance`
+  set Epsilon's extended property `~inst` of the definition while it is translated as that instance, so that
+  `StateMachineDef.FQN()` (and everything built on it: nodes, triggers, channel names) gives the instance's names;
+  `FQNllLocalVariables` keeps the original name in `~baseName` and computes the local names again. The extended
+  properties are not features of the model; but `FQNllLocalVariables` still renames the variables IN MEMORY, as it
+  did before for every machine (never saved; the plugin's RC model is an InMemoryEmfModel). The references to
+  controllers and platforms (module level) are unchanged (step 4).
+- Rule 19 rewritten (`createControllerAsProcessPara`): each instance translated once, then `renamingMachinePara`;
+  synchronisation set `set_v` (local variables) ∪ copies `set_EXT_v_<m>` ∪ {terminate}; hidden `set_v` ∪ copies (not
+  the controller's own `set_EXT_v`, SEMANTICS_DIFFERENCES 24); no constants (decision 7); channel paragraphs
+  `machine_copy_channels_ctrl_<c>` and `internal_connection_channels_ctrl_<c>` declare the new names.
+- Rule 22 `renamingMachinePara` (variant (ii), 1.1): pairs for the connections and `set_EXT_v <- set_EXT_v_<m>`;
+  unconnected events hidden before the renaming (decision 2); no pairs for constants.
+- Rule 21 `composeMachinesAction`: right-nested, synchronised on the internal connection channels and terminate,
+  which are hidden afterwards (as the CSP-M).
+- Rule 20 `ctrlMemoryPara`: `ctrlMemory_<c>` (decision 5), parameters the variables only, nested prefixes to the
+  copies in the order of the machines, `□ terminate → Skip` (decision 1, option 2); `terminate → Skip` without
+  variables.
+- Name matching of required variables by name at Rule 20 and at the module memory (decision 4; the old object
+  comparisons at 2445 and 2530 were in the old `ctrl_memory`, which is replaced; 1653 changed).
+- `sharedMemory_<v>` created once (shared by the machines of a controller).
+- Operations of a controller: generatorNote on `controller_action_<c>` (decision 8): "The operations of controller
+  ... are not supported yet ..."; printed as a comment in the HOL-CSP theory and as `GENERATOR WARNING` by GenAll
+  and the plugin. `CALL__<op>` is still printed (the theory does not load, as before).
+
+Templates:
+- circusM2T_HOLCSP.egl: the action paragraphs of a controller's Basic Process are printed by the machine-only code
+  (fixrecs in `locale actions`, Trans, nodes innermost first, then the rest in RC2Z's order); the IsaCircus form
+  (`locale <proc>` with `actions is`, `cProcess`) is no longer printed in the HOL-CSP theory; generator notes of the
+  remaining paragraphs are printed as comments.
+- circusM2T_HOLCSP.egl, circusM2T_HOLCSP_trans_core.egl, circusM2T.egl: every channel declared once, at its first
+  declaration (`chanOwners`, `keptChans`; IsaCircus `declaredChans`).
+
+Verification: see the report of 25 Nov 2026 and CONTROLLER_MODULE_STATUS.md Section 6.
+
+To do (recorded 25 Nov 2026, not done):
+- Initial value of a machine's copy of a controller variable (SEMANTICS_DIFFERENCES 25): the default of the type in
+  both generators; read the manual, ask; then decide.
+- Defect of the MACHINE level found with ctl_comp: a composite state whose inner action writes a REQUIRED variable
+  v uses `setL_v`, `setR_v` in `Behaviour_<S>` (write synchronisation of the composite level), which are declared
+  only for local variables (`var_channel_stmbd`), not in `shared_var_channel_stmbd` (get, set, set_EXT): Isabelle
+  "Extra variables on rhs: setR_v, setL_v". The same without a controller and on f242344.
+- Operations (issue R, Rule 27): only the warning (decision 8); `CALL__<op>` is still printed.
+- Two references to ONE definition in a controller: supported by enterInstance/leaveInstance, not tested.
+- Module level (step 4): ControllerRef/RoboticPlatformRef still cloned by replaceRef; module memory still writes
+  `set_Ext_`.
+- The Trans-core theory of a controller model prints one `Transc` per machine; not checked beyond loading of the
+  HOL-CSP theory (the Trans-core theories were not loaded).

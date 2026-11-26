@@ -572,3 +572,29 @@ With a controller it causes the duplicate declarations of Section 2.2, and it ma
 eventId(e.efrom).out` between two different machines) inexpressible, since both sides are the same constructor. The
 CSP-M gets the distinction from its module namespaces. Possible clash (INFERRED, not tested): FQNs are joined by `_`
 without escaping, so different paths whose names contain `_` can give the same FQN.
+
+## 6. Status after the implementation of 25 Nov 2026 (controller-layer)
+
+Implemented: CONTROLLER_PLAN steps 1 (every channel declared once) and 2 (HOL-CSP printing of Rules 19-23 as
+fixrecs in `locale actions`), decisions 1-8 of Fang of 25 Nov 2026, naming variant (ii) (CONTROLLER_PLAN 1.1, 7.10,
+8). Defects of Section 2.3 / CONTROLLER_PLAN 3: fixed 1 (duplicates), 2 (old `e\<cdot>in` syntax gone), 3 (sets with
+non-channels: no `set_` of constants), 4 (`crtlMemory`), 5 (`set_Ext_` at the controller level), 6 (memory without
+variables), 7 (match by name), 8 (connections lost: no copies), 10 is NOT fixed (the Basic Process still takes
+`Z!ActionPara.all()`; only one controller per model works), 13 (no constants duplicated in the tests; not changed
+otherwise), 14 (`set_c <- set_c` removed), 15 (ordering through the controller path), 16 (copies in Rule 19, unconnected
+events hidden). Not done: 9 (operations; warning only), 11, 12 (module).
+
+Checked on 25 Nov 2026 (dev-tools GenAll, generator controller-layer, uncommitted working tree of that day):
+- Models without controller (41 of the regression list: c1-c6, c8, c9, c9b, flat and full Adaptation_Plan,
+  Legitimate, ex10, ex12, d1-d3, the ITP configurations, the regression tests): the same tokens as f242344 in every
+  HOL-CSP, Trans-core and IsaCircus theory; 89 files identical, 28 the same tokens in another order, which two runs
+  of f242344 itself also show (c6, d1, itp_tb_ddlf). itp_lre, itp_lre2d fail in the M2M step, as on f242344. The
+  Trans-core theories of the ITP configurations are identical, so the ITP proof theories are not affected (not rerun).
+- Controller models: ctl2 (71 s), the running example obsDetect (44 s), robot_ctrl (c0e67a0 `example_robot.rct`,
+  45 s), DDLK (193 s) load in Isabelle; ctl_comp stops at a machine-level defect (CONTROLLER_PLAN 8, to do); c7 gives
+  the operations warning and does not load (CALL__Op). No duplicate declaration in any HOL-CSP, Trans-core or
+  IsaCircus theory of these.
+- FDR (proof repository `robochart-models/controller-fdr/`): see the report; the HOL-CSP controller layer of ctl2 and
+  the running example, transcribed by hand over RoboTool's machine processes, equals RoboTool's controller in T, F, FD.
+- IsaCircus: text only (no IsaCircus environment): names, renamings and sets as in the HOL-CSP; the controller is
+  still printed as `locale controller_proc_<c>` with `actions is`.

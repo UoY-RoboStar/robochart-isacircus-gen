@@ -240,32 +240,23 @@ abbreviation "SSTOP \<equiv> SSTOP_aux share"
 
           
 
+[*Step 2 of CONTROLLER_PLAN (25 Nov 2026): a controller (a ProcessPara whose Basic Process holds all action
+  paragraphs, RC2Z Rule 19) is printed in HOL-CSP as the machine-only models are: every action paragraph of the
+  Basic Process a fixrec in the one locale actions, by the same code below (Trans, the nodes per container innermost
+  first, the remaining paragraphs in the order of RC2Z, which creates them in dependency order: machines, their
+  renamings, composeMachines, ctrlMemory, controller_action); the channel sets are the definitions above. Before,
+  the IsaCircus form (locale <proc> with "actions is ... where" and cProcess) was printed here, which is not HOL-CSP.
+  The IsaCircus template keeps that form.*]
 [%var procparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ProcessPara));%]
-[%for(procpara in procparas){%]
-locale [%=procpara.name.word%] 
-begin
-
-actions  is "(mychan, unit) action" where 
-[%if(procpara.circusProcess.instanceOf(Z!BasicProcess)){%]
-[%=procpara.circusProcess.parseProc()%]
-[%} else {%]
-" [%= procpara.name.word%] = 
-	[%=procpara.circusProcess.parseProc()%] "
-[%}%]
-
-\<comment> \<open>Main action of the process\<close>
-[%if(procpara.circusProcess.instanceOf(Z!BasicProcess)){%]
-definition "ProcDef = cProcess [%= parseActionOrMarker(procpara.circusProcess.mainAction, procpara.circusProcess)%]"
-	[%} else {%]
-definition "ProcDef = cProcess [%= procpara.name.word%].ProcDef"
-	[%}%]
-
-end
-[%}%]
-
- 
 [%var actparas = z.eContents.select(s|s.instanceOf(Z!ZSect)).at(0).paraList.paras.select(s|s.instanceOf(Z!ActionPara));
-if(procparas.size()=0 and actparas.size()>0){%]
+for(procpara in procparas.select(pp|pp.circusProcess.instanceOf(Z!BasicProcess))){
+	for(ap in procpara.circusProcess.paraList.paras.select(s|s.instanceOf(Z!ActionPara))){
+		if(not actparas.includes(ap)){
+			actparas.add(ap);
+		}
+	}
+}
+if(actparas.size()>0){%]
 
 locale actions 
 begin
@@ -370,7 +361,7 @@ or ap.name.word.startsWith("Transc_")
 or ap.name.word.startsWith("RunEntered_")
 or innerParaNames.includes(ap.name.word)
 ))){%]
-
+[%=generatorNoteComment(actpara)%]
 fixrec [%= actpara.name.word%] :: "[%= actpara.actionWithSig()%]chan_event process"
 where 
 [simp del] :\<open>[%= actpara.nameWithSig()%] = 
@@ -941,12 +932,35 @@ operation triggerChanBases(): Map{
 	}
 	return self;
 }%]
-[%operation Z!ChannelDecl keptChans(): Sequence{
+[%operation Z!ChannelDecl usedChans(): Sequence{
 	var para = self.eContainer().eContainer();
 	if(para.isDefined() and para.isTypeOf(Z!ChannelPara) and para.name.word.startsWith("event_channel_stmbd_")){
 		return self.channelNameList.names.select(c | usedEventBases().includes(c.word.eventBase())).asSequence();
 	}
 	return self.channelNameList.names.asSequence();
+}%]
+[*Step 1 of CONTROLLER_PLAN (25 Nov 2026): every channel is declared once. RC2Z declares the channels per
+  component (controller, each machine), so a channel that several components use (set_obs of a controller variable
+  and of its machines, an event name used by two machines, aviol, gviol) appeared several times, which the datatype
+  rejects. A name is declared at its first (kept) declaration, in the order of the channel paragraphs of the section;
+  the later ones are dropped. Machine-only models with one machine have no such duplicates (unchanged).*]
+[%@cached
+operation chanOwners(): Map{
+	var m = new Map;
+	var sect = Z!ZSect.all().first();
+	for(cp in sect.paraList.paras.select(s|s.isTypeOf(Z!ChannelPara))){
+		for(d in cp.declList.decls){
+			for(c in d.usedChans()){
+				if(not m.containsKey(c.word)){
+					m.put(c.word, d);
+				}
+			}
+		}
+	}
+	return m;
+}%]
+[%operation Z!ChannelDecl keptChans(): Sequence{
+	return self.usedChans().select(c | chanOwners().get(c.word) = self);
 }%]
 [%operation Z!Field parseField(): String{
 	
