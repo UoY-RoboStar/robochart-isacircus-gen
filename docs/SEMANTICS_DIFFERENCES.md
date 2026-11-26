@@ -611,3 +611,19 @@ the generator).
   `robochart-models/controller-fdr/termination-unconnected/`.
 - Kind: form; equivalence see the FDR package.
 - Status: adopted.
+
+## 27. setL and setR of the required variables (26 Nov 2026)
+
+(Written for the fix release of main, generator issue OO, 26 Nov 2026; on main entries 20-26 are absent.)
+
+- Manual: Chapter 4 Rules 41 and 60 use `setL_v`, `setR_v` for the write synchronisation (Definition C.2.2); the
+  declarations are not given there.
+- CSP-M: declares `get_v, set_v, setL_v, setR_v` for every variable of every machine, required variables included
+  (`set_EXT_v` separately), whether or not they are used.
+- This generator: declares `setL_v`, `setR_v` of a REQUIRED variable only when the machine has a composite state,
+  the only place where they are used (Behaviour, Rule 60, over all variables of the machine); local variables as
+  before. Fang (26 Nov 2026): keep the conditional declaration. By the naming principle (controller-layer entry 20:
+  unique names, injective correspondence with the CSP-M events) the events of the two correspond one to one; the
+  CSP-M's extra channels are not used by any process, so no event of either side is affected.
+- Kind: form (declarations).
+- Status: adopted 26 Nov 2026 (fix of generator issue OO).
