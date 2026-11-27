@@ -587,6 +587,15 @@ Answer of Alvaro (26 Nov 2026; SEMANTICS_DIFFERENCES 22, 24, 25):
   set_Ext_vid(v,m) |}`, in both the synchronisation set and the hidden set. Fang has asked (open) whether it should
   cover the controller's local variables, `{| m : ms; v : requiredVariables(m) @ set_Ext_vid(v,m) |}`, which is the
   CSP-M and the present implementation. Implementation unchanged.
+- Second answer of Alvaro (27 Nov 2026), on that question: the local variables are covered by `lvars = {| v :
+  allLocalVariables(c) @ set_vid(v) |}`. Our view, sent back (27 Nov 2026): `lvars` holds the machines' writes into
+  the memory, `set_vid(v)`; the memory's forwards to the machines' copies, `set_Ext_vid(v,m)`, are for a local
+  variable in neither `lvars` nor the corrected `rvars`; the running example's `obs` (local to ctrl, required by ObsD)
+  is such a case. Asked again; OPEN (SEMANTICS_DIFFERENCES 22). Implementation unchanged, as the CSP-M: for every
+  machine m and every variable v that m requires, `set_EXT_v_<FQN m>` is synchronised and hidden.
+- Rule 25 `{ shared }` (SEMANTICS_DIFFERENCES 28): confirmed by Alvaro (27 Nov 2026) as a typo for `share`. Both
+  cases now follow the CSP-M, `[| {share} |] Skip` for every machine (with required variables since 26 Nov 2026,
+  without since 27 Nov 2026, issue PP).
 - Hiding of `rvars` (entry 24): with the corrected `rvars` the controller's own `set_Ext_vid(v)` is no longer hidden;
   this agrees with the implementation.
 - Initial value of the copies (entry 25): a by-product of the propagation mechanism, intended; kept; GitHub issue
@@ -801,6 +810,11 @@ To do (recorded 25 Nov 2026, not done):
   `robochart-models/controller-fdr/hol-csp-full/`, checked with FDR 4.2.7): ctl2 and the running example equal
   RoboTool's controller in traces, failures and failures-divergences, both directions. The earlier comparison
   (`hol-csp-compare/`, RoboTool's machines standing in) did not cover the machine level and so missed PP.
+  Second part (27 Nov 2026, main 2b3ce47, plugin 1.0.0.202611271208; merged here, 43fbd2c): machines WITHOUT
+  required variables synchronised with Skip on the empty set, so `share` was not blocked and a deadlock of the
+  machine was hidden; now `{share}` for every machine (AG-dev `robochart-models/controller-fdr/stm-shell-all/`,
+  checked with FDR). ctl2 and the running example are not affected (all their machines require a variable; output
+  byte-identical); `hol-csp-full/` rerun on 27 Nov 2026: the same results.
 - Operations (issue R, Rule 27): only the warning (decision 8); `CALL__<op>` is still printed.
 - Two references to ONE definition in a controller: supported by enterInstance/leaveInstance, not tested.
 - Module level (step 4): ControllerRef/RoboticPlatformRef still cloned by replaceRef; module memory still writes

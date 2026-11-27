@@ -566,9 +566,17 @@ the generator).
   CSP-M (`{| stm::set_EXT_x |}` for every machine that requires x) and the present implementation; with Alvaro's
   formula over `requiredVariables(c)` only, the copies of a controller-local variable (ctl2, the running example)
   would again be neither synchronised nor hidden.
+- Second answer of Alvaro (27 Nov 2026): the local variables are already covered by `lvars = {| v :
+  allLocalVariables(c) @ set_vid(v) |}`. Our view (sent to Alvaro, 27 Nov 2026, OPEN): `lvars` contains the
+  machines' writes into the controller memory, `set_vid(v)`; the memory's forwards into the machines' copies,
+  `set_Ext_vid(v,m)`, are for a controller-local variable in neither `lvars` nor the corrected `rvars` (which ranges
+  over `requiredVariables(c)`). The running example obsDetect is such a case: `obs` is local to the controller and
+  required by the machine ObsD, so `set_Ext_vid(obs,ObsD)` would be neither synchronised nor hidden. Asked again.
 - Kind: error of the manual (confirmed by Alvaro, 26 Nov 2026).
 - Status: adopted 25 Nov 2026 (controller-layer); confirmed in principle by Alvaro on 26 Nov 2026; the extent of
-  `rvars` (required or all variables of the machines) still open, the implementation stays as the CSP-M.
+  `rvars` (whether the copies of the controller's local variables are covered) still OPEN after the answer of
+  27 Nov 2026. The implementation stays as the CSP-M: for every machine and every variable it requires,
+  `set_EXT_v_<FQN m>` is synchronised and hidden.
 
 ## 23. Events of the machines in a controller: unconnected and internal connections hidden (25 Nov 2026)
 
