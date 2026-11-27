@@ -2818,17 +2818,16 @@ operation createStateMachineDefAsActionPara(stm: RC!StateMachineDef): Z!ActionPa
 	//TBC the direction of renaming
 	
 	action = action.createRenameAction(renamepairL, renamepairR);
-	//Synchronisation with Skip (Rule 25 writes {shared}, a channel that does not exist; read as share, as RoboTool's
-	//CSP-M [| {share__} |] SKIP). With required variables: {share}; after the renaming share no longer occurs, so
-	//nothing is blocked and the machine accepts set_EXT_v wherever it offered share. From 9 Oct 2026 (9faa957) to
-	//this fix the set was shared_variable_events_in_stmbd_<stm> = range set_EXT_v, which blocked every external write.
-	//Without required variables the declared set (empty) is kept, so that the output of these machines does not
-	//change; the CSP-M blocks share__ there (a difference recorded in SEMANTICS_DIFFERENCES, not fixed, Fang to decide).
-	if(requiredVariables(stm).size() > 0){
-		action = createParallelAction(Set{"share"}, action, createSkipAction());
-	} else {
-		action = createParallelAction("shared_variable_events_in_stmbd_" + stm.FQN(), action, createSkipAction());
-	}
+	//Synchronisation with Skip on {share} (Rule 25 writes {shared}; Alvaro confirmed on 27 Nov 2026 that this is a
+	//typo for share; RoboTool's CSP-M: [| {share__} |] SKIP), whether or not the machine has required variables.
+	//With required variables share no longer occurs after the renaming, so nothing is blocked and the machine accepts
+	//set_EXT_v wherever it offered share. Without required variables the renaming is empty and share is blocked, so
+	//the machine cannot idle on share: a deadlock of the machine is not hidden by an endless offer of share.
+	//History: from 9 Oct 2026 (9faa957) to 26 Nov 2026 the set was shared_variable_events_in_stmbd_<stm>
+	//(= range set_EXT_v), which blocked every external write (issue PP, fixed in 1.0.0.202611262148 for machines with
+	//required variables); for machines without required variables that set is empty, which left share unblocked
+	//(fixed here). The set shared_variable_events_in_stmbd_<stm> is still declared but no longer used here.
+	action = createParallelAction(Set{"share"}, action, createSkipAction());
 	
 	var sharedVarSync = new Set<String>;
 	for(v in requiredVariables(stm)){
