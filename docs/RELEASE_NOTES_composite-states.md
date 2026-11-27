@@ -2,7 +2,8 @@
 
 Released 23 Nov 2026: `main` f242344 (merge of composite-states 23d181e), plugin 1.0.0.202611232203, update site
 https://robostar.cs.york.ac.uk/robotool/robochart-isacircus-gen/update/. The test results behind these notes are in
-`docs/COMPOSITE_RELEASE_TEST.md`. Fix releases followed on 26 Nov 2026 (section "Fix release of 26 Nov 2026" below: OO, then PP).
+`docs/COMPOSITE_RELEASE_TEST.md`. Fix releases followed on 26 Nov 2026 (section "Fix release of 26 Nov 2026" below: OO, then PP) and on
+27 Nov 2026 (section "Fix release of 27 Nov 2026": PP for machines without required variables).
 
 The plugin writes three theories per state machine: the HOL-CSP semantics (`HOLCSP_<model>_<time>.thy`), the
 HOL-CSP Trans core (`HOLCSP_trans_core_<model>_<time>.thy`) and the IsaCircus semantics
@@ -163,3 +164,18 @@ the CSP-M, and each difference is listed in `docs/SEMANTICS_DIFFERENCES.md`.
   zero and for an index outside a sequence are not generated.
 - The Trans-core deadlock lemma of a composite state's inner machine fails when the theory is loaded
   outside the plugin (expected, see issue T).
+
+## Fix release of 27 Nov 2026
+
+- PP, machines WITHOUT required variables. In the machine process `stm_<m>` (Chapter 4 Rule 25) a machine that
+  requires no variable was synchronised with `Skip` on `shared_variable_events_in_stmbd_<m>`, which is then empty,
+  so `share` was not blocked (the fix of 26 Nov 2026 used `{share}` only for machines with required variables).
+  Where such a machine is stuck in a state that offers `share`, the machine process offered `share` for ever
+  instead of refusing every event: a deadlock of the machine was hidden. Now every machine is synchronised with
+  `Skip` on `{share}`, as RoboTool's CSP-M (`[| {share__} |] SKIP`) and Chapter 4 Rule 25 (`{shared}`, a typo for
+  `share`, confirmed by Alvaro on 27 Nov 2026). Affects the HOL-CSP and the IsaCircus theory, only the paragraph
+  `stm_<m>`; the Trans core and the ITP results are not affected (the ITP proofs use only the Trans core). Checked
+  with FDR on c1, the ITP chemical detector and a new test model that gets stuck (RoboChart-Deadlock-HOLCSP-AG-dev
+  `robochart-models/controller-fdr/stm-shell-all/`; test model `robochart-models/regression-tests/pp_stuck/`): the
+  machine process now equals RoboTool's in traces, failures and failures-divergences, and pp_stuck deadlocks as in
+  RoboTool, where before it did not. docs/SEMANTICS_DIFFERENCES.md entry 28.
